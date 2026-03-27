@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <style>
+      body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+      h1 { text-align: center; margin-bottom: 30px; }
+
+      .filter {
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        justify-content: center;
+      }
+      .filter label { font-weight: bold; }
+      .filter select { padding: 5px; font-size: 1em; }
+
+      .card-container { display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; }
+
+      .card {
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        width: 220px;
+        padding: 10px;
+        box-shadow: 2px 2px 6px rgba(0,0,0,0.1);
+        background: #fff;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .card h3 { margin: 10px 0 5px 0; font-size: 1.1em; text-align: center; }
+      .card h3 a { text-decoration: none; color: #333; }
+      .card h3 a:hover { text-decoration: underline; }
+      .card p { margin: 5px 0; font-size: 0.9em; text-align: center; }
+
+      .image-container {
+        width: 100%;
+        height: 150px;              /* taille fixe = placeholder */
+        background: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+        overflow: hidden;
+        border: 1px solid #ddd;
+      }
+      .image-container img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;        /* garde proportions */
+        background: #fff;
+      }
+
+      .placeholder {
+        width: 100%;
+        height: 150px;
+        background: #eee;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #999;
+        font-size: 14px;
+        border-radius: 4px;
+      }
+      .rayon-link {
+        text-decoration: none;
+        color: #337ab7;
+        cursor: pointer;
+      }
+
+      .rayon-link:hover {
+        text-decoration: none;
+        color: #285e8e;
+      }
+
+      /* Italique pour labels */
+      .label-italic { font-style: italic; }
+
+      /* MU en petit */
+      .MU-style {
+        font-size: 8pt;
+        font-style: italic;
+      }
+    </style>
+  </head>
+  <body>
+    <div align="center"><h1>[FRJ] - enzo beau gosse = FOR SALE</h1></div>
+    <hr>
+    <div align="center"><h3>PM Offer InGame @ enzo beau gosse</h2></div>
+    <div align="center"><h3>-=> New Oxford Storage <=-</h2></div>
+    <hr>
+    <div class="filter">
+      <label for="rayonFilter"><span class="label-italic">Filter by RAYON</span>:</label>
+      <select id="rayonFilter" onchange="applyFilter()">
+        <option value="">All</option>
+      </select>
+    </div>
+
+    <div class="card-container" id="cardContainer"></div>
+
+    <script>
+		const API_URL = "https://script.google.com/macros/s/AKfycbzmEVTzK9y1-xMyQfzKR-MiUJKEDPqne-Y-WXeWmhsh7cw3XGuXM3wq_VEAWQpmFET9/exec";
+      let data = [];
+
+      // Charger les données côté serveur
+fetch(API_URL)
+  .then(res => res.json())
+  .then(response => {
+    data = response;
+
+    const rayons = [...new Set(data.map(item => item.RAYON))].sort();
+    const select = document.getElementById('rayonFilter');
+
+    rayons.forEach(rayon => {
+      const option = document.createElement('option');
+      option.value = rayon;
+      option.textContent = rayon;
+      select.appendChild(option);
+    });
+
+    renderCards(data);
+  })
+  .catch(err => {
+    console.error("Erreur chargement data:", err);
+  });
+
+      // Filtre par rayon et quantité
+      function applyFilter() {
+        const selectedRayon = document.getElementById('rayonFilter').value;
+        let filtered = data;
+
+        if (selectedRayon) {
+          filtered = filtered.filter(item => item.RAYON === selectedRayon);
+        }
+
+        // Filtre QUANTITE > 0
+        filtered = filtered.filter(item => item.QUANTITE && item.QUANTITE > 0);
+
+        renderCards(filtered);
+      }
+
+      function selectRayon(rayon) {
+        // Met à jour le select
+        const select = document.getElementById('rayonFilter');
+        select.value = rayon;
+
+        // Applique le filtre
+        applyFilter();
+      }
+
+      // Génère les cards HTML
+      function renderCards(items) {
+        const container = document.getElementById('cardContainer');
+        container.innerHTML = '';
+
+        // Tri alphabétique par ITEM
+        items.sort((a,b) => a.ITEM.localeCompare(b.ITEM));
+
+        items.forEach(item => {
+          const card = document.createElement('div');
+          card.className = 'card';
+
+          // Image ou placeholder
+          const imgHTML = (item.IMAGE && item.IMAGE !== '--')
+            ? `<div class="image-container">
+                <img src="${item.IMAGE}" alt="${item.ITEM}">
+              </div>`
+            : `<div class="image-container" style="background:#eee;">No image</div>`;
+
+          // Affichage prix et total avec 2 décimales + monnaie "peds"
+          let prixUnitaire = "--";
+          let total = "--";
+
+          if (item.PRIX_UNITAIRE !== "" && item.PRIX_UNITAIRE != null) {
+            prixUnitaire = formatNumber(item.PRIX_UNITAIRE);          // dynamique
+            total = (parseFloat(item.TOTAL) || 0).toFixed(2);         // toujours 2 décimales
+          }
+
+          // Génération du titre ITEM
+          let itemTitle = "";
+          if (item.LIEN_WIKI && item.LIEN_WIKI.trim() !== "") {
+            itemTitle = `<a href="${item.LIEN_WIKI}" target="_blank">${item.ITEM}</a>`;
+          } else {
+            itemTitle = `${item.ITEM}`;
+          }
+
+          let rayonHTML = "";
+          const selectedRayon = document.getElementById('rayonFilter').value;
+          if (!selectedRayon) { 
+            // Affiche Rayon avec lien cliquable
+            rayonHTML = `<p><span class="label-italic">Rayon</span>: 
+                        <a href="#" class="rayon-link" onclick="selectRayon('${item.RAYON}'); return false;">
+                          ${item.RAYON}
+                        </a>
+                      </p>`;
+          }
+
+          let muHTML = "";
+
+          // Afficher uniquement si MU existe et n'est pas vide
+          if (item.MU !== "" && item.MU != null) {
+
+            const dateMU = item.DATE_MU || "";
+
+            const muValue = parseFloat(item.MU);
+
+            let muDisplay = "";
+
+            if (!isNaN(muValue)) {
+              muDisplay = (muValue * 100).toFixed(2) + " %";
+            }
+
+            muHTML = `
+              <p title="Date MU: ${dateMU}">
+                <span class="MU-style">MU: ${muDisplay}</span>
+              </p>
+            `;
+          }
+
+          card.innerHTML = `
+            ${imgHTML}
+            <h3>${itemTitle}</h3>
+            ${rayonHTML}
+            <p><span class="label-italic">Quantity</span>: ${item.QUANTITE}</p>
+            <p><span class="label-italic">Unit Price</span>: ${prixUnitaire} peds</p>
+            <p><span class="label-italic">Total TT</span>: ${total} peds</p>
+            ${muHTML}
+          `;
+
+          container.appendChild(card);
+        });
+      }
+
+      function formatNumber(value) {
+        if (value === "" || value == null) return "";
+        const str = value.toString();
+        if (!str.includes(".")) return str + ".00";
+        const decimals = str.split(".")[1].length;
+        if (decimals === 1) return str + "0";
+        return str; // 2 décimales ou + → on garde tel quel
+      }
+    </script>
+  </body>
+</html>
