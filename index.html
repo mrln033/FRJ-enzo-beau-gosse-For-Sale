@@ -190,7 +190,7 @@ fetch(API_URL)
 			});
 		}
 
-		return { display, full };
+		return { display };
 	}
 
       // Génère les cards HTML
@@ -256,12 +256,12 @@ fetch(API_URL)
             }
 
             muHTML = `
-				<p title="${dateFormatted.full}">
-					<span class="MU-style">
-					MU: ${muDisplay} (${dateFormatted.display})
-					</span>
-				</p>
-				`;
+				<p title="${dateFormatted.display}">
+				<span class="MU-style">
+				MU: ${muDisplay}
+				</span>
+			</p>
+			`;
           }
 
           card.innerHTML = `
