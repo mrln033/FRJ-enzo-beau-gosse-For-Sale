@@ -165,7 +165,7 @@ fetch(API_URL)
           // Image ou placeholder
           const imgHTML = (item.IMAGE && item.IMAGE !== '--')
             ? `<div class="image-container">
-                <img src="${item.IMAGE}" alt="${item.ITEM}">
+                <img src="img/${item.IMAGE}" alt="${item.ITEM}">
               </div>`
             : `<div class="image-container" style="background:#eee;">No image</div>`;
 
