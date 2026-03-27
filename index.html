@@ -99,7 +99,7 @@
       </select>
     </div>
 
-    <div class="card-container" id="cardContainer"></div>
+    <div class="card-container" id="cardContainer">Chargement en cours...</div>
 
     <script>
 		const API_URL = "https://script.google.com/macros/s/AKfycbzmEVTzK9y1-xMyQfzKR-MiUJKEDPqne-Y-WXeWmhsh7cw3XGuXM3wq_VEAWQpmFET9/exec";
@@ -203,7 +203,9 @@ fetch(API_URL)
           // Afficher uniquement si MU existe et n'est pas vide
           if (item.MU !== "" && item.MU != null) {
 
-            const dateMU = item.DATE_MU || "";
+            const dateMU = item.DATE_MU
+				? item.DATE_MU.replace("T", " ").replace("Z", "")
+				: "";
 
             const muValue = parseFloat(item.MU);
 
