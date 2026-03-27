@@ -150,6 +150,48 @@ fetch(API_URL)
         // Applique le filtre
         applyFilter();
       }
+	  
+	  function formatDateMU(dateStr) {
+		if (!dateStr) return { display: "", full: "" };
+
+		const d = new Date(dateStr);
+		const now = new Date();
+
+		const diffMs = now - d;
+		const diffHours = diffMs / (1000 * 60 * 60);
+		const diffMinutes = diffMs / (1000 * 60);
+
+		// Tooltip complet
+		const full = d.toLocaleString("fr-FR", {
+			year: "numeric",
+			month: "2-digit",
+			day: "2-digit",
+			hour: "2-digit",
+			minute: "2-digit",
+			second: "2-digit"
+		});
+
+		let display = "";
+
+		if (diffHours < 24) {
+			if (diffHours >= 1) {
+			display = `il y a ${Math.floor(diffHours)}h`;
+			} else {
+			const mins = Math.max(1, Math.floor(diffMinutes));
+			display = `il y a ${mins} min`;
+			}
+		} else {
+			display = d.toLocaleString("fr-FR", {
+			year: "numeric",
+			month: "2-digit",
+			day: "2-digit",
+			hour: "2-digit",
+			minute: "2-digit"
+			});
+		}
+
+		return { display, full };
+	}
 
       // Génère les cards HTML
       function renderCards(items) {
@@ -203,9 +245,7 @@ fetch(API_URL)
           // Afficher uniquement si MU existe et n'est pas vide
           if (item.MU !== "" && item.MU != null) {
 
-            const dateMU = item.DATE_MU
-				? item.DATE_MU.replace("T", " ").replace("Z", "")
-				: "";
+            const dateFormatted = formatDateMU(item.DATE_MU);
 
             const muValue = parseFloat(item.MU);
 
@@ -216,10 +256,12 @@ fetch(API_URL)
             }
 
             muHTML = `
-              <p title="Date MU: ${dateMU}">
-                <span class="MU-style">MU: ${muDisplay}</span>
-              </p>
-            `;
+				<p title="${dateFormatted.full}">
+					<span class="MU-style">
+					MU: ${muDisplay} (${dateFormatted.display})
+					</span>
+				</p>
+				`;
           }
 
           card.innerHTML = `
