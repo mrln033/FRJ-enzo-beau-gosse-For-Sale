@@ -192,6 +192,30 @@ fetch(API_URL)
 
 		return { display };
 	}
+	
+	function getMUColor(dateStr) {
+  if (!dateStr) return "#000";
+
+  const d = new Date(dateStr);
+  const now = new Date();
+
+  const diffMs = now - d;
+  const days = diffMs / (1000 * 60 * 60 * 24);
+
+  // > 7 jours → on ne doit plus afficher
+  if (days > 7) return null;
+
+  // < 1 jour → noir
+  if (days <= 1) return "#000000";
+
+  // Dégradé entre 1 et 7 jours
+  const ratio = (days - 1) / 6; // 0 → 1
+
+  // 0 = noir (0), 1 = gris clair (~200)
+  const gray = Math.round(0 + ratio * 200);
+
+  return `rgb(${gray}, ${gray}, ${gray})`;
+}
 
       // Génère les cards HTML
       function renderCards(items) {
@@ -242,27 +266,31 @@ fetch(API_URL)
 
           let muHTML = "";
 
-          // Afficher uniquement si MU existe et n'est pas vide
-          if (item.MU !== "" && item.MU != null) {
+// Afficher uniquement si MU existe et n'est pas vide
+if (item.MU !== "" && item.MU != null) {
 
-            const dateFormatted = formatDateMU(item.DATE_MU);
+  const color = getMUColor(item.DATE_MU);
 
-            const muValue = parseFloat(item.MU);
+  // Si trop ancien → on n'affiche rien
+  if (color === null) return;
 
-            let muDisplay = "";
+  const dateFormatted = formatDateMU(item.DATE_MU);
 
-            if (!isNaN(muValue)) {
-              muDisplay = (muValue * 100).toFixed(2) + " %";
-            }
+  const muValue = parseFloat(item.MU);
+  let muDisplay = "";
 
-            muHTML = `
-				<p title="${dateFormatted.display}">
-				<span class="MU-style">
-				MU: ${muDisplay}
-				</span>
-			</p>
-			`;
-          }
+  if (!isNaN(muValue)) {
+    muDisplay = (muValue * 100).toFixed(2) + " %";
+  }
+
+  muHTML = `
+    <p title="${dateFormatted.display}">
+      <span class="MU-style" style="color:${color}">
+        MU: ${muDisplay}
+      </span>
+    </p>
+  `;
+}
 
           card.innerHTML = `
             ${imgHTML}
