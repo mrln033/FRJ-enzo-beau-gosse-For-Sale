@@ -105,6 +105,16 @@
 		const API_URL = "https://script.google.com/macros/s/AKfycbzmEVTzK9y1-xMyQfzKR-MiUJKEDPqne-Y-WXeWmhsh7cw3XGuXM3wq_VEAWQpmFET9/exec";
       let data = [];
 
+function formatRayon(rayon) {
+  if (!rayon) return "";
+
+  return rayon
+    .toLowerCase()
+    .split(" ")
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
       // Charger les données côté serveur
 fetch(API_URL)
   .then(res => res.json())
@@ -117,7 +127,7 @@ fetch(API_URL)
     rayons.forEach(rayon => {
       const option = document.createElement('option');
       option.value = rayon;
-      option.textContent = rayon;
+      option.textContent = formatRayon(rayon);
       select.appendChild(option);
     });
 
