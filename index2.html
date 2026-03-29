@@ -218,8 +218,7 @@
 			.then(response => {
 				data = response;
 				const container = document.getElementById("rayonImages");
-				
-				container.appendChild(headerImg);
+				container.innerHTML = "";
 
 				Object.keys(CATEGORY_IMAGES).forEach(cat => {
 				
