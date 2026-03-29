@@ -85,18 +85,24 @@
         font-style: italic;
       }
 	  
-	  .rayon-images {
+.rayon-images {
+  display: flex;
+  flex-direction: column; /* 👈 clé */
+  gap: 10px;
+  justify-content: center;
+
+  margin-bottom: 20px;
+  background: #000;
+  padding: 15px;
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.5);
+}
+
+#rayonImages {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
   justify-content: center;
-  margin-bottom: 20px;
-
-  background: #000;
-  padding: 15px;
-  border-radius: 10px;
-
-  box-shadow: 0 0 10px rgba(0,0,0,0.5);
 }
 
 	  .rayon-img {
@@ -127,7 +133,6 @@
 		<div class="rayon-header-container">
 			<img src="https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/img/storage/00_EnTete-Storage.png" class="rayon-header">
 		</div>
-		<p>>&nbsp<BR></p>
 		<div id="rayonImages"></div>
 	</div>
     <div class="filter">
