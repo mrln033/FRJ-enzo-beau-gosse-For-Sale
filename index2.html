@@ -205,6 +205,14 @@
 				const container = document.getElementById("rayonImages");
 
 				Object.keys(CATEGORY_IMAGES).forEach(cat => {
+				
+				// 🔥 vérifier s'il existe au moins un item avec RAYON dans cette catégorie
+				const hasRayon = data.some(item =>
+					item.STORAGE === cat &&
+					item.RAYON && item.RAYON !== ""
+				);
+
+				if (!hasRayon) return; // ❌ on skip cette image
 
 				const img = document.createElement("img");
 				const config = CATEGORY_IMAGES[cat];
