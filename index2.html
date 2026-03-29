@@ -106,6 +106,7 @@
     <div align="center"><h3>PM Offer InGame @ enzo beau gosse</h2></div>
     <div align="center"><h3>-=> New Oxford Storage <=-</h2></div>
     <hr>
+	<div class="rayon-images" id="rayonImages"></div>
     <div class="filter">
       <label for="rayonFilter"><span class="label-italic">Filter by RAYON</span>:</label>
       <select id="rayonFilter" onchange="applyFilter()" disabled>
@@ -123,57 +124,57 @@
 		let selectedCategory = null;
 		
 		const CATEGORY_IMAGES = {
-			"Money and Deeds": {
+			"MONEY AND DEEDS": {
 				normal: "storage/01_Money-and-Deeds.png",
 				hover: "storage/01_Money-and-Deeds_Hover.png",
 				selected: "storage/01_Money-and-Deeds_Select.png"
 			},
-			"Clothes": {
+			"CLOTHES": {
 				normal: "storage/02_Clothes.png",
 				hover: "storage/02_Clothes_Hover.png",
 				selected: "storage/02_Clothes_Select.png"
 			},
-			"Armors": {
+			"ARMORS": {
 				normal: "storage/03_Armors.png",
 				hover: "storage/03_Armors_Hover.png",
 				selected: "storage/03_Armors_Select.png"
 			},
-			"Weapons": {
+			"WEAPONS": {
 				normal: "storage/04_Weapons.png",
 				hover: "storage/04_Weapons_Hover.png",
 				selected: "storage/04_Weapons_Select.png"
 			},
-			"Tools": {
+			"TOOLS": {
 				normal: "storage/05_Tools.png",
 				hover: "storage/05_Tools_Hover.png",
 				selected: "storage/05_Tools_Select.png"
 			},
-			"Mindforce": {
+			"MINDFORCE": {
 				normal: "storage/06_Mindforce.png",
 				hover: "storage/06_Mindforce_Hover.png",
 				selected: "storage/06_Mindforce_Select.png"
 			},
-			"Materials": {
+			"MATERIALS": {
 				normal: "storage/07_Materials.png",
 				hover: "storage/07_Materials_Hover.png",
 				selected: "storage/07_Materials_Select.png"
 			},
-			"Resources": {
+			"RESOURCES": {
 				normal: "storage/08_Resources.png",
 				hover: "storage/08_Resources_Hover.png",
 				selected: "storage/08_Resources_Select.png"
 			},
-			"Blueprints": {
+			"BLUEPRINTS": {
 				normal: "storage/09_Blueprints.png",
 				hover: "storage/09_Blueprints_Hover.png",
 				selected: "storage/09_Blueprints_Select.png"
 			},
-			"Vehicles": {
+			"VEHICLES": {
 				normal: "storage/10_Vehicles.png",
 				hover: "storage/10_Vehicles_Hover.png",
 				selected: "storage/10_Vehicles_Select.png"
 			},
-			"Miscellaneous": {
+			"MISCELLANEOUS": {
 				normal: "storage/11_Miscellaneous.png",
 				hover: "storage/11_Miscellaneous_Hover.png",
 				selected: "storage/11_Miscellaneous_Select.png"
@@ -194,6 +195,7 @@
 		fetch(API_URL)
 			.then(res => res.json())
 			.then(response => {
+				data = response;
 				const container = document.getElementById("rayonImages");
 
 				Object.keys(CATEGORY_IMAGES).forEach(cat => {
@@ -239,7 +241,7 @@
 			container.appendChild(img);
 			});
 
-			renderCards(data);
+			renderCards([]);
 		})
 		.catch(err => {
 		console.error("Erreur chargement data:", err);
@@ -279,7 +281,7 @@ function updateRayonFilter() {
   select.appendChild(allOption);
 
   // filtrer data par catégorie
-  const filtered = data.filter(item => item.CATEGORY === selectedCategory);
+  const filtered = data.filter(item => item.STORAGE === selectedCategory);
 
   const rayons = [...new Set(filtered.map(item => item.RAYON))].sort();
 
@@ -308,7 +310,7 @@ function resetRayonFilter() {
   let filtered = data;
 
   if (selectedCategory) {
-    filtered = filtered.filter(item => item.CATEGORY === selectedCategory);
+    filtered = filtered.filter(item => item.STORAGE === selectedCategory);
   }
 
   if (selectedRayon) {
