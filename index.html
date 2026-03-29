@@ -103,39 +103,40 @@
 
     <script>
 		const API_URL = "https://script.google.com/macros/s/AKfycbzmEVTzK9y1-xMyQfzKR-MiUJKEDPqne-Y-WXeWmhsh7cw3XGuXM3wq_VEAWQpmFET9/exec";
-      let data = [];
+		const IMG_URL = "https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/"
+		let data = [];
 
-function formatRayon(rayon) {
-  if (!rayon) return "";
+		function formatRayon(rayon) {
+		if (!rayon) return "";
 
-  return rayon
-    .toLowerCase()
-    .split(" ")
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-}
+		return rayon
+			.toLowerCase()
+			.split(" ")
+			.map(word => word.charAt(0).toUpperCase() + word.slice(1))
+			.join(" ");
+		}
 
-      // Charger les données côté serveur
-fetch(API_URL)
-  .then(res => res.json())
-  .then(response => {
-    data = response;
+		// Charger les données côté serveur
+		fetch(API_URL)
+			.then(res => res.json())
+			.then(response => {
+				data = response;
 
-    const rayons = [...new Set(data.map(item => item.RAYON))].sort();
-    const select = document.getElementById('rayonFilter');
+				const rayons = [...new Set(data.map(item => item.RAYON))].sort();
+				const select = document.getElementById('rayonFilter');
 
-    rayons.forEach(rayon => {
-      const option = document.createElement('option');
-      option.value = rayon;
-      option.textContent = formatRayon(rayon);
-      select.appendChild(option);
-    });
+			rayons.forEach(rayon => {
+			const option = document.createElement('option');
+			option.value = rayon;
+			option.textContent = formatRayon(rayon);
+			select.appendChild(option);
+			});
 
-    renderCards(data);
-  })
-  .catch(err => {
-    console.error("Erreur chargement data:", err);
-  });
+			renderCards(data);
+		})
+		.catch(err => {
+		console.error("Erreur chargement data:", err);
+	});
 
       // Filtre par rayon et quantité
       function applyFilter() {
@@ -240,11 +241,24 @@ fetch(API_URL)
           card.className = 'card';
 
           // Image ou placeholder
-          const imgHTML = (item.IMAGE && item.IMAGE !== '--')
-            ? `<div class="image-container">
-                <img src="${item.IMAGE}" alt="${item.ITEM}">
-              </div>`
-            : `<div class="image-container" style="background:#eee;">No image</div>`;
+let imageSrc = "";
+
+// Vérifie si IMAGE est valide
+if (item.IMAGE && item.IMAGE !== '--') {
+
+  // Si ce n'est PAS une URL complète → on préfixe avec IMG_URL
+  if (!item.IMAGE.startsWith("http")) {
+    imageSrc = IMG_URL + item.IMAGE;
+  } else {
+    imageSrc = item.IMAGE;
+  }
+}
+
+const imgHTML = imageSrc
+  ? `<div class="image-container">
+      <img src="${imageSrc}" alt="${item.ITEM}">
+    </div>`
+  : `<div class="image-container" style="background:#eee;">No image</div>`;
 
           // Affichage prix et total avec 2 décimales + monnaie "peds"
           let prixUnitaire = "--";
