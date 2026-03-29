@@ -104,6 +104,13 @@
 		height: 60px;
 		cursor: pointer;
 	  }
+	  
+	  .rayon-header {
+		width: 100%;
+		max-width: 400px;   /* ajuste selon ton rendu */
+		display: block;
+		margin: 0 auto 10px auto; /* centré + espace dessous */
+	  }
     </style>
   </head>
   <body>
@@ -203,6 +210,13 @@
 			.then(response => {
 				data = response;
 				const container = document.getElementById("rayonImages");
+				
+				// 🔥 Image d'en-tête (toujours affichée)
+				const headerImg = document.createElement("img");
+				headerImg.src = IMG_URL + "storage/00_EnTete-Storage.png";
+				headerImg.className = "rayon-header";
+
+				container.appendChild(headerImg);
 
 				Object.keys(CATEGORY_IMAGES).forEach(cat => {
 				
