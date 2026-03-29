@@ -111,7 +111,7 @@
 }
 
 .rayon-header {
-  max-width: 400px;
+  max-width: 453px;
   width: 100%;
   display: inline-block;
 }
@@ -123,11 +123,13 @@
     <div align="center"><h3>PM Offer InGame @ enzo beau gosse</h2></div>
     <div align="center"><h3>-=> New Oxford Storage <=-</h2></div>
     <hr>
+	<div class="rayon-images">
 	<div class="rayon-header-container">
   <img src="https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/img/storage/00_EnTete-Storage.png" class="rayon-header">
 </div>
 
-<div class="rayon-images" id="rayonImages"></div>
+<div id="rayonImages"></div>
+</div>
     <div class="filter">
       <label for="rayonFilter"><span class="label-italic">Filter by RAYON</span>:</label>
       <select id="rayonFilter" onchange="applyFilter()" disabled>
@@ -217,14 +219,6 @@
 			.then(res => res.json())
 			.then(response => {
 				data = response;
-				const container = document.getElementById("rayonImages");
-				
-				// 🔥 Image d'en-tête (toujours affichée)
-				const headerImg = document.createElement("img");
-				headerImg.src = IMG_URL + "storage/00_EnTete-Storage.png";
-				headerImg.className = "rayon-header";
-
-				container.appendChild(headerImg);
 
 				Object.keys(CATEGORY_IMAGES).forEach(cat => {
 				
