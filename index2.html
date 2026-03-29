@@ -88,6 +88,7 @@
 	  .rayon-images {
   display: flex;
   flex-wrap: wrap;
+  flex-direction: column;
   gap: 10px;
   justify-content: center;
   margin-bottom: 20px;
@@ -105,15 +106,16 @@
 		cursor: pointer;
 	  }
 	  
-	  .rayon-header-container {
+.rayon-header-container {
+  width: 100%;
   text-align: center;
-  margin-bottom: 10px;
 }
 
 .rayon-header {
-  max-width: 453px;
+  max-width: 400px;
   width: 100%;
-  display: inline-block;
+  display: block;
+  margin: 0 auto;
 }
     </style>
   </head>
@@ -229,6 +231,9 @@
 				);
 
 				if (!hasRayon) return; // ❌ on skip cette image
+
+const container = document.getElementById("rayonImages");
+container.innerHTML = "";
 
 				const img = document.createElement("img");
 				const config = CATEGORY_IMAGES[cat];
