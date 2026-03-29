@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+	<link rel="icon" href="./favicon.ico">
+    <style>
+      body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+      h1 { text-align: center; margin-bottom: 30px; }
+
+      .filter {
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        justify-content: center;
+      }
+      .filter label { font-weight: bold; }
+      .filter select { padding: 5px; font-size: 1em; }
+
+      .card-container { display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; }
+
+      .card {
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        width: 220px;
+        padding: 10px;
+        box-shadow: 2px 2px 6px rgba(0,0,0,0.1);
+        background: #fff;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .card h3 { margin: 10px 0 5px 0; font-size: 1.1em; text-align: center; }
+      .card h3 a { text-decoration: none; color: #333; }
+      .card h3 a:hover { text-decoration: underline; }
+      .card p { margin: 5px 0; font-size: 0.9em; text-align: center; }
+
+      .image-container {
+        width: 100%;
+        height: 150px;              /* taille fixe = placeholder */
+        background: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+        overflow: hidden;
+        border: 1px solid #ddd;
+      }
+      .image-container img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;        /* garde proportions */
+        background: #fff;
+      }
+
+      .placeholder {
+        width: 100%;
+        height: 150px;
+        background: #eee;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #999;
+        font-size: 14px;
+        border-radius: 4px;
+      }
+      .rayon-link {
+        text-decoration: none;
+        color: #337ab7;
+        cursor: pointer;
+      }
+
+      .rayon-link:hover {
+        text-decoration: none;
+        color: #285e8e;
+      }
+
+      /* Italique pour labels */
+      .label-italic { font-style: italic; }
+
+      /* MU en petit */
+      .MU-style {
+        font-size: 8pt;
+        font-style: italic;
+      }
+	  
+	  .rayon-images {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 10px;
+		justify-content: center;
+		margin-bottom: 20px;
+	  }
+
+	  .rayon-img {
+		width: 60px;
+		height: 60px;
+		cursor: pointer;
+	  }
+    </style>
+  </head>
+  <body>
+    <div align="center"><h1>[FRJ] - enzo beau gosse = FOR SALE</h1></div>
+    <hr>
+    <div align="center"><h3>PM Offer InGame @ enzo beau gosse</h2></div>
+    <div align="center"><h3>-=> New Oxford Storage <=-</h2></div>
+    <hr>
+    <div class="filter">
+      <label for="rayonFilter"><span class="label-italic">Filter by RAYON</span>:</label>
+      <select id="rayonFilter" onchange="applyFilter()" disabled>
+		<option value="">Select a Category</option>
+	  </select>
+    </div>
+
+    <div class="card-container" id="cardContainer">Chargement en cours...</div>
+
+    <script>
+		const API_URL = "https://script.google.com/macros/s/AKfycbzmEVTzK9y1-xMyQfzKR-MiUJKEDPqne-Y-WXeWmhsh7cw3XGuXM3wq_VEAWQpmFET9/exec";
+		const IMG_URL = "https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/img/"
+		
+		let data = [];
+		let selectedCategory = null;
+		
+		const CATEGORY_IMAGES = {
+			"Money and Deeds": {
+				normal: "storage/01_Money-and-Deeds.png",
+				hover: "storage/01_Money-and-Deeds_Hover.png",
+				selected: "storage/01_Money-and-Deeds_Select.png"
+			},
+			"Clothes": {
+				normal: "storage/02_Clothes.png",
+				hover: "storage/02_Clothes_Hover.png",
+				selected: "storage/02_Clothes_Select.png"
+			},
+			"Armors": {
+				normal: "storage/03_Armors.png",
+				hover: "storage/03_Armors_Hover.png",
+				selected: "storage/03_Armors_Select.png"
+			},
+			"Weapons": {
+				normal: "storage/04_Weapons.png",
+				hover: "storage/04_Weapons_Hover.png",
+				selected: "storage/04_Weapons_Select.png"
+			},
+			"Tools": {
+				normal: "storage/05_Tools.png",
+				hover: "storage/05_Tools_Hover.png",
+				selected: "storage/05_Tools_Select.png"
+			},
+			"Mindforce": {
+				normal: "storage/06_Mindforce.png",
+				hover: "storage/06_Mindforce_Hover.png",
+				selected: "storage/06_Mindforce_Select.png"
+			},
+			"Materials": {
+				normal: "storage/07_Materials.png",
+				hover: "storage/07_Materials_Hover.png",
+				selected: "storage/07_Materials_Select.png"
+			},
+			"Resources": {
+				normal: "storage/08_Resources.png",
+				hover: "storage/08_Resources_Hover.png",
+				selected: "storage/08_Resources_Select.png"
+			},
+			"Blueprints": {
+				normal: "storage/09_Blueprints.png",
+				hover: "storage/09_Blueprints_Hover.png",
+				selected: "storage/09_Blueprints_Select.png"
+			},
+			"Vehicles": {
+				normal: "storage/10_Vehicles.png",
+				hover: "storage/10_Vehicles_Hover.png",
+				selected: "storage/10_Vehicles_Select.png"
+			},
+			"Miscellaneous": {
+				normal: "storage/11_Miscellaneous.png",
+				hover: "storage/11_Miscellaneous_Hover.png",
+				selected: "storage/11_Miscellaneous_Select.png"
+			}
+		};
+
+		function formatRayon(rayon) {
+		if (!rayon) return "";
+
+		return rayon
+			.toLowerCase()
+			.split(" ")
+			.map(word => word.charAt(0).toUpperCase() + word.slice(1))
+			.join(" ");
+		}
+
+		// Charger les données côté serveur
+		fetch(API_URL)
+			.then(res => res.json())
+			.then(response => {
+				const container = document.getElementById("rayonImages");
+
+				Object.keys(CATEGORY_IMAGES).forEach(cat => {
+
+				const img = document.createElement("img");
+				const config = CATEGORY_IMAGES[cat];
+	
+				img.src = IMG_URL + config.normal;
+				img.className = "rayon-img";
+				img.dataset.category = cat;
+
+				// hover
+				img.onmouseenter = () => {
+					if (selectedCategory !== cat) {
+					img.src = IMG_URL + config.hover;
+					}
+				};
+	
+				img.onmouseleave = () => {
+					if (selectedCategory !== cat) {
+					img.src = IMG_URL + config.normal;
+					}
+				};
+
+				// click
+				img.onclick = () => {
+	
+				// 🔁 toggle OFF si recliqué
+				if (selectedCategory === cat) {
+					selectedCategory = null;
+					resetCategories();
+					resetRayonFilter();
+					applyFilter();
+					return;
+				}
+
+				selectedCategory = cat;
+				updateCategoryImages();
+				updateRayonFilter();
+				applyFilter();
+			};
+
+			container.appendChild(img);
+			});
+
+			renderCards(data);
+		})
+		.catch(err => {
+		console.error("Erreur chargement data:", err);
+	});
+
+function updateCategoryImages() {
+  document.querySelectorAll(".rayon-img").forEach(img => {
+    const cat = img.dataset.category;
+    const config = CATEGORY_IMAGES[cat];
+
+    if (cat === selectedCategory) {
+      img.src = IMG_URL + config.selected;
+    } else {
+      img.src = IMG_URL + config.normal;
+    }
+  });
+}
+
+function resetCategories() {
+  document.querySelectorAll(".rayon-img").forEach(img => {
+    const cat = img.dataset.category;
+    img.src = IMG_URL + CATEGORY_IMAGES[cat].normal;
+  });
+}
+
+function updateRayonFilter() {
+  const select = document.getElementById('rayonFilter');
+
+  // reset
+  select.innerHTML = '';
+  select.disabled = false;
+
+  // option ALL
+  const allOption = document.createElement('option');
+  allOption.value = "";
+  allOption.textContent = "All";
+  select.appendChild(allOption);
+
+  // filtrer data par catégorie
+  const filtered = data.filter(item => item.CATEGORY === selectedCategory);
+
+  const rayons = [...new Set(filtered.map(item => item.RAYON))].sort();
+
+  rayons.forEach(rayon => {
+    const option = document.createElement('option');
+    option.value = rayon;
+    option.textContent = formatRayon(rayon);
+    select.appendChild(option);
+  });
+
+  // valeur par défaut = ALL
+  select.value = "";
+}
+
+function resetRayonFilter() {
+  const select = document.getElementById('rayonFilter');
+
+  select.innerHTML = '<option value="">Select a Category</option>';
+  select.disabled = true;
+}
+
+      // Filtre par rayon et quantité
+      function applyFilter() {
+  const selectedRayon = document.getElementById('rayonFilter').value;
+
+  let filtered = data;
+
+  if (selectedCategory) {
+    filtered = filtered.filter(item => item.CATEGORY === selectedCategory);
+  }
+
+  if (selectedRayon) {
+    filtered = filtered.filter(item => item.RAYON === selectedRayon);
+  }
+
+  filtered = filtered.filter(item => item.QUANTITE && item.QUANTITE > 0);
+
+  renderCards(filtered);
+}
+
+      function selectRayon(rayon) {
+        // Met à jour le select
+        const select = document.getElementById('rayonFilter');
+        select.value = rayon;
+
+        // Applique le filtre
+        applyFilter();
+      }
+	  
+	  function formatDateMU(dateStr) {
+		if (!dateStr) return { display: "", full: "" };
+
+		const d = new Date(dateStr);
+		const now = new Date();
+
+		const diffMs = now - d;
+		const diffHours = diffMs / (1000 * 60 * 60);
+		const diffMinutes = diffMs / (1000 * 60);
+
+		// Tooltip complet
+		const full = d.toLocaleString("fr-FR", {
+			year: "numeric",
+			month: "2-digit",
+			day: "2-digit",
+			hour: "2-digit",
+			minute: "2-digit",
+			second: "2-digit"
+		});
+
+		let display = "";
+
+		if (diffHours < 24) {
+			if (diffHours >= 1) {
+			display = `il y a ${Math.floor(diffHours)}h`;
+			} else {
+			const mins = Math.max(1, Math.floor(diffMinutes));
+			display = `il y a ${mins} min`;
+			}
+		} else {
+			display = d.toLocaleString("fr-FR", {
+			year: "numeric",
+			month: "2-digit",
+			day: "2-digit",
+			hour: "2-digit",
+			minute: "2-digit"
+			});
+		}
+
+		return { display };
+	}
+	
+	function getMUColor(dateStr) {
+  if (!dateStr) return "#000";
+
+  const d = new Date(dateStr);
+  const now = new Date();
+
+  const diffMs = now - d;
+  const days = diffMs / (1000 * 60 * 60 * 24);
+
+  // > 7 jours → on ne doit plus afficher
+  if (days > 7) return null;
+
+  // < 1 jour → noir
+  if (days <= 1) return "#000000";
+
+  // Dégradé entre 1 et 7 jours
+  const ratio = (days - 1) / 6; // 0 → 1
+
+  // 0 = noir (0), 1 = gris clair (~200)
+  const gray = Math.round(0 + ratio * 200);
+
+  return `rgb(${gray}, ${gray}, ${gray})`;
+}
+
+      // Génère les cards HTML
+      function renderCards(items) {
+        const container = document.getElementById('cardContainer');
+        container.innerHTML = '';
+
+        // Tri alphabétique par ITEM
+        items.sort((a,b) => a.ITEM.localeCompare(b.ITEM));
+
+        items.forEach(item => {
+          const card = document.createElement('div');
+          card.className = 'card';
+
+          // Image ou placeholder
+let imageSrc = "";
+
+// Vérifie si IMAGE est valide
+if (item.IMAGE && item.IMAGE !== '--') {
+
+  // Si ce n'est PAS une URL complète → on préfixe avec IMG_URL
+  if (!item.IMAGE.startsWith("http")) {
+    imageSrc = IMG_URL + item.IMAGE;
+  } else {
+    imageSrc = item.IMAGE;
+  }
+}
+
+const imgHTML = imageSrc
+  ? `<div class="image-container">
+      <img src="${imageSrc}" alt="${item.ITEM}">
+    </div>`
+  : `<div class="image-container" style="background:#eee;">No image</div>`;
+
+          // Affichage prix et total avec 2 décimales + monnaie "peds"
+          let prixUnitaire = "--";
+          let total = "--";
+
+          if (item.PRIX_UNITAIRE !== "" && item.PRIX_UNITAIRE != null) {
+            prixUnitaire = formatNumber(item.PRIX_UNITAIRE);          // dynamique
+            total = (parseFloat(item.TOTAL) || 0).toFixed(2);         // toujours 2 décimales
+          }
+
+          // Génération du titre ITEM
+          let itemTitle = "";
+          if (item.LIEN_WIKI && item.LIEN_WIKI.trim() !== "") {
+            itemTitle = `<a href="${item.LIEN_WIKI}" target="_blank">${item.ITEM}</a>`;
+          } else {
+            itemTitle = `${item.ITEM}`;
+          }
+
+          let rayonHTML = "";
+          const selectedRayon = document.getElementById('rayonFilter').value;
+          if (!selectedRayon) { 
+            // Affiche Rayon avec lien cliquable
+            rayonHTML = `<p><span class="label-italic">Rayon</span>: 
+                        <a href="#" class="rayon-link" onclick="selectRayon('${item.RAYON}'); return false;">
+                          ${item.RAYON}
+                        </a>
+                      </p>`;
+          }
+
+          let muHTML = "";
+
+// Afficher uniquement si MU existe et n'est pas vide
+if (item.MU !== "" && item.MU != null) {
+
+  const color = getMUColor(item.DATE_MU);
+
+  // Si trop ancien → on n'affiche rien
+  if (color === null) return;
+
+  const dateFormatted = formatDateMU(item.DATE_MU);
+
+  const muValue = parseFloat(item.MU);
+  let muDisplay = "";
+
+  if (!isNaN(muValue)) {
+    muDisplay = (muValue * 100).toFixed(2) + " %";
+  }
+
+  muHTML = `
+    <p title="${dateFormatted.display}">
+      <span class="MU-style" style="color:${color}">
+        MU: ${muDisplay}
+      </span>
+    </p>
+  `;
+}
+
+          card.innerHTML = `
+            ${imgHTML}
+            <h3>${itemTitle}</h3>
+            ${rayonHTML}
+            <p><span class="label-italic">Quantity</span>: ${item.QUANTITE}</p>
+            <p><span class="label-italic">Unit Price</span>: ${prixUnitaire} peds</p>
+            <p><span class="label-italic">Total TT</span>: ${total} peds</p>
+            ${muHTML}
+          `;
+
+          container.appendChild(card);
+        });
+      }
+
+      function formatNumber(value) {
+        if (value === "" || value == null) return "";
+        const str = value.toString();
+        if (!str.includes(".")) return str + ".00";
+        const decimals = str.split(".")[1].length;
+        if (decimals === 1) return str + "0";
+        return str; // 2 décimales ou + → on garde tel quel
+      }
+    </script>
+  </body>
+</html>
