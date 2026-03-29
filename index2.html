@@ -344,7 +344,7 @@ function resetRayonFilter() {
       function applyFilter() {
   const selectedRayon = document.getElementById('rayonFilter').value;
 
-  let filtered = data;
+  let filtered = "";
 
   if (selectedCategory) {
     filtered = filtered.filter(item => item.STORAGE === selectedCategory);
