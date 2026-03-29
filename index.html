@@ -84,6 +84,43 @@
         font-size: 8pt;
         font-style: italic;
       }
+	  
+.rayon-images {
+  display: flex;
+  flex-direction: column; /* 👈 clé */
+  gap: 10px;
+  justify-content: center;
+
+  margin-bottom: 20px;
+  background: #000;
+  padding: 15px;
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.5);
+}
+
+#rayonImages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+	  .rayon-img {
+		width: 60px;
+		height: 60px;
+		cursor: pointer;
+	  }
+	  
+	  .rayon-header-container {
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.rayon-header {
+  max-width: 400px;
+  width: 100%;
+  display: inline-block;
+}
     </style>
   </head>
   <body>
@@ -92,11 +129,17 @@
     <div align="center"><h3>PM Offer InGame @ enzo beau gosse</h2></div>
     <div align="center"><h3>-=> New Oxford Storage <=-</h2></div>
     <hr>
+	<div class="rayon-images">
+		<div class="rayon-header-container">
+			<img src="https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/img/storage/00_EnTete-Storage.png" class="rayon-header">
+		</div>
+		<div id="rayonImages"></div>
+	</div>
     <div class="filter">
       <label for="rayonFilter"><span class="label-italic">Filter by RAYON</span>:</label>
-      <select id="rayonFilter" onchange="applyFilter()">
-        <option value="">All</option>
-      </select>
+      <select id="rayonFilter" onchange="applyFilter()" disabled>
+		<option value="">Select a Category</option>
+	  </select>
     </div>
 
     <div class="card-container" id="cardContainer">Chargement en cours...</div>
@@ -104,7 +147,67 @@
     <script>
 		const API_URL = "https://script.google.com/macros/s/AKfycbzmEVTzK9y1-xMyQfzKR-MiUJKEDPqne-Y-WXeWmhsh7cw3XGuXM3wq_VEAWQpmFET9/exec";
 		const IMG_URL = "https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/img/"
+		
 		let data = [];
+		let selectedCategory = null;
+		
+		const CATEGORY_IMAGES = {
+			"MONEY AND DEEDS": {
+				normal: "storage/01_Money-and-Deeds.png",
+				hover: "storage/01_Money-and-Deeds_Hover.png",
+				selected: "storage/01_Money-and-Deeds_Select.png"
+			},
+			"CLOTHES": {
+				normal: "storage/02_Clothes.png",
+				hover: "storage/02_Clothes_Hover.png",
+				selected: "storage/02_Clothes_Select.png"
+			},
+			"ARMORS": {
+				normal: "storage/03_Armors.png",
+				hover: "storage/03_Armors_Hover.png",
+				selected: "storage/03_Armors_Select.png"
+			},
+			"WEAPONS": {
+				normal: "storage/04_Weapons.png",
+				hover: "storage/04_Weapons_Hover.png",
+				selected: "storage/04_Weapons_Select.png"
+			},
+			"TOOLS": {
+				normal: "storage/05_Tools.png",
+				hover: "storage/05_Tools_Hover.png",
+				selected: "storage/05_Tools_Select.png"
+			},
+			"MINDFORCE": {
+				normal: "storage/06_Mindforce.png",
+				hover: "storage/06_Mindforce_Hover.png",
+				selected: "storage/06_Mindforce_Select.png"
+			},
+			"MATERIALS": {
+				normal: "storage/07_Materials.png",
+				hover: "storage/07_Materials_Hover.png",
+				selected: "storage/07_Materials_Select.png"
+			},
+			"RESOURCES": {
+				normal: "storage/08_Resources.png",
+				hover: "storage/08_Resources_Hover.png",
+				selected: "storage/08_Resources_Select.png"
+			},
+			"BLUEPRINTS": {
+				normal: "storage/09_Blueprints.png",
+				hover: "storage/09_Blueprints_Hover.png",
+				selected: "storage/09_Blueprints_Select.png"
+			},
+			"VEHICLES": {
+				normal: "storage/10_Vehicles.png",
+				hover: "storage/10_Vehicles_Hover.png",
+				selected: "storage/10_Vehicles_Select.png"
+			},
+			"MISCELLANEOUS": {
+				normal: "storage/11_Miscellaneous.png",
+				hover: "storage/11_Miscellaneous_Hover.png",
+				selected: "storage/11_Miscellaneous_Select.png"
+			}
+		};
 
 		function formatRayon(rayon) {
 		if (!rayon) return "";
@@ -121,37 +224,140 @@
 			.then(res => res.json())
 			.then(response => {
 				data = response;
+				const container = document.getElementById("rayonImages");
+				container.innerHTML = "";
 
-				const rayons = [...new Set(data.map(item => item.RAYON))].sort();
-				const select = document.getElementById('rayonFilter');
+				Object.keys(CATEGORY_IMAGES).forEach(cat => {
+				
+				// 🔥 vérifier s'il existe au moins un item avec RAYON dans cette catégorie
+				const hasRayon = data.some(item =>
+					item.STORAGE === cat &&
+					item.RAYON && item.RAYON !== ""
+				);
 
-			rayons.forEach(rayon => {
-			const option = document.createElement('option');
-			option.value = rayon;
-			option.textContent = formatRayon(rayon);
-			select.appendChild(option);
+				if (!hasRayon) return; // ❌ on skip cette image
+
+				const img = document.createElement("img");
+				const config = CATEGORY_IMAGES[cat];
+	
+				img.src = IMG_URL + config.normal;
+				img.className = "rayon-img";
+				img.dataset.category = cat;
+
+				// hover
+				img.onmouseenter = () => {
+					if (selectedCategory !== cat) {
+					img.src = IMG_URL + config.hover;
+					}
+				};
+	
+				img.onmouseleave = () => {
+					if (selectedCategory !== cat) {
+					img.src = IMG_URL + config.normal;
+					}
+				};
+
+				// click
+				img.onclick = () => {
+	
+				// 🔁 toggle OFF si recliqué
+				if (selectedCategory === cat) {
+					selectedCategory = null;
+					resetCategories();
+					resetRayonFilter();
+					applyFilter();
+					return;
+				}
+
+				selectedCategory = cat;
+				updateCategoryImages();
+				updateRayonFilter();
+				applyFilter();
+			};
+
+			container.appendChild(img);
 			});
 
-			renderCards(data);
+			renderCards([]);
 		})
 		.catch(err => {
 		console.error("Erreur chargement data:", err);
 	});
 
+function updateCategoryImages() {
+  document.querySelectorAll(".rayon-img").forEach(img => {
+    const cat = img.dataset.category;
+    const config = CATEGORY_IMAGES[cat];
+
+    if (cat === selectedCategory) {
+      img.src = IMG_URL + config.selected;
+    } else {
+      img.src = IMG_URL + config.normal;
+    }
+  });
+}
+
+function resetCategories() {
+  document.querySelectorAll(".rayon-img").forEach(img => {
+    const cat = img.dataset.category;
+    img.src = IMG_URL + CATEGORY_IMAGES[cat].normal;
+  });
+}
+
+function updateRayonFilter() {
+  const select = document.getElementById('rayonFilter');
+
+  // reset
+  select.innerHTML = '';
+  select.disabled = false;
+
+  // option ALL
+  const allOption = document.createElement('option');
+  allOption.value = "";
+  allOption.textContent = "All";
+  select.appendChild(allOption);
+
+  // filtrer data par catégorie
+  const filtered = data.filter(item => item.STORAGE === selectedCategory);
+
+  const rayons = [...new Set(filtered.map(item => item.RAYON))].sort();
+
+  rayons.forEach(rayon => {
+    const option = document.createElement('option');
+    option.value = rayon;
+    option.textContent = formatRayon(rayon);
+    select.appendChild(option);
+  });
+
+  // valeur par défaut = ALL
+  select.value = "";
+}
+
+function resetRayonFilter() {
+  const select = document.getElementById('rayonFilter');
+
+  select.innerHTML = '<option value="">Select a Category</option>';
+  select.disabled = true;
+}
+
       // Filtre par rayon et quantité
       function applyFilter() {
-        const selectedRayon = document.getElementById('rayonFilter').value;
-        let filtered = data;
+  const selectedRayon = document.getElementById('rayonFilter').value;
 
-        if (selectedRayon) {
-          filtered = filtered.filter(item => item.RAYON === selectedRayon);
-        }
+  let filtered = data;
 
-        // Filtre QUANTITE > 0
-        filtered = filtered.filter(item => item.QUANTITE && item.QUANTITE > 0);
+  if (selectedCategory) {
+    filtered = filtered.filter(item => item.STORAGE === selectedCategory);
+  }
 
-        renderCards(filtered);
-      }
+  if (selectedRayon) {
+    filtered = filtered.filter(item => item.RAYON === selectedRayon);
+  }
+
+  filtered = filtered.filter(item => item.QUANTITE && item.QUANTITE > 0);
+
+  renderCards(filtered);
+}
 
       function selectRayon(rayon) {
         // Met à jour le select
