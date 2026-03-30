@@ -350,6 +350,7 @@ function resetRayonFilter() {
 
 		if (selectedCategory === "__NONE__") {
 			renderCards([]);
+			scrollToTop();
 			return;
 		}
 
@@ -364,6 +365,7 @@ function resetRayonFilter() {
 		filtered = filtered.filter(item => item.QUANTITE && item.QUANTITE > 0);
 
 		renderCards(filtered);
+		scrollToTop();
 	}
 
       function selectRayon(rayon) {
@@ -551,6 +553,13 @@ if (item.MU !== "" && item.MU != null) {
         if (decimals === 1) return str + "0";
         return str; // 2 décimales ou + → on garde tel quel
       }
+	  
+	  function scrollToTop() {
+		const topAnchor = document.querySelector('a[name="top"]');
+		if (topAnchor) {
+			topAnchor.scrollIntoView({ behavior: "smooth" });
+		}
+	  }
     </script>
   </body>
 </html>
