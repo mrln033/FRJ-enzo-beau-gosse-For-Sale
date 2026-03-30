@@ -263,7 +263,7 @@
 	
 				// 🔁 toggle OFF si recliqué
 				if (selectedCategory === cat) {
-					selectedCategory = null;
+					selectedCategory = "__NONE__";
 					resetCategories();
 					resetRayonFilter();
 					applyFilter();
@@ -341,24 +341,29 @@ function resetRayonFilter() {
   select.disabled = true;
 }
 
-      // Filtre par rayon et quantité
-      function applyFilter() {
-  const selectedRayon = document.getElementById('rayonFilter').value;
+	// Filtre par rayon et quantité
+	function applyFilter() {
+		const selectedRayon = document.getElementById('rayonFilter').value;
 
-  let filtered = data;
+		let filtered = data;
 
-  if (selectedCategory) {
-    filtered = filtered.filter(item => item.STORAGE === selectedCategory);
-  }
+		if (selectedCategory === "__NONE__") {
+			renderCards([]);
+			return;
+		}
 
-  if (selectedRayon) {
-    filtered = filtered.filter(item => item.RAYON === selectedRayon);
-  }
+		if (selectedCategory) {
+			filtered = filtered.filter(item => item.STORAGE === selectedCategory);
+		}
 
-  filtered = filtered.filter(item => item.QUANTITE && item.QUANTITE > 0);
+		if (selectedRayon) {
+			filtered = filtered.filter(item => item.RAYON === selectedRayon);
+		}
 
-  renderCards(filtered);
-}
+		filtered = filtered.filter(item => item.QUANTITE && item.QUANTITE > 0);
+
+		renderCards(filtered);
+	}
 
       function selectRayon(rayon) {
         // Met à jour le select
