@@ -121,13 +121,67 @@
   width: 100%;
   display: inline-block;
 }
+
+#loadingState {
+  display: block;
+  text-align: center;
+  font-size: 16px;
+  margin-top: 20px;
+  color: #555;
+}
+
+#emptyState {
+  display: block;
+  position: relative;
+  padding: 30px;
+  text-align: center;
+  background: #fff;
+  border-radius: 10px;
+  margin-top: 20px;
+  box-shadow: 2px 2px 6px rgba(0,0,0,0.1);
+}
+
+#langToggle {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+#emptyText {
+	text-align: left;
+	max-width: 700px;
+	margin: 0 auto;
+	line-height: 1.6;
+	color: #444;
+}
+
+#emptyText h2 {
+  margin-top: 0;
+  text-align: center;
+}
+
+#emptyText ul {
+  margin-top: 10px;
+  padding-left: 20px;
+}
+
+#emptyText li {
+  margin-bottom: 5px;
+}
+
+#emptyText strong {
+  color: #000;
+}
+
     </style>
   </head>
   <body>
     <div align="center"><h1>[FRJ] - enzo beau gosse = FOR SALE</h1></div>
     <hr>
-    <div align="center"><h3>PM Offer InGame @ enzo beau gosse</h2></div>
-    <div align="center"><h3>-=> New Oxford Storage <=-</h2></div>
+    <div align="center"><b>PM Offer InGame @ enzo beau gosse  |  -=> New Oxford Storage <=-</b></div>
     <hr>
 	<a name="top"></a>
 	<div class="rayon-images">
@@ -143,7 +197,14 @@
 	  </select>
     </div>
 
-    <div class="card-container" id="cardContainer">Chargement en cours...</div>
+    <div id="loadingState">Chargement en cours...</div>
+
+	<div id="emptyState">
+		<button id="langToggle">EN</button>
+		<div id="emptyText"></div>
+	</div>
+
+	<div class="card-container" id="cardContainer"></div>
 
     <script>
 		const API_URL = "https://script.google.com/macros/s/AKfycbzmEVTzK9y1-xMyQfzKR-MiUJKEDPqne-Y-WXeWmhsh7cw3XGuXM3wq_VEAWQpmFET9/exec";
@@ -151,6 +212,59 @@
 		
 		let data = [];
 		let selectedCategory = null;
+		let isLoading = true;
+		let lastRenderedItems = [];
+		let currentLang = "EN";
+
+		const TEXTS = {
+  EN: `
+    <h2>Welcome to my Inventory</h2>
+
+	<p>
+	This page allows you to browse all items currently available for sale.
+	</p>
+
+	<p>
+	To get started, <strong>select an inventory category</strong> above.
+	</p>
+
+	<ul>
+		<li>Browse items by inventory category</li>
+		<li>Filter by "Rayon"</li>
+		<li>Click on an item's name to open the wiki</li>
+		<li>All (L) items are Full TT! Non-(L) items may need repairs, but the displayed value always corresponds to Full TT</li>
+		<li>MU values are updated regularly (hover to see the last update date): they gradually fade and disappear after 7 days</li>
+	</ul>
+
+	<p>
+	<strong>Tip:</strong> you can click again on a category to reset your selection.
+	</p>
+  `,
+
+  FR: `
+    <h2>Bienvenue dans mon Inventaire</h2>
+
+    <p>
+      Cette page vous permet de consulter tous les objets actuellement en vente.
+    </p>
+
+    <p>
+      Pour commencer, <strong>sélectionnez une catégorie d'inventaire</strong> ci-dessus.
+    </p>
+
+    <ul>
+      <li>Parcourez les objets par catégorie d'inventaire</li>
+      <li>Filtrez par "Rayon"</li>
+      <li>Cliquez sur le nom d'un objet pour ouvrir le wiki</li>
+	  <li>Tous les items (L) sont Full TT !! Concernant les items non-(L), ils peuvent être à réparer, mais c'est bien la valeur Full TT qui est affichée.</li>
+	  <li>Les MU sont actualisés régulièrement (survolez la ligne pour afficher la date de mise à jour) : ils s'efface progressivement pour disparaitre à + 7 jours<br><i><b>Membres FRJ =</b> remise de 50% du MU pour tous les membres</i></li>
+    </ul>
+
+    <p>
+      <strong>Astuce :</strong> vous pouvez recliquer sur une catégorie pour réinitialiser.
+    </p>
+  `
+};
 		
 		const CATEGORY_IMAGES = {
 			"MONEY AND DEEDS": {
@@ -209,6 +323,13 @@
 				selected: "storage/11_Miscellaneous_Select.png"
 			}
 		};
+		
+		document.addEventListener("DOMContentLoaded", () => {
+			document.getElementById("langToggle").addEventListener("click", () => {
+				currentLang = currentLang === "EN" ? "FR" : "EN";
+				renderCards(lastRenderedItems);
+			});
+		});
 
 		function formatRayon(rayon) {
 		if (!rayon) return "";
@@ -264,7 +385,7 @@
 	
 				// 🔁 toggle OFF si recliqué
 				if (selectedCategory === cat) {
-					selectedCategory = "__NONE__";
+					selectedCategory = null;
 					resetCategories();
 					resetRayonFilter();
 					applyFilter();
@@ -280,7 +401,15 @@
 			container.appendChild(img);
 			});
 
+			// ✅ FIN DU LOADING
+			isLoading = false;
+			document.getElementById("loadingState").style.display = "none";
+
+			// affiche message initial
+			isLoading = false;
+			document.getElementById("loadingState").style.display = "none";
 			renderCards([]);
+
 		})
 		.catch(err => {
 		console.error("Erreur chargement data:", err);
@@ -348,7 +477,7 @@ function resetRayonFilter() {
 
 		let filtered = data;
 
-		if (selectedCategory === "__NONE__") {
+		if (!selectedCategory) {
 			renderCards([]);
 			scrollToTop();
 			return;
@@ -446,7 +575,40 @@ function resetRayonFilter() {
       // Génère les cards HTML
       function renderCards(items) {
         const container = document.getElementById('cardContainer');
-        container.innerHTML = '';
+		const emptyState = document.getElementById('emptyState');
+		const loadingState = document.getElementById('loadingState');
+
+		lastRenderedItems = items;
+		container.innerHTML = '';
+		
+		// ⏳ Affichage loading prioritaire
+		if (isLoading) {
+			loadingState.style.display = "block";
+
+			// on affiche aussi le message explicatif
+			document.getElementById("emptyText").innerHTML = TEXTS[currentLang];
+			document.getElementById("langToggle").innerText =
+				currentLang === "EN" ? "🇫🇷 FR" : "🇬🇧 EN";
+
+			emptyState.style.display = "block";
+			return;
+		} else {
+			loadingState.style.display = "none";
+		}
+		
+		// 📘 Message explicatif si aucune catégorie sélectionnée
+		if (!selectedCategory || items.length === 0) {
+
+			document.getElementById("emptyText").innerHTML = TEXTS[currentLang];
+			document.getElementById("langToggle").innerText =
+				currentLang === "EN" ? "🇫🇷 FR" : "🇬🇧 EN";
+	
+			emptyState.style.display = "block";
+			return;
+
+		} else {
+			emptyState.style.display = "none";
+		}
 
         // Tri alphabétique par ITEM
         items.sort((a,b) => a.ITEM.localeCompare(b.ITEM));
@@ -455,95 +617,95 @@ function resetRayonFilter() {
           const card = document.createElement('div');
           card.className = 'card';
 
-          // Image ou placeholder
-let imageSrc = "";
+         // Image ou placeholder
+		let imageSrc = "";
 
-// Vérifie si IMAGE est valide
-if (item.IMAGE && item.IMAGE !== '--') {
+		// Vérifie si IMAGE est valide
+		if (item.IMAGE && item.IMAGE !== '--') {
 
-  // Si ce n'est PAS une URL complète → on préfixe avec IMG_URL
-  if (!item.IMAGE.startsWith("http")) {
-    imageSrc = IMG_URL + item.IMAGE;
-  } else {
-    imageSrc = item.IMAGE;
-  }
-}
+			// Si ce n'est PAS une URL complète → on préfixe avec IMG_URL
+			if (!item.IMAGE.startsWith("http")) {
+				imageSrc = IMG_URL + item.IMAGE;
+			} else {
+				imageSrc = item.IMAGE;
+			}
+		}
 
-const imgHTML = imageSrc
-  ? `<div class="image-container">
-      <img src="${imageSrc}" alt="${item.ITEM}">
-    </div>`
-  : `<div class="image-container" style="background:#eee;">No image</div>`;
+		const imgHTML = imageSrc
+			? `<div class="image-container">
+				<img src="${imageSrc}" alt="${item.ITEM}">
+			</div>`
+			: `<div class="image-container" style="background:#eee;">No image</div>`;
 
-          // Affichage prix et total avec 2 décimales + monnaie "peds"
-          let prixUnitaire = "--";
-          let total = "--";
+			// Affichage prix et total avec 2 décimales + monnaie "peds"
+			let prixUnitaire = "--";
+			let total = "--";
 
-          if (item.PRIX_UNITAIRE !== "" && item.PRIX_UNITAIRE != null) {
-            prixUnitaire = formatNumber(item.PRIX_UNITAIRE);          // dynamique
-            total = (parseFloat(item.TOTAL) || 0).toFixed(2);         // toujours 2 décimales
-          }
+			if (item.PRIX_UNITAIRE !== "" && item.PRIX_UNITAIRE != null) {
+				prixUnitaire = formatNumber(item.PRIX_UNITAIRE);          // dynamique
+				total = (parseFloat(item.TOTAL) || 0).toFixed(2);         // toujours 2 décimales
+			}
 
-          // Génération du titre ITEM
-          let itemTitle = "";
-          if (item.LIEN_WIKI && item.LIEN_WIKI.trim() !== "") {
-            itemTitle = `<a href="${item.LIEN_WIKI}" target="_blank">${item.ITEM}</a>`;
-          } else {
-            itemTitle = `${item.ITEM}`;
-          }
+			// Génération du titre ITEM
+			let itemTitle = "";
+			if (item.LIEN_WIKI && item.LIEN_WIKI.trim() !== "") {
+				itemTitle = `<a href="${item.LIEN_WIKI}" target="_blank">${item.ITEM}</a>`;
+			} else {
+				itemTitle = `${item.ITEM}`;
+			}
 
-          let rayonHTML = "";
-          const selectedRayon = document.getElementById('rayonFilter').value;
-          if (!selectedRayon) { 
-            // Affiche Rayon avec lien cliquable
-            rayonHTML = `<p><span class="label-italic">Rayon</span>: 
-                        <a href="#" class="rayon-link" onclick="selectRayon('${item.RAYON}'); return false;">
+			let rayonHTML = "";
+			const selectedRayon = document.getElementById('rayonFilter').value;
+			if (!selectedRayon) { 
+				// Affiche Rayon avec lien cliquable
+				rayonHTML = `<p><span class="label-italic">Rayon</span>: 
+					<a href="#" class="rayon-link" onclick="selectRayon('${item.RAYON}'); return false;">
                           ${item.RAYON}
-                        </a>
-                      </p>`;
-          }
+                    </a>
+                    </p>`;
+			}
 
-          let muHTML = "";
+			let muHTML = "";
 
-// Afficher uniquement si MU existe et n'est pas vide
-if (item.MU !== "" && item.MU != null) {
+			// Afficher uniquement si MU existe et n'est pas vide
+			if (item.MU !== "" && item.MU != null) {
 
-  const color = getMUColor(item.DATE_MU);
+				const color = getMUColor(item.DATE_MU);
 
-  // Si trop ancien → on n'affiche rien
-  if (color === null) return;
+				// Si trop ancien → on n'affiche rien
+				if (color === null) return;
 
-  const dateFormatted = formatDateMU(item.DATE_MU);
+					const dateFormatted = formatDateMU(item.DATE_MU);
 
-  const muValue = parseFloat(item.MU);
-  let muDisplay = "";
+					const muValue = parseFloat(item.MU);
+					let muDisplay = "";
 
-  if (!isNaN(muValue)) {
-    muDisplay = (muValue * 100).toFixed(2) + " %";
-  }
+					if (!isNaN(muValue)) {
+						muDisplay = (muValue * 100).toFixed(2) + " %";
+					}
 
-  muHTML = `
-    <p title="${dateFormatted.display}">
-      <span class="MU-style" style="color:${color}">
-        MU: ${muDisplay}
-      </span>
-    </p>
-  `;
-}
+					muHTML = `
+						<p title="${dateFormatted.display}">
+						<span class="MU-style" style="color:${color}">
+							MU: ${muDisplay}
+						</span>
+						</p>
+					`;
+				}
 
-          card.innerHTML = `
-            ${imgHTML}
-            <h3>${itemTitle}</h3>
-            ${rayonHTML}
-            <p><span class="label-italic">Quantity</span>: ${item.QUANTITE}</p>
-            <p><span class="label-italic">Unit Price</span>: ${prixUnitaire} peds</p>
-            <p><span class="label-italic">Total TT</span>: ${total} peds</p>
-            ${muHTML}
-          `;
+				card.innerHTML = `
+					${imgHTML}
+					<h3>${itemTitle}</h3>
+					${rayonHTML}
+					<p><span class="label-italic">Quantity</span>: ${item.QUANTITE}</p>
+					<p><span class="label-italic">Unit Price</span>: ${prixUnitaire} peds</p>
+					<p><span class="label-italic">Total TT</span>: ${total} peds</p>
+						${muHTML}
+				`;
 
-          container.appendChild(card);
-        });
-      }
+				container.appendChild(card);
+			});
+		}
 
       function formatNumber(value) {
         if (value === "" || value == null) return "";
