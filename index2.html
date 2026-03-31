@@ -229,7 +229,6 @@
     <div id="loadingState"></div>
 
 	<div id="emptyState">
-		<button id="langToggle">EN</button>
 		<div id="emptyText"></div>
 	</div>
 
@@ -263,13 +262,12 @@
 	const TRANSLATIONS = {
 		EN: {
 			title: "[FRJ] - enzo beau gosse = FOR SALE",
-			subtitle: "PM Offer InGame @ enzo beau gosse",
-			storage: "-=> New Oxford Storage <=-",
+			subtitle: "PM Offer InGame @ enzo beau gosse  |  -=> New Oxford Storage <=-",
 			
 			loadingState: "Loading in progress...",
 
 			filterLabel: "Filter by RAYON",
-			selectCategory: "Select a Category",
+			selectCategory: "First, select Inventory Category",
 			all: "All",
 
 			quantity: "Quantity",
@@ -302,13 +300,12 @@
 
 		FR: {
 			title: "[FRJ] - enzo beau gosse = A VENDRE",
-			subtitle: "Faites une offre en jeu @ enzo beau gosse",
-			storage: "-=> New Oxford Storage <=-",
+			subtitle: "Faites une offre en jeu @ enzo beau gosse  |  -=> New Oxford Storage <=-",
 			
 			loadingState: "Chargement en cours...",
 
 			filterLabel: "Filtrer par RAYON",
-			selectCategory: "Sélectionnez une catégorie",
+			selectCategory: "Sélectionnez une catégorie d'inventaire",
 			all: "Tous",
 
 			quantity: "Quantité",
@@ -436,7 +433,6 @@
 	function applyTranslations() {
 		document.getElementById("title").innerText = t("title");
 		document.getElementById("subtitle").innerText = t("subtitle");
-		// document.getElementById("storage").innerText = t("storage");
 
 		document.getElementById("filterLabel").innerHTML =
 			`<span class="label-italic">${t("filterLabel")}</span>:`;
@@ -563,7 +559,7 @@ function updateRayonFilter() {
   // option ALL
   const allOption = document.createElement('option');
   allOption.value = "";
-  allOption.textContent = "All";
+  allOption.textContent = {$t("all")};
   select.appendChild(allOption);
 
   // filtrer data par catégorie
