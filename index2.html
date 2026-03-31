@@ -205,6 +205,11 @@
   content: "⏳ ";
 }
 
+.filter {
+  display: none;
+  transition: opacity 0.2s ease;
+}
+
     </style>
   </head>
   <body>
@@ -240,12 +245,28 @@
 
     <script>
 	
+	document.addEventListener("DOMContentLoaded", () => {
+		updateLanguageButtons();
+		applyTranslations();
+		updateFilterVisibility();
+	});
+	
 	let currentLang = localStorage.getItem("lang");
 
 	if (!currentLang) {
 		currentLang = "EN";
 		localStorage.setItem("lang", currentLang);
 	}
+	
+	const API_URL = "https://script.google.com/macros/s/AKfycbzmEVTzK9y1-xMyQfzKR-MiUJKEDPqne-Y-WXeWmhsh7cw3XGuXM3wq_VEAWQpmFET9/exec";
+	const IMG_URL = "https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/img/"
+		
+	let data = [];
+	let selectedCategory = null;
+	let isLoading = true;
+	let lastRenderedItems = [];
+	
+
 		
 	function setLanguage(lang) {
 		currentLang = lang;
@@ -259,15 +280,6 @@
 		renderCards(lastRenderedItems);
 	}
 	
-	const API_URL = "https://script.google.com/macros/s/AKfycbzmEVTzK9y1-xMyQfzKR-MiUJKEDPqne-Y-WXeWmhsh7cw3XGuXM3wq_VEAWQpmFET9/exec";
-	const IMG_URL = "https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/img/"
-		
-	let data = [];
-	let selectedCategory = null;
-	let isLoading = true;
-	let lastRenderedItems = [];
-	
-
 	const TRANSLATIONS = {
 		EN: {
 			title: "[FRJ] - enzo beau gosse = FOR SALE",
@@ -347,63 +359,63 @@
 		}
 	};
 		
-		const CATEGORY_IMAGES = {
-			"MONEY AND DEEDS": {
-				normal: "storage/01_Money-and-Deeds.png",
-				hover: "storage/01_Money-and-Deeds_Hover.png",
-				selected: "storage/01_Money-and-Deeds_Select.png"
-			},
-			"CLOTHES": {
-				normal: "storage/02_Clothes.png",
-				hover: "storage/02_Clothes_Hover.png",
-				selected: "storage/02_Clothes_Select.png"
-			},
-			"ARMORS": {
-				normal: "storage/03_Armors.png",
-				hover: "storage/03_Armors_Hover.png",
-				selected: "storage/03_Armors_Select.png"
-			},
-			"WEAPONS": {
-				normal: "storage/04_Weapons.png",
-				hover: "storage/04_Weapons_Hover.png",
-				selected: "storage/04_Weapons_Select.png"
-			},
-			"TOOLS": {
-				normal: "storage/05_Tools.png",
-				hover: "storage/05_Tools_Hover.png",
-				selected: "storage/05_Tools_Select.png"
-			},
-			"MINDFORCE": {
-				normal: "storage/06_Mindforce.png",
-				hover: "storage/06_Mindforce_Hover.png",
-				selected: "storage/06_Mindforce_Select.png"
-			},
-			"MATERIALS": {
-				normal: "storage/07_Materials.png",
-				hover: "storage/07_Materials_Hover.png",
-				selected: "storage/07_Materials_Select.png"
-			},
-			"RESOURCES": {
-				normal: "storage/08_Resources.png",
-				hover: "storage/08_Resources_Hover.png",
-				selected: "storage/08_Resources_Select.png"
-			},
-			"BLUEPRINTS": {
-				normal: "storage/09_Blueprints.png",
-				hover: "storage/09_Blueprints_Hover.png",
-				selected: "storage/09_Blueprints_Select.png"
-			},
-			"VEHICLES": {
-				normal: "storage/10_Vehicles.png",
-				hover: "storage/10_Vehicles_Hover.png",
-				selected: "storage/10_Vehicles_Select.png"
-			},
-			"MISCELLANEOUS": {
-				normal: "storage/11_Miscellaneous.png",
-				hover: "storage/11_Miscellaneous_Hover.png",
-				selected: "storage/11_Miscellaneous_Select.png"
-			}
-		};
+	const CATEGORY_IMAGES = {
+		"MONEY AND DEEDS": {
+			normal: "storage/01_Money-and-Deeds.png",
+			hover: "storage/01_Money-and-Deeds_Hover.png",
+			selected: "storage/01_Money-and-Deeds_Select.png"
+		},
+		"CLOTHES": {
+			normal: "storage/02_Clothes.png",
+			hover: "storage/02_Clothes_Hover.png",
+			selected: "storage/02_Clothes_Select.png"
+		},
+		"ARMORS": {
+			normal: "storage/03_Armors.png",
+			hover: "storage/03_Armors_Hover.png",
+			selected: "storage/03_Armors_Select.png"
+		},
+		"WEAPONS": {
+			normal: "storage/04_Weapons.png",
+			hover: "storage/04_Weapons_Hover.png",
+			selected: "storage/04_Weapons_Select.png"
+		},
+		"TOOLS": {
+			normal: "storage/05_Tools.png",
+			hover: "storage/05_Tools_Hover.png",
+			selected: "storage/05_Tools_Select.png"
+		},
+		"MINDFORCE": {
+			normal: "storage/06_Mindforce.png",
+			hover: "storage/06_Mindforce_Hover.png",
+			selected: "storage/06_Mindforce_Select.png"
+		},
+		"MATERIALS": {
+			normal: "storage/07_Materials.png",
+			hover: "storage/07_Materials_Hover.png",
+			selected: "storage/07_Materials_Select.png"
+		},
+		"RESOURCES": {
+			normal: "storage/08_Resources.png",
+			hover: "storage/08_Resources_Hover.png",
+			selected: "storage/08_Resources_Select.png"
+		},
+		"BLUEPRINTS": {
+			normal: "storage/09_Blueprints.png",
+			hover: "storage/09_Blueprints_Hover.png",
+			selected: "storage/09_Blueprints_Select.png"
+		},
+		"VEHICLES": {
+			normal: "storage/10_Vehicles.png",
+			hover: "storage/10_Vehicles_Hover.png",
+			selected: "storage/10_Vehicles_Select.png"
+		},
+		"MISCELLANEOUS": {
+			normal: "storage/11_Miscellaneous.png",
+			hover: "storage/11_Miscellaneous_Hover.png",
+			selected: "storage/11_Miscellaneous_Select.png"
+		}
+	};
 	
 	function updateLanguageButtons() {
 		document.getElementById("btnEN").classList.remove("active");
@@ -436,7 +448,7 @@
 		}
 	}
 
-		function formatRayon(rayon) {
+	function formatRayon(rayon) {
 		if (!rayon) return "";
 
 		return rayon
@@ -493,6 +505,7 @@
 					selectedCategory = null;
 					resetCategories();
 					resetRayonFilter();
+					updateFilterVisibility();
 					applyFilter();
 					return;
 				}
@@ -500,6 +513,7 @@
 				selectedCategory = cat;
 				updateCategoryImages();
 				updateRayonFilter();
+				updateFilterVisibility();
 				applyFilter();
 			};
 
@@ -520,64 +534,66 @@
 		console.error("Erreur chargement data:", err);
 	});
 
-function updateCategoryImages() {
-  document.querySelectorAll(".rayon-img").forEach(img => {
-    const cat = img.dataset.category;
-    const config = CATEGORY_IMAGES[cat];
+	function updateCategoryImages() {
+		document.querySelectorAll(".rayon-img").forEach(img => {
+			const cat = img.dataset.category;
+			const config = CATEGORY_IMAGES[cat];
 
-    if (cat === selectedCategory) {
-      img.src = IMG_URL + config.selected;
-    } else {
-      img.src = IMG_URL + config.normal;
-    }
-  });
-}
+			if (cat === selectedCategory) {
+				img.src = IMG_URL + config.selected;
+			} else {
+				img.src = IMG_URL + config.normal;
+			}
+		});
+	}
 
-function resetCategories() {
-  document.querySelectorAll(".rayon-img").forEach(img => {
-    const cat = img.dataset.category;
-    img.src = IMG_URL + CATEGORY_IMAGES[cat].normal;
-  });
-}
+	function resetCategories() {
+		document.querySelectorAll(".rayon-img").forEach(img => {
+			const cat = img.dataset.category;
+			img.src = IMG_URL + CATEGORY_IMAGES[cat].normal;
+		});
+	}
 
-function updateRayonFilter() {
-  const select = document.getElementById('rayonFilter');
+	function updateRayonFilter() {
+		const select = document.getElementById('rayonFilter');
 
-  // reset
-  select.innerHTML = '';
-  select.disabled = false;
+		// reset
+		select.innerHTML = '';
+		select.disabled = false;
 
-  // option ALL
-  const allOption = document.createElement('option');
-  allOption.value = "";
-  allOption.textContent = t("all");
-  select.appendChild(allOption);
+		// option ALL
+		const allOption = document.createElement('option');
+		allOption.value = "";
+		allOption.textContent = t("all");
+		select.appendChild(allOption);
 
-  // filtrer data par catégorie
-  const filtered = data.filter(item => item.STORAGE === selectedCategory);
+		// filtrer data par catégorie
+		const filtered = data.filter(item => item.STORAGE === selectedCategory);
 
-  const rayons = [...new Set(filtered.map(item => item.RAYON))].sort();
+		const rayons = [...new Set(filtered.map(item => item.RAYON))].sort();
 
-  rayons.forEach(rayon => {
-    const option = document.createElement('option');
-    option.value = rayon;
-    option.textContent = formatRayon(rayon);
-    select.appendChild(option);
-  });
+		rayons.forEach(rayon => {
+			const option = document.createElement('option');
+			option.value = rayon;
+			option.textContent = formatRayon(rayon);
+			select.appendChild(option);
+		});
 
-  // valeur par défaut = ALL
-  select.value = "";
-}
+		// valeur par défaut = ALL
+		select.value = "";
+	}
 
-function resetRayonFilter() {
-  const select = document.getElementById('rayonFilter');
+	function resetRayonFilter() {
+		const select = document.getElementById('rayonFilter');
 
-  select.innerHTML = '<option value="">${t("selectCategory")}</option>';
-  select.disabled = true;
-}
+		select.innerHTML = '<option value="">${t("selectCategory")}</option>';
+		select.disabled = true;
+	}
 
 	// Filtre par rayon et quantité
 	function applyFilter() {
+		updateFilterVisibility();
+		
 		const selectedRayon = document.getElementById('rayonFilter').value;
 
 		let filtered = data;
@@ -602,16 +618,16 @@ function resetRayonFilter() {
 		scrollToTop();
 	}
 
-      function selectRayon(rayon) {
+	function selectRayon(rayon) {
         // Met à jour le select
         const select = document.getElementById('rayonFilter');
         select.value = rayon;
 
         // Applique le filtre
         applyFilter();
-      }
+	}
 	  
-	  function formatDateMU(dateStr) {
+	function formatDateMU(dateStr) {
 		if (!dateStr) return { display: "", full: "" };
 
 		const d = new Date(dateStr);
@@ -635,9 +651,9 @@ function resetRayonFilter() {
 
 		if (diffHours < 24) {
 			if (diffHours >= 1) {
-			display = `il y a ${Math.floor(diffHours)}h`;
+				display = `il y a ${Math.floor(diffHours)}h`;
 			} else {
-			const mins = Math.max(1, Math.floor(diffMinutes));
+				const mins = Math.max(1, Math.floor(diffMinutes));
 			display = `il y a ${mins} min`;
 			}
 		} else {
@@ -654,31 +670,31 @@ function resetRayonFilter() {
 	}
 	
 	function getMUColor(dateStr) {
-  if (!dateStr) return "#000";
+		if (!dateStr) return "#000";
 
-  const d = new Date(dateStr);
-  const now = new Date();
+		const d = new Date(dateStr);
+		const now = new Date();
 
-  const diffMs = now - d;
-  const days = diffMs / (1000 * 60 * 60 * 24);
+		const diffMs = now - d;
+		const days = diffMs / (1000 * 60 * 60 * 24);
 
-  // > 7 jours → on ne doit plus afficher
-  if (days > 7) return null;
+		// > 7 jours → on ne doit plus afficher
+		if (days > 7) return null;
 
-  // < 1 jour → noir
-  if (days <= 1) return "#000000";
+		// < 1 jour → noir
+		if (days <= 1) return "#000000";
 
-  // Dégradé entre 1 et 7 jours
-  const ratio = (days - 1) / 6; // 0 → 1
+		// Dégradé entre 1 et 7 jours
+		const ratio = (days - 1) / 6; // 0 → 1
 
-  // 0 = noir (0), 1 = gris clair (~200)
-  const gray = Math.round(0 + ratio * 200);
+		// 0 = noir (0), 1 = gris clair (~200)
+		const gray = Math.round(0 + ratio * 200);
 
-  return `rgb(${gray}, ${gray}, ${gray})`;
-}
+		return `rgb(${gray}, ${gray}, ${gray})`;
+	}
 
-      // Génère les cards HTML
-      function renderCards(items) {
+	// Génère les cards HTML
+	function renderCards(items) {
         const container = document.getElementById('cardContainer');
 		const emptyState = document.getElementById('emptyState');
 		const loadingState = document.getElementById('loadingState');
@@ -715,28 +731,28 @@ function resetRayonFilter() {
         items.sort((a,b) => a.ITEM.localeCompare(b.ITEM));
 
         items.forEach(item => {
-          const card = document.createElement('div');
-          card.className = 'card';
+			const card = document.createElement('div');
+			card.className = 'card';
 
-         // Image ou placeholder
-		let imageSrc = "";
+			// Image ou placeholder
+			let imageSrc = "";
 
-		// Vérifie si IMAGE est valide
-		if (item.IMAGE && item.IMAGE !== '--') {
+			// Vérifie si IMAGE est valide
+			if (item.IMAGE && item.IMAGE !== '--') {
 
-			// Si ce n'est PAS une URL complète → on préfixe avec IMG_URL
-			if (!item.IMAGE.startsWith("http")) {
-				imageSrc = IMG_URL + item.IMAGE;
-			} else {
-				imageSrc = item.IMAGE;
+				// Si ce n'est PAS une URL complète → on préfixe avec IMG_URL
+				if (!item.IMAGE.startsWith("http")) {
+					imageSrc = IMG_URL + item.IMAGE;
+				} else {
+					imageSrc = item.IMAGE;
+				}
 			}
-		}
 
-		const imgHTML = imageSrc
-			? `<div class="image-container">
-				<img src="${imageSrc}" alt="${item.ITEM}">
-			</div>`
-			: `<div class="image-container" style="background:#eee;">No image</div>`;
+			const imgHTML = imageSrc
+				? `<div class="image-container">
+					<img src="${imageSrc}" alt="${item.ITEM}">
+				</div>`
+				: `<div class="image-container" style="background:#eee;">No image</div>`;
 
 			// Affichage prix et total avec 2 décimales + monnaie "peds"
 			let prixUnitaire = "--";
@@ -801,33 +817,39 @@ function resetRayonFilter() {
 					<p><span class="label-italic">${t("quantity")}</span>: ${item.QUANTITE}</p>
 					<p><span class="label-italic">${t("unitPrice")}</span>: ${prixUnitaire} peds</p>
 					<p><span class="label-italic">${t("total")}</span>: ${total} peds</p>
-						${muHTML}
+					${muHTML}
 				`;
 
 				container.appendChild(card);
 			});
 		}
 
-      function formatNumber(value) {
+	function formatNumber(value) {
         if (value === "" || value == null) return "";
         const str = value.toString();
         if (!str.includes(".")) return str + ".00";
         const decimals = str.split(".")[1].length;
         if (decimals === 1) return str + "0";
         return str; // 2 décimales ou + → on garde tel quel
-      }
+	}
 	  
-	  function scrollToTop() {
+	function scrollToTop() {
 		const topAnchor = document.querySelector('a[name="top"]');
 		if (topAnchor) {
 			topAnchor.scrollIntoView({ behavior: "smooth" });
 		}
-	  }
+	}
 	  
-	document.addEventListener("DOMContentLoaded", () => {
-		updateLanguageButtons();
-		applyTranslations();
-	});
+	function updateFilterVisibility() {
+		const filter = document.querySelector(".filter");
+
+		if (selectedCategory) {
+			filter.style.display = "flex";
+		} else {
+			filter.style.display = "none";
+		}
+	}
+	  
     </script>
   </body>
 </html>
