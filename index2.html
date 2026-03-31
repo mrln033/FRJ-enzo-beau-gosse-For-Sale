@@ -237,7 +237,12 @@
 
     <script>
 	
-	let currentLang = localStorage.getItem("lang") || "EN";
+	let currentLang = localStorage.getItem("lang");
+
+	if (!currentLang) {
+		currentLang = "EN";
+		localStorage.setItem("lang", currentLang);
+	}
 
 	function setLanguage(lang) {
 		currentLang = lang;
@@ -253,12 +258,7 @@
 	let selectedCategory = null;
 	let isLoading = true;
 	let lastRenderedItems = [];
-	let currentLang = localStorage.getItem("lang");
-
-	if (!currentLang) {
-		currentLang = "EN";
-		localStorage.setItem("lang", currentLang);
-	}
+	
 
 	const TRANSLATIONS = {
 		EN: {
