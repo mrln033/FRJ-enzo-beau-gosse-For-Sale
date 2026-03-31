@@ -201,6 +201,10 @@
   opacity: 0.8;
 }
 
+#loadingState::before {
+  content: "⏳ ";
+}
+
     </style>
   </head>
   <body>
@@ -242,12 +246,17 @@
 		currentLang = "EN";
 		localStorage.setItem("lang", currentLang);
 	}
-
+		
 	function setLanguage(lang) {
 		currentLang = lang;
+
+		// sauvegarde
 		localStorage.setItem("lang", lang);
+
+		// mise à jour UI
+		updateLanguageButtons();
 		applyTranslations();
-		renderCards(lastRenderedItems); // refresh dynamique
+		renderCards(lastRenderedItems);
 	}
 	
 	const API_URL = "https://script.google.com/macros/s/AKfycbzmEVTzK9y1-xMyQfzKR-MiUJKEDPqne-Y-WXeWmhsh7cw3XGuXM3wq_VEAWQpmFET9/exec";
@@ -395,25 +404,6 @@
 				selected: "storage/11_Miscellaneous_Select.png"
 			}
 		};
-		
-		document.addEventListener("DOMContentLoaded", () => {
-			document.getElementById("langToggle").addEventListener("click", () => {
-				currentLang = currentLang === "EN" ? "FR" : "EN";
-				renderCards(lastRenderedItems);
-			});
-		});
-		
-	function setLanguage(lang) {
-		currentLang = lang;
-
-		// sauvegarde
-		localStorage.setItem("lang", lang);
-
-		// mise à jour UI
-		updateLanguageButtons();
-		applyTranslations();
-		renderCards(lastRenderedItems);
-	}
 	
 	function updateLanguageButtons() {
 		document.getElementById("btnEN").classList.remove("active");
@@ -433,6 +423,7 @@
 	function applyTranslations() {
 		document.getElementById("title").innerText = t("title");
 		document.getElementById("subtitle").innerText = t("subtitle");
+		document.getElementById("loadingState").innerText = t("loadingState");
 
 		document.getElementById("filterLabel").innerHTML =
 			`<span class="label-italic">${t("filterLabel")}</span>:`;
@@ -581,7 +572,7 @@ function updateRayonFilter() {
 function resetRayonFilter() {
   const select = document.getElementById('rayonFilter');
 
-  select.innerHTML = '<option value="">Select a Category</option>';
+  select.innerHTML = '<option value="">${t("selectCategory")}</option>';
   select.disabled = true;
 }
 
@@ -701,8 +692,6 @@ function resetRayonFilter() {
 
 			// on affiche aussi le message explicatif
 			document.getElementById("emptyText").innerHTML = t("empty");
-			document.getElementById("langToggle").innerText =
-				currentLang === "EN" ? "🇫🇷 FR" : "🇬🇧 EN";
 
 			emptyState.style.display = "block";
 			return;
