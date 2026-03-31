@@ -187,14 +187,26 @@
   margin-left: 5px;
   padding: 5px 8px;
   cursor: pointer;
+  border: 1px solid #ccc;
+  background: #fff;
+}
+
+#langSwitcher button.active {
+  background: #333;
+  color: #fff;
+  border-color: #333;
+}
+
+#langSwitcher button:hover {
+  opacity: 0.8;
 }
 
     </style>
   </head>
   <body>
 	<div id="langSwitcher">
-		<button onclick="setLanguage('EN')">🇬🇧 EN</button>
-		<button onclick="setLanguage('FR')">🇫🇷 FR</button>
+		<button id="btnEN" onclick="setLanguage('EN')">🇬🇧 EN</button>
+		<button id="btnFR" onclick="setLanguage('FR')">🇫🇷 FR</button>
 	</div>
     <div align="center"><h1 id="title"></h1></div>
     <hr>
@@ -241,7 +253,12 @@
 	let selectedCategory = null;
 	let isLoading = true;
 	let lastRenderedItems = [];
-	let currentLang = "EN";
+	let currentLang = localStorage.getItem("lang");
+
+	if (!currentLang) {
+		currentLang = "EN";
+		localStorage.setItem("lang", currentLang);
+	}
 
 	const TRANSLATIONS = {
 		EN: {
@@ -389,6 +406,29 @@
 			});
 		});
 		
+	function setLanguage(lang) {
+		currentLang = lang;
+
+		// sauvegarde
+		localStorage.setItem("lang", lang);
+
+		// mise à jour UI
+		updateLanguageButtons();
+		applyTranslations();
+		renderCards(lastRenderedItems);
+	}
+	
+	function updateLanguageButtons() {
+		document.getElementById("btnEN").classList.remove("active");
+		document.getElementById("btnFR").classList.remove("active");
+
+		if (currentLang === "EN") {
+			document.getElementById("btnEN").classList.add("active");
+		} else {
+			document.getElementById("btnFR").classList.add("active");
+		}
+	}
+	
 	function t(key) {
 		return TRANSLATIONS[currentLang][key] || key;
 	}
@@ -802,6 +842,7 @@ function resetRayonFilter() {
 	  }
 	  
 	document.addEventListener("DOMContentLoaded", () => {
+		updateLanguageButtons();
 		applyTranslations();
 	});
     </script>
