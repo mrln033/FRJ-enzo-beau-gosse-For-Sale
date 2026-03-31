@@ -121,6 +121,40 @@
   width: 100%;
   display: inline-block;
 }
+
+#loadingState {
+  display: block;
+  text-align: center;
+  font-size: 16px;
+  margin-top: 20px;
+  color: #555;
+}
+
+#emptyState {
+  display: none;
+  position: relative;
+  padding: 30px;
+  text-align: center;
+  background: #fff;
+  border-radius: 10px;
+  margin-top: 20px;
+  box-shadow: 2px 2px 6px rgba(0,0,0,0.1);
+}
+
+#langToggle {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+#emptyText {
+  font-size: 15px;
+  color: #555;
+}
+
     </style>
   </head>
   <body>
@@ -143,7 +177,14 @@
 	  </select>
     </div>
 
-    <div class="card-container" id="cardContainer">Chargement en cours...</div>
+    <div id="loadingState">Chargement en cours...</div>
+
+	<div id="emptyState">
+		<button id="langToggle">EN</button>
+		<p id="emptyText"></p>
+	</div>
+
+	<div class="card-container" id="cardContainer"></div>
 
     <script>
 		const API_URL = "https://script.google.com/macros/s/AKfycbzmEVTzK9y1-xMyQfzKR-MiUJKEDPqne-Y-WXeWmhsh7cw3XGuXM3wq_VEAWQpmFET9/exec";
@@ -151,6 +192,20 @@
 		
 		let data = [];
 		let selectedCategory = null;
+		let isLoading = true;
+		let lastRenderedItems = [];
+		let currentLang = "EN";
+
+		const TEXTS = {
+			EN: {
+				initial: "Select a category to display items.",
+				empty: "No items match your filters."
+			},
+			FR: {
+				initial: "Sélectionnez une catégorie pour afficher les objets.",
+				empty: "Aucun objet ne correspond aux filtres."
+			}
+		};
 		
 		const CATEGORY_IMAGES = {
 			"MONEY AND DEEDS": {
@@ -209,6 +264,13 @@
 				selected: "storage/11_Miscellaneous_Select.png"
 			}
 		};
+		
+		document.addEventListener("DOMContentLoaded", () => {
+			document.getElementById("langToggle").addEventListener("click", () => {
+				currentLang = currentLang === "EN" ? "FR" : "EN";
+				renderCards(lastRenderedItems);
+			});
+		});
 
 		function formatRayon(rayon) {
 		if (!rayon) return "";
@@ -280,7 +342,13 @@
 			container.appendChild(img);
 			});
 
+			// ✅ FIN DU LOADING
+			isLoading = false;
+			document.getElementById("loadingState").style.display = "none";
+
+			// affiche message initial
 			renderCards([]);
+
 		})
 		.catch(err => {
 		console.error("Erreur chargement data:", err);
@@ -446,7 +514,35 @@ function resetRayonFilter() {
       // Génère les cards HTML
       function renderCards(items) {
         const container = document.getElementById('cardContainer');
-        container.innerHTML = '';
+		const emptyState = document.getElementById('emptyState');
+		const loadingState = document.getElementById('loadingState');
+
+		lastRenderedItems = items;
+		container.innerHTML = '';
+		
+		// ⏳ Affichage loading prioritaire
+		if (isLoading) {
+			loadingState.style.display = "block";
+			emptyState.style.display = "none";
+			return;
+		} else {
+			loadingState.style.display = "none";
+		}
+		
+		// 📭 Aucun résultat / état initial
+		if (!items || items.length === 0) {
+
+			let messageType = selectedCategory ? "empty" : "initial";
+
+			document.getElementById("emptyText").innerText = TEXTS[currentLang][messageType];
+			document.getElementById("langToggle").innerText =
+			currentLang === "EN" ? "🇫🇷 FR" : "🇬🇧 EN";
+	
+			emptyState.style.display = "block";
+			return;
+		} else {
+			emptyState.style.display = "none";
+		}
 
         // Tri alphabétique par ITEM
         items.sort((a,b) => a.ITEM.localeCompare(b.ITEM));
