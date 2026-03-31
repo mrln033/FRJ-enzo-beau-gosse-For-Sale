@@ -703,8 +703,6 @@ function resetRayonFilter() {
 		if (!selectedCategory || items.length === 0) {
 
 			document.getElementById("emptyText").innerHTML = t("empty");
-			document.getElementById("langToggle").innerText =
-				currentLang === "EN" ? "🇫🇷 FR" : "🇬🇧 EN";
 	
 			emptyState.style.display = "block";
 			return;
