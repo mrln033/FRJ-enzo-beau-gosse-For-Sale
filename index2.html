@@ -699,13 +699,13 @@
 			<input type="number" id="calcQty" value="${item.QUANTITE}" min="1">
 			</p>
 
-			<p>{$t("unitPrice")}: ${prix.toFixed(2)} peds</p>
+			<p>${t("unitPrice")}: ${prix.toFixed(2)} peds</p>
 
 			<p>TT: <span id="calcTT">${(item.QUANTITE * prix).toFixed(2)}</span> peds</p>
 
 			<p>MU: ${mu}</p>
 
-			<p>{$t("calcSell")}: <span id="calcSell">--</span></p>
+			<p>${t("calcSell")}: <span id="calcSell">--</span></p>
 
 			<button onclick="closeToast()">${t("close")}</button>
 		`;
