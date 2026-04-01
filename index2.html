@@ -602,6 +602,7 @@
 			}
 
 			let muHTML = "";
+			let calculatorHTML = "";
 
 			// Afficher uniquement si MU existe et n'est pas vide
 			if (item.MU !== "" && item.MU != null) {
@@ -623,11 +624,20 @@
 			
 			}
 				
-			const calculatorHTML = `
-				<div class="calc-icon" 		onclick='openCalculator(${JSON.stringify(item).replace(/'/g, "&apos;")})'>
-				🧮
-				</div>
-			`;
+			// 👉 afficher l'icône SEULEMENT si prix + MU existent
+			if (
+				item.PRIX_UNITAIRE !== "" &&
+				item.PRIX_UNITAIRE != null &&
+				item.MU !== "" &&
+				item.MU != null
+			) {
+				calculatorHTML = `
+					<div class="calc-icon"
+						onclick='openCalculator(${JSON.stringify(item).replace(/'/g, "&apos;")})'>
+						🧮
+					</div>
+				`;
+			}
 			
 			card.innerHTML = `
 				${imgHTML}
