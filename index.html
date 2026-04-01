@@ -501,8 +501,8 @@
 		// < 1 jour → noir
 		if (days <= 1) return "#000000";
 
-		// Dégradé entre 1 et 7 jours
-		const ratio = (days - 1) / 6; // 0 → 1
+		// Dégradé entre 1 et 8 jours
+		const ratio = (days - 1) / 7; // 0 → 1
 
 		// 0 = noir (0), 1 = gris clair (~200)
 		const gray = Math.round(0 + ratio * 200);
