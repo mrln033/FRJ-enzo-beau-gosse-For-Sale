@@ -264,15 +264,21 @@ h1 {
 }
 
 .toast {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  background: white;
-  border-radius: 10px;
-  padding: 15px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-  width: 280px;
-  z-index: 9999;
+	position: fixed;
+	bottom: 20px;
+	right: 20px;
+	width: 300px;
+
+	background: #ffffff;
+	border: 2px solid #4a90e2; /* couleur principale */
+	border-radius: 12px;
+	box-shadow: 0 8px 25px rgba(0,0,0,0.25);
+
+	padding: 0; /* important pour header */
+	z-index: 9999;
+
+	text-align: center; /* 🔥 tout centré */
+	font-family: Arial, sans-serif;
 }
 
 .hidden {
@@ -280,9 +286,52 @@ h1 {
 }
 
 .toast h3 {
-  margin-top: 0;
+	margin: 0;
+	padding: 10px;
+
+	background: #4a90e2; /* même couleur que bordure */
+	color: white;
+	border-top-left-radius: 10px;
+	border-top-right-radius: 10px;
+
+	font-size: 16px;
 }
 
 .toast input {
-  width: 80px;
+	width: 80px;
+	text-align: center;
+	padding: 4px;
+	border-radius: 6px;
+	border: 1px solid #ccc;
+}
+
+.toast button {
+	margin: 10px 0 15px 0;
+	padding: 6px 12px;
+
+	background: #4a90e2;
+	color: white;
+	border: none;
+	border-radius: 6px;
+	cursor: pointer;
+	transition: 0.2s;
+}
+
+.toast button:hover {
+	background: #357abd;
+}
+
+.toast p {
+	margin: 10px 0;
+}
+
+.toast::before {
+	content: "";
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	background: rgba(0,0,0,0.3);
+	z-index: -1;
 }
