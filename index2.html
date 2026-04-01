@@ -113,6 +113,9 @@
 			quantity: "Quantity",
 			unitPrice: "Unit Price",
 			total: "Total TT",
+			calcSell: "Selling Price",
+			
+			close: "Close",
 			
 			empty: `
 				<h2>Welcome to my Inventory</h2>
@@ -151,6 +154,9 @@
 			quantity: "Quantité",
 			unitPrice: "Prix unitaire",
 			total: "Total TT",
+			calcSell: "Prix de Vente",
+			
+			close: "Fermer",
 			
 			empty: `
 				<h2>Bienvenue dans mon Inventaire</h2>
@@ -624,13 +630,12 @@
 			
 			}
 				
-			// 👉 afficher l'icône SEULEMENT si prix + MU existent
-			if (
-				item.PRIX_UNITAIRE !== "" &&
-				item.PRIX_UNITAIRE != null &&
-				item.MU !== "" &&
-				item.MU != null
-			) {
+			// 👉 afficher l'icône SEULEMENT si prix + MU existent + MU %
+			const hasPrice = item.PRIX_UNITAIRE !== "" && item.PRIX_UNITAIRE != null && !isNaN(item.PRIX_UNITAIRE);
+			const hasMU = item.MU !== "" && item.MU != null;
+			const isPercentMU = typeof item.MU === "string" && item.MU.includes("%");
+
+			if (hasPrice && hasMU && isPercentMU) {
 				calculatorHTML = `
 					<div class="calc-icon"
 						onclick='openCalculator(${JSON.stringify(item).replace(/'/g, "&apos;")})'>
@@ -690,19 +695,19 @@
 			<h3>${item.ITEM}</h3>
 
 			<p>
-			Quantité:
+			${t(quantity")}:
 			<input type="number" id="calcQty" value="${item.QUANTITE}" min="1">
 			</p>
 
-			<p>Prix unitaire: ${prix.toFixed(2)} peds</p>
+			<p>$t("unitPrice")}: ${prix.toFixed(2)} peds</p>
 
 			<p>TT: <span id="calcTT">${(item.QUANTITE * prix).toFixed(2)}</span> peds</p>
 
 			<p>MU: ${mu}</p>
 
-			<p>Prix de vente: <span id="calcSell">--</span></p>
+			<p>$t("calcSell")}: <span id="calcSell">--</span></p>
 
-			<button onclick="closeToast()">Fermer</button>
+			<button onclick="closeToast()">${t("close")}</button>
 		`;
 
 		toast.classList.remove("hidden");
