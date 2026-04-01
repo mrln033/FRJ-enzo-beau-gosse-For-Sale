@@ -59,6 +59,8 @@
 	</div>
 
 	<div class="card-container" id="cardContainer"></div>
+	
+	<div id="toastCalc" class="toast hidden"></div>
 
     <script>
 	
@@ -501,8 +503,8 @@
 		// < 1 jour → noir
 		if (days <= 1) return "#000000";
 
-		// Dégradé entre 1 et 7 jours
-		const ratio = (days - 1) / 6; // 0 → 1
+		// Dégradé entre 1 et 8 jours
+		const ratio = (days - 1) / 7; // 0 → 1
 
 		// 0 = noir (0), 1 = gris clair (~200)
 		const gray = Math.round(0 + ratio * 200);
@@ -618,8 +620,15 @@
 						</span>
 					</p>
 				`;
+				
+				const calculatorHTML = `
+					<div class="calc-icon" 		onclick='openCalculator(${JSON.stringify(item).replace(/'/g, "&apos;")})'>
+					🧮
+					</div>
+				`;
+			
 			}
-
+			
 			card.innerHTML = `
 				${imgHTML}
 				<h3>${itemTitle}</h3>
@@ -627,13 +636,14 @@
 				<p><span class="label-italic">${t("quantity")}</span>: ${item.QUANTITE}</p>
 				<p><span class="label-italic">${t("unitPrice")}</span>: ${prixUnitaire} peds</p>
 				<p><span class="label-italic">${t("total")}</span>: ${total} peds</p>
-					${muHTML}
+				${muHTML}
+				${calculatorHTML}
 			`;
 
 			container.appendChild(card);
 		});
 	}
-
+	
 	function formatNumber(value) {
         if (value === "" || value == null) return "";
         const str = value.toString();
@@ -659,7 +669,72 @@
 			filter.style.display = "none";
 		}
 	}
-	  
+
+	function openCalculator(item) {
+		const toast = document.getElementById("toastCalc");
+
+		const prix = parseFloat(item.PRIX_UNITAIRE) || 0;
+		const mu = item.MU || "";
+
+		toast.innerHTML = `
+			<h3>${item.ITEM}</h3>
+
+			<p>
+			Quantité:
+			<input type="number" id="calcQty" value="${item.QUANTITE}" min="1">
+			</p>
+
+			<p>Prix unitaire: ${prix.toFixed(2)} peds</p>
+
+			<p>TT: <span id="calcTT">${(item.QUANTITE * prix).toFixed(2)}</span> peds</p>
+
+			<p>MU: ${mu}</p>
+
+			<p>Prix de vente: <span id="calcSell">--</span></p>
+
+			<button onclick="closeToast()">Fermer</button>
+		`;
+
+		toast.classList.remove("hidden");
+
+		// recalcul live
+		document.getElementById("calcQty").addEventListener("input", () => {
+			updateCalc(prix, mu);
+		});
+
+		updateCalc(prix, mu);
+	}
+	
+	function updateCalc(prix, muStr) {
+		const qty = parseFloat(document.getElementById("calcQty").value) || 0;
+
+		const tt = qty * prix;
+		document.getElementById("calcTT").innerText = tt.toFixed(2);
+
+		// Extraction MU (ex: "105%" → 1.05)
+		let muValue = 1;
+
+		if (muStr && muStr.includes("%")) {
+			muValue = parseFloat(muStr.replace("%", "")) / 100;
+		}
+
+		const sell = tt * muValue;
+
+		document.getElementById("calcSell").innerText = sell.toFixed(2) + " peds";
+	}
+	
+	function closeToast() {
+		document.getElementById("toastCalc").classList.add("hidden");
+	}
+
+
+	document.addEventListener("click", (e) => {
+		const toast = document.getElementById("toastCalc");
+		if (!toast.contains(e.target) && !e.target.classList.contains("calc-icon")) {
+			toast.classList.add("hidden");
+		}
+	});
+	
     </script>
   </body>
 </html>
