@@ -609,37 +609,30 @@
 				// Si trop ancien → on n'affiche rien
 				if (color === null) return;
 
-					const dateFormatted = formatDateMU(item.DATE_MU);
+				const dateFormatted = formatDateMU(item.DATE_MU);
 
-					const muValue = parseFloat(item.MU);
-					let muDisplay = "";
-
-					if (!isNaN(muValue)) {
-						muDisplay = (muValue * 100).toFixed(2) + " %";
-					}
-
-					muHTML = `
-						<p title="${dateFormatted.display}">
+				muHTML = `
+					<p title="${dateFormatted.display}">
 						<span class="MU-style" style="color:${color}">
-							MU: ${muDisplay}
+							MU: ${item.MU}
 						</span>
-						</p>
-					`;
-				}
-
-				card.innerHTML = `
-					${imgHTML}
-					<h3>${itemTitle}</h3>
-					${rayonHTML}
-					<p><span class="label-italic">${t("quantity")}</span>: ${item.QUANTITE}</p>
-					<p><span class="label-italic">${t("unitPrice")}</span>: ${prixUnitaire} peds</p>
-					<p><span class="label-italic">${t("total")}</span>: ${total} peds</p>
-					${muHTML}
+					</p>
 				`;
+			}
 
-				container.appendChild(card);
-			});
-		}
+			card.innerHTML = `
+				${imgHTML}
+				<h3>${itemTitle}</h3>
+				${rayonHTML}
+				<p><span class="label-italic">${t("quantity")}</span>: ${item.QUANTITE}</p>
+				<p><span class="label-italic">${t("unitPrice")}</span>: ${prixUnitaire} peds</p>
+				<p><span class="label-italic">${t("total")}</span>: ${total} peds</p>
+					${muHTML}
+			`;
+
+			container.appendChild(card);
+		});
+	}
 
 	function formatNumber(value) {
         if (value === "" || value == null) return "";
