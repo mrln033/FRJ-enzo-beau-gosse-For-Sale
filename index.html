@@ -59,6 +59,8 @@
 	</div>
 
 	<div class="card-container" id="cardContainer"></div>
+	
+	<div id="toastCalc" class="toast hidden"></div>
 
     <script>
 	
@@ -111,6 +113,9 @@
 			quantity: "Quantity",
 			unitPrice: "Unit Price",
 			total: "Total TT",
+			calcSell: "Selling Price",
+			
+			close: "Close",
 			
 			empty: `
 				<h2>Welcome to my Inventory</h2>
@@ -149,6 +154,9 @@
 			quantity: "Quantité",
 			unitPrice: "Prix unitaire",
 			total: "Total TT",
+			calcSell: "Prix de Vente",
+			
+			close: "Fermer",
 			
 			empty: `
 				<h2>Bienvenue dans mon Inventaire</h2>
@@ -600,6 +608,7 @@
 			}
 
 			let muHTML = "";
+			let calculatorHTML = "";
 
 			// Afficher uniquement si MU existe et n'est pas vide
 			if (item.MU !== "" && item.MU != null) {
@@ -618,8 +627,23 @@
 						</span>
 					</p>
 				`;
+			
 			}
+				
+			// 👉 afficher l'icône SEULEMENT si prix + MU existent + MU %
+			const hasPrice = item.PRIX_UNITAIRE !== "" && item.PRIX_UNITAIRE != null && !isNaN(item.PRIX_UNITAIRE);
+			const hasMU = item.MU !== "" && item.MU != null;
+			const isPercentMU = typeof item.MU === "string" && item.MU.includes("%");
 
+			if (hasPrice && hasMU && isPercentMU) {
+				calculatorHTML = `
+					<div class="calc-icon"
+						onclick='openCalculator(${JSON.stringify(item).replace(/'/g, "&apos;")})'>
+						🧮
+					</div>
+				`;
+			}
+			
 			card.innerHTML = `
 				${imgHTML}
 				<h3>${itemTitle}</h3>
@@ -627,7 +651,8 @@
 				<p><span class="label-italic">${t("quantity")}</span>: ${item.QUANTITE}</p>
 				<p><span class="label-italic">${t("unitPrice")}</span>: ${prixUnitaire} peds</p>
 				<p><span class="label-italic">${t("total")}</span>: ${total} peds</p>
-					${muHTML}
+				${muHTML}
+				${calculatorHTML}
 			`;
 
 			container.appendChild(card);
@@ -659,7 +684,72 @@
 			filter.style.display = "none";
 		}
 	}
-	  
+
+	function openCalculator(item) {
+		const toast = document.getElementById("toastCalc");
+
+		const prix = parseFloat(item.PRIX_UNITAIRE) || 0;
+		const mu = item.MU || "";
+
+		toast.innerHTML = `
+			<h3>${item.ITEM}</h3>
+
+			<p>
+			${t("quantity")}:
+			<input type="number" id="calcQty" value="${item.QUANTITE}" min="1">
+			</p>
+
+			<p>${t("unitPrice")}: ${prix.toFixed(2)} peds</p>
+
+			<p>TT: <span id="calcTT">${(item.QUANTITE * prix).toFixed(2)}</span> peds</p>
+
+			<p>MU: ${mu}</p>
+
+			<p>${t("calcSell")}: <span id="calcSell">--</span></p>
+
+			<button onclick="closeToast()">${t("close")}</button>
+		`;
+
+		toast.classList.remove("hidden");
+
+		// recalcul live
+		document.getElementById("calcQty").addEventListener("input", () => {
+			updateCalc(prix, mu);
+		});
+
+		updateCalc(prix, mu);
+	}
+	
+	function updateCalc(prix, muStr) {
+		const qty = parseFloat(document.getElementById("calcQty").value) || 0;
+
+		const tt = qty * prix;
+		document.getElementById("calcTT").innerText = tt.toFixed(2);
+
+		// Extraction MU (ex: "105%" → 1.05)
+		let muValue = 1;
+
+		if (muStr && muStr.includes("%")) {
+			muValue = parseFloat(muStr.replace("%", "")) / 100;
+		}
+
+		const sell = tt * muValue;
+
+		document.getElementById("calcSell").innerText = sell.toFixed(2) + " peds";
+	}
+	
+	function closeToast() {
+		document.getElementById("toastCalc").classList.add("hidden");
+	}
+
+
+	document.addEventListener("click", (e) => {
+		const toast = document.getElementById("toastCalc");
+		if (!toast.contains(e.target) && !e.target.classList.contains("calc-icon")) {
+			toast.classList.add("hidden");
+		}
+	});
+	
     </script>
   </body>
 </html>
