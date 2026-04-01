@@ -602,6 +602,7 @@
 			}
 
 			let muHTML = "";
+			let calculatorHTML = "";
 
 			// Afficher uniquement si MU existe et n'est pas vide
 			if (item.MU !== "" && item.MU != null) {
@@ -620,14 +621,14 @@
 						</span>
 					</p>
 				`;
-				
-				const calculatorHTML = `
-					<div class="calc-icon" 		onclick='openCalculator(${JSON.stringify(item).replace(/'/g, "&apos;")})'>
-					🧮
-					</div>
-				`;
 			
 			}
+				
+			const calculatorHTML = `
+				<div class="calc-icon" 		onclick='openCalculator(${JSON.stringify(item).replace(/'/g, "&apos;")})'>
+				🧮
+				</div>
+			`;
 			
 			card.innerHTML = `
 				${imgHTML}
