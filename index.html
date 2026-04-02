@@ -539,30 +539,33 @@ function parseMUDate(dateStr) {
 		return { display };
 	}
 	
-	function getMUColor(dateStr) {
-		if (!dateStr) return "#000";
+function getMUColor(dateStr) {
+  if (!dateStr) return "#000";
 
-		const d = parseMUDate(dateStr);
-		if (!d || isNaN(d.getTime())) return "#000";
-		const now = new Date();
+  const d = parseMUDate(dateStr);
+  if (!d || isNaN(d.getTime())) return "#000";
 
-		const diffMs = now - d;
-		const days = diffMs / (1000 * 60 * 60 * 24);
+  const now = new Date();
 
-		// > 7 jours → on ne doit plus afficher
-		if (days > 7) return null;
+  const diffMs = now - d;
+  const days = diffMs / (1000 * 60 * 60 * 24);
 
-		// < 1 jour → noir
-		if (days <= 1) return "#000000";
+  // 🔥 FIX stabilité float
+  const safeDays = Math.floor(days * 10) / 10;
 
-		// Dégradé entre 1 et 7 jours
-		const ratio = (days - 1) / 6; // 0 → 1
+  // > 7 jours → on ne doit plus afficher
+  if (safeDays >= 7) return null;
 
-		// 0 = noir (0), 1 = gris clair (~200)
-		const gray = Math.round(0 + ratio * 200);
+  // < 1 jour → noir
+  if (safeDays <= 1) return "#000000";
 
-		return `rgb(${gray}, ${gray}, ${gray})`;
-	}
+  // Dégradé entre 1 et 7 jours (PAS 8)
+  const ratio = (safeDays - 1) / 6; // 1 → 7 = 6 steps
+
+  const gray = Math.round(ratio * 200);
+
+  return `rgb(${gray}, ${gray}, ${gray})`;
+}
 
 	// Génère les cards HTML
 	function renderCards(items) {
