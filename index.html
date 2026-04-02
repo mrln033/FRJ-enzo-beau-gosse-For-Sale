@@ -632,22 +632,21 @@ function loadCategoryData(category) {
 			let calculatorHTML = "";
 
 			// Afficher uniquement si MU existe et n'est pas vide
-			if (item.MU !== "" && item.MU != null) {
+			let muHTML = "";
+
+			if (item.MU != null && item.MU !== "") {
 
 				const color = getMUColor(item.DATE_MU);
 
-				// Si trop ancien → on n'affiche PAS le MU mais on garde la card
-				if (color !== null) {
-					const dateFormatted = formatDateMU(item.DATE_MU);
+				const dateFormatted = formatDateMU(item.DATE_MU);
 
-					muHTML = `
-					<p title="${dateFormatted.display}">
-						<span class="MU-style" style="color:${color}">
+				muHTML = `
+					<p title="${dateFormatted?.display || ""}">
+					<span class="MU-style" style="color:${color}">
 						MU: ${item.MU}
-						</span>
+					</span>
 					</p>
-					`;
-				}
+				`;
 			}
 				
 			// 👉 afficher l'icône SEULEMENT si prix + MU existent + MU %
