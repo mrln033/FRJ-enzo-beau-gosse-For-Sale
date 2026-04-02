@@ -559,8 +559,8 @@ function getMUColor(dateStr) {
   // ⚫ 0 à 1 jour → noir
   if (safeDays <= 1) return "#000000";
 
-  // 🎨 dégradé 1 → 7 jours
-  const ratio = (safeDays - 1) / 6; // 6 steps (1→7)
+  // 🎨 dégradé 1 → 8 jours
+  const ratio = (safeDays - 1) / 7; // 6 steps (1→7)
   const gray = Math.round(ratio * 200);
 
   return `rgb(${gray}, ${gray}, ${gray})`;
