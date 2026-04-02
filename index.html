@@ -540,10 +540,10 @@ function parseMUDate(dateStr) {
 	}
 	
 	function getMUColor(dateStr) {
-		if (!dateStr) return "#fff";
+		if (!dateStr) return "#000";
 
 		const d = parseMUDate(dateStr);
-		if (!d || isNaN(d.getTime())) return "#fff";
+		if (!d || isNaN(d.getTime())) return "#000";
 		const now = new Date();
 
 		const diffMs = now - d;
@@ -555,8 +555,8 @@ function parseMUDate(dateStr) {
 		// < 1 jour → noir
 		if (days <= 1) return "#000000";
 
-		// Dégradé entre 1 et 8 jours
-		const ratio = (days - 1) / 7; // 0 → 1
+		// Dégradé entre 1 et 7 jours
+		const ratio = (days - 1) / 6; // 0 → 1
 
 		// 0 = noir (0), 1 = gris clair (~200)
 		const gray = Math.round(0 + ratio * 200);
