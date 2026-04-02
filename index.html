@@ -547,26 +547,20 @@ function getMUColor(dateStr) {
 
   const now = new Date();
 
-  const diffMs = now - d;
+  const diffMs = d - now; // 🔥 FIX ICI
   const days = diffMs / (1000 * 60 * 60 * 24);
 
-  // 🔥 FIX stabilité float
   const safeDays = Math.floor(days * 10) / 10;
 
-  // > 7 jours → on ne doit plus afficher
   if (safeDays >= 7) return null;
 
-  // < 1 jour → noir
   if (safeDays <= 1) return "#000000";
 
-  // Dégradé entre 1 et 8 jours
-  const ratio = (safeDays - 1) / 7; // 1 → 7 = 6 steps
-
+  const ratio = (safeDays - 1) / 7;
   const gray = Math.round(ratio * 200);
-console.log("MU RAW:", dateStr, "=> PARSED:", parseMUDate(dateStr), "Color = ", gray);
+
   return `rgb(${gray}, ${gray}, ${gray})`;
 }
-
 	// Génère les cards HTML
 	function renderCards(items) {
         const container = document.getElementById('cardContainer');
