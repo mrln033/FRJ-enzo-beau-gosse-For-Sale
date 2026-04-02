@@ -636,19 +636,18 @@ function loadCategoryData(category) {
 
 				const color = getMUColor(item.DATE_MU);
 
-				// Si trop ancien → on n'affiche rien
-				if (color === null) return;
+				// Si trop ancien → on n'affiche PAS le MU mais on garde la card
+				if (color !== null) {
+					const dateFormatted = formatDateMU(item.DATE_MU);
 
-				const dateFormatted = formatDateMU(item.DATE_MU);
-
-				muHTML = `
+					muHTML = `
 					<p title="${dateFormatted.display}">
 						<span class="MU-style" style="color:${color}">
-							MU: ${item.MU}
+						MU: ${item.MU}
 						</span>
 					</p>
-				`;
-			
+					`;
+				}
 			}
 				
 			// 👉 afficher l'icône SEULEMENT si prix + MU existent + MU %
