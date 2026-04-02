@@ -563,7 +563,7 @@ function getMUColor(dateStr) {
   const ratio = (safeDays - 1) / 7; // 1 → 7 = 6 steps
 
   const gray = Math.round(ratio * 200);
-
+console.log("MU RAW:", dateStr, "=> PARSED:", parseMUDate(dateStr), "Color = ", gray);
   return `rgb(${gray}, ${gray}, ${gray})`;
 }
 
