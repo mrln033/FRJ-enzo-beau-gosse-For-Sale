@@ -540,10 +540,10 @@ function parseMUDate(dateStr) {
 	}
 	
 	function getMUColor(dateStr) {
-		if (!dateStr) return "#000";
+		if (!dateStr) return "#fff";
 
 		const d = parseMUDate(dateStr);
-		if (!d || isNaN(d.getTime())) return "#000";
+		if (!d || isNaN(d.getTime())) return "#fff";
 		const now = new Date();
 
 		const diffMs = now - d;
