@@ -475,11 +475,45 @@ function loadCategoryData(category) {
         // Applique le filtre
         applyFilter();
 	}
+	
+	function parseMUDate(dateStr) {
+  if (!dateStr) return null;
+
+  // 🔥 tentative native (ISO ou déjà OK)
+  const direct = new Date(dateStr);
+  if (!isNaN(direct.getTime()) && dateStr.includes("T")) {
+    return direct;
+  }
+
+  // 🔥 format "dd/MM/yyyy HH:mm" ou "mm/dd/yyyy HH:mm"
+  const parts = dateStr.split(" ");
+  if (parts.length < 2) return direct;
+
+  const datePart = parts[0];
+  const timePart = parts[1];
+
+  const t = timePart.split(":");
+
+  if (datePart.includes("/")) {
+    const d = datePart.split("/");
+
+    // heuristique simple FR vs US
+    // si premier nombre > 12 → FR
+    if (parseInt(d[0]) > 12) {
+      return new Date(d[2], d[1] - 1, d[0], t[0], t[1] || 0, t[2] || 0);
+    } else {
+      return new Date(d[2], d[0] - 1, d[1], t[0], t[1] || 0, t[2] || 0);
+    }
+  }
+
+  return direct;
+}
 	  
 	function formatDateMU(dateStr) {
 		if (!dateStr) return { display: "", full: "" };
 
-		const d = new Date(dateStr);
+		const d = parseMUDate(dateStr);
+		if (!d || isNaN(d.getTime())) return { display: "", full: "" };
 		const now = new Date();
 
 		const diffMs = now - d;
@@ -521,7 +555,8 @@ function loadCategoryData(category) {
 	function getMUColor(dateStr) {
 		if (!dateStr) return "#000";
 
-		const d = new Date(dateStr);
+		const d = parseMUDate(dateStr);
+		if (!d || isNaN(d.getTime())) return "#000";
 		const now = new Date();
 
 		const diffMs = now - d;
