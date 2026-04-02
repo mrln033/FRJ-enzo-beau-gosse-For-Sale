@@ -64,7 +64,7 @@
 
     <script>
 	
-	document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", () => {
   updateLanguageButtons();
   applyTranslations();
   updateFilterVisibility();
@@ -72,55 +72,65 @@
   const container = document.getElementById("rayonImages");
   container.innerHTML = "";
 
-  Object.keys(CATEGORY_IMAGES).forEach(cat => {
-    const img = document.createElement("img");
-    const config = CATEGORY_IMAGES[cat];
+  // 🔥 on récupère les catégories dispo
+  fetch(API_URL + "?action=categories")
+    .then(res => res.json())
+    .then(categories => {
 
-    img.src = IMG_URL + config.normal;
-    img.className = "rayon-img";
-    img.dataset.category = cat;
-    img.title = cat;
+      Object.keys(CATEGORY_IMAGES).forEach(cat => {
 
-    // hover
-    img.onmouseenter = () => {
-      if (selectedCategory !== cat) {
-        img.src = IMG_URL + config.hover;
-      }
-    };
+        // ❌ si catégorie vide → on skip
+        if (!categories.includes(cat)) return;
 
-    img.onmouseleave = () => {
-      if (selectedCategory !== cat) {
+        const img = document.createElement("img");
+        const config = CATEGORY_IMAGES[cat];
+
         img.src = IMG_URL + config.normal;
-      }
-    };
+        img.className = "rayon-img";
+        img.dataset.category = cat;
+        img.title = cat;
 
-    // click
-    img.onclick = () => {
+        // hover
+        img.onmouseenter = () => {
+          if (selectedCategory !== cat) {
+            img.src = IMG_URL + config.hover;
+          }
+        };
 
-      // toggle OFF
-      if (selectedCategory === cat) {
-        selectedCategory = null;
-        resetCategories();
-        resetRayonFilter();
-        updateFilterVisibility();
-        renderCards([]);
-        return;
-      }
+        img.onmouseleave = () => {
+          if (selectedCategory !== cat) {
+            img.src = IMG_URL + config.normal;
+          }
+        };
 
-      selectedCategory = cat;
-      updateCategoryImages();
-      updateFilterVisibility();
+        // click
+        img.onclick = () => {
 
-      loadCategoryData(cat); // 🔥 NOUVEAU
-    };
+          if (selectedCategory === cat) {
+            selectedCategory = null;
+            resetCategories();
+            resetRayonFilter();
+            updateFilterVisibility();
+            renderCards([]);
+            return;
+          }
 
-    container.appendChild(img);
-  });
+          selectedCategory = cat;
+          updateCategoryImages();
+          updateFilterVisibility();
 
-  // affichage initial
-  renderCards([]);
-});
-	
+          loadCategoryData(cat); // 🔥 fetch items
+        };
+
+        container.appendChild(img);
+      });
+
+      renderCards([]);
+    })
+    .catch(err => {
+      console.error("Erreur chargement catégories:", err);
+    });
+});	
 	let currentLang = localStorage.getItem("lang");
 
 	if (!currentLang) {
