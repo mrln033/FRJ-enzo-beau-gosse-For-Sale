@@ -559,8 +559,8 @@ function getMUColor(dateStr) {
   // < 1 jour → noir
   if (safeDays <= 1) return "#000000";
 
-  // Dégradé entre 1 et 7 jours (PAS 8)
-  const ratio = (safeDays - 1) / 6; // 1 → 7 = 6 steps
+  // Dégradé entre 1 et 8 jours
+  const ratio = (safeDays - 1) / 7; // 1 → 7 = 6 steps
 
   const gray = Math.round(ratio * 200);
 
