@@ -476,37 +476,24 @@ function loadCategoryData(category) {
         applyFilter();
 	}
 	
-	function parseMUDate(dateStr) {
+function parseMUDate(dateStr) {
   if (!dateStr) return null;
 
-  // 🔥 tentative native (ISO ou déjà OK)
-  const direct = new Date(dateStr);
-  if (!isNaN(direct.getTime()) && dateStr.includes("T")) {
-    return direct;
-  }
-
-  // 🔥 format "dd/MM/yyyy HH:mm" ou "mm/dd/yyyy HH:mm"
   const parts = dateStr.split(" ");
-  if (parts.length < 2) return direct;
+  if (parts.length < 2) return null;
 
-  const datePart = parts[0];
-  const timePart = parts[1];
+  const d = parts[0].split("/");
+  const t = parts[1].split(":");
 
-  const t = timePart.split(":");
-
-  if (datePart.includes("/")) {
-    const d = datePart.split("/");
-
-    // heuristique simple FR vs US
-    // si premier nombre > 12 → FR
-    if (parseInt(d[0]) > 12) {
-      return new Date(d[2], d[1] - 1, d[0], t[0], t[1] || 0, t[2] || 0);
-    } else {
-      return new Date(d[2], d[0] - 1, d[1], t[0], t[1] || 0, t[2] || 0);
-    }
-  }
-
-  return direct;
+  // ⚠️ FORCE FORMAT FR: dd/MM/yyyy
+  return new Date(
+    parseInt(d[2]),      // year
+    parseInt(d[1]) - 1,  // month
+    parseInt(d[0]),      // day
+    parseInt(t[0]),
+    parseInt(t[1] || 0),
+    parseInt(t[2] || 0)
+  );
 }
 	  
 	function formatDateMU(dateStr) {
