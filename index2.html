@@ -125,12 +125,17 @@ document.addEventListener("DOMContentLoaded", () => {
         container.appendChild(img);
       });
 
-      renderCards([]);
+      isLoading = false;
+	  document.getElementById("loadingState").style.display = "none";
+
+	  renderCards([]);
     })
     .catch(err => {
       console.error("Erreur chargement catégories:", err);
     });
-});	
+});
+
+
 	let currentLang = localStorage.getItem("lang");
 
 	if (!currentLang) {
@@ -346,9 +351,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function loadCategoryData(category) {
   isLoading = true;
-  renderCards([]);
 
+  // 🔥 cacher filtre pendant chargement
+  document.querySelector(".filter").style.display = "none";
+
+  // 🔥 afficher loading seul
   document.getElementById("loadingState").style.display = "block";
+
+  // 🔥 vider affichage
+  renderCards([]);
 
   fetch(API_URL + "?category=" + encodeURIComponent(category))
     .then(res => res.json())
@@ -356,7 +367,12 @@ function loadCategoryData(category) {
       data = response;
 
       isLoading = false;
+
+      // 🔥 cacher loading
       document.getElementById("loadingState").style.display = "none";
+
+      // 🔥 remettre filtre
+      updateFilterVisibility();
 
       updateRayonFilter();
       applyFilter();
@@ -366,7 +382,6 @@ function loadCategoryData(category) {
       isLoading = false;
     });
 }
-
 	function updateCategoryImages() {
 		document.querySelectorAll(".rayon-img").forEach(img => {
 			const cat = img.dataset.category;
@@ -425,6 +440,7 @@ function loadCategoryData(category) {
 
 	// Filtre par rayon et quantité
 	function applyFilter() {
+		if (isLoading) return;
 		updateFilterVisibility();
 		
 		const selectedRayon = document.getElementById('rayonFilter').value;
@@ -539,13 +555,10 @@ function loadCategoryData(category) {
 		if (isLoading) {
 			loadingState.style.display = "block";
 
-			// on affiche aussi le message explicatif
-			document.getElementById("emptyText").innerHTML = t("empty");
+			// ❌ NE PAS afficher empty pendant loading
+			emptyState.style.display = "none";
 
-			emptyState.style.display = "block";
 			return;
-		} else {
-			loadingState.style.display = "none";
 		}
 		
 		// 📘 Message explicatif si aucune catégorie sélectionnée
