@@ -65,10 +65,61 @@
     <script>
 	
 	document.addEventListener("DOMContentLoaded", () => {
-		updateLanguageButtons();
-		applyTranslations();
-		updateFilterVisibility();
-	});
+  updateLanguageButtons();
+  applyTranslations();
+  updateFilterVisibility();
+
+  const container = document.getElementById("rayonImages");
+  container.innerHTML = "";
+
+  Object.keys(CATEGORY_IMAGES).forEach(cat => {
+    const img = document.createElement("img");
+    const config = CATEGORY_IMAGES[cat];
+
+    img.src = IMG_URL + config.normal;
+    img.className = "rayon-img";
+    img.dataset.category = cat;
+    img.title = cat;
+
+    // hover
+    img.onmouseenter = () => {
+      if (selectedCategory !== cat) {
+        img.src = IMG_URL + config.hover;
+      }
+    };
+
+    img.onmouseleave = () => {
+      if (selectedCategory !== cat) {
+        img.src = IMG_URL + config.normal;
+      }
+    };
+
+    // click
+    img.onclick = () => {
+
+      // toggle OFF
+      if (selectedCategory === cat) {
+        selectedCategory = null;
+        resetCategories();
+        resetRayonFilter();
+        updateFilterVisibility();
+        renderCards([]);
+        return;
+      }
+
+      selectedCategory = cat;
+      updateCategoryImages();
+      updateFilterVisibility();
+
+      loadCategoryData(cat); // 🔥 NOUVEAU
+    };
+
+    container.appendChild(img);
+  });
+
+  // affichage initial
+  renderCards([]);
+});
 	
 	let currentLang = localStorage.getItem("lang");
 
@@ -77,7 +128,7 @@
 		localStorage.setItem("lang", currentLang);
 	}
 	
-	const API_URL = "https://script.google.com/macros/s/AKfycbzmEVTzK9y1-xMyQfzKR-MiUJKEDPqne-Y-WXeWmhsh7cw3XGuXM3wq_VEAWQpmFET9/exec";
+	const API_URL = "https://script.google.com/macros/s/AKfycbyRaPJqnyGXx38AXYxkjV8MLfFBY2vdRNmwr9KPA1XMVMWd1SKQwnWirE8BeGmU2Cta/exec";
 	const IMG_URL = "https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/img/"
 		
 	let data = [];
@@ -283,81 +334,28 @@
 			.join(" ");
 		}
 
-		// Charger les données côté serveur
-		fetch(API_URL)
-			.then(res => res.json())
-			.then(response => {
-				data = response;
-				const container = document.getElementById("rayonImages");
-				container.innerHTML = "";
+function loadCategoryData(category) {
+  isLoading = true;
+  renderCards([]);
 
-				Object.keys(CATEGORY_IMAGES).forEach(cat => {
-				
-				// 🔥 vérifier s'il existe au moins un item avec RAYON dans cette catégorie
-				const hasRayon = data.some(item =>
-					item.STORAGE === cat &&
-					item.RAYON && item.RAYON !== ""
-				);
+  document.getElementById("loadingState").style.display = "block";
 
-				if (!hasRayon) return; // ❌ on skip cette image
+  fetch(API_URL + "?category=" + encodeURIComponent(category))
+    .then(res => res.json())
+    .then(response => {
+      data = response;
 
-				const img = document.createElement("img");
-				const config = CATEGORY_IMAGES[cat];
-	
-				img.src = IMG_URL + config.normal;
-				img.className = "rayon-img";
-				img.dataset.category = cat;
-				img.title = cat;
+      isLoading = false;
+      document.getElementById("loadingState").style.display = "none";
 
-				// hover
-				img.onmouseenter = () => {
-					if (selectedCategory !== cat) {
-					img.src = IMG_URL + config.hover;
-					}
-				};
-	
-				img.onmouseleave = () => {
-					if (selectedCategory !== cat) {
-					img.src = IMG_URL + config.normal;
-					}
-				};
-
-				// click
-				img.onclick = () => {
-	
-				// 🔁 toggle OFF si recliqué
-				if (selectedCategory === cat) {
-					selectedCategory = null;
-					resetCategories();
-					resetRayonFilter();
-					updateFilterVisibility();
-					applyFilter();
-					return;
-				}
-
-				selectedCategory = cat;
-				updateCategoryImages();
-				updateRayonFilter();
-				updateFilterVisibility();
-				applyFilter();
-			};
-
-			container.appendChild(img);
-			});
-
-			// ✅ FIN DU LOADING
-			isLoading = false;
-			document.getElementById("loadingState").style.display = "none";
-
-			// affiche message initial
-			isLoading = false;
-			document.getElementById("loadingState").style.display = "none";
-			renderCards([]);
-
-		})
-		.catch(err => {
-		console.error("Erreur chargement data:", err);
-	});
+      updateRayonFilter();
+      applyFilter();
+    })
+    .catch(err => {
+      console.error("Erreur chargement data:", err);
+      isLoading = false;
+    });
+}
 
 	function updateCategoryImages() {
 		document.querySelectorAll(".rayon-img").forEach(img => {
