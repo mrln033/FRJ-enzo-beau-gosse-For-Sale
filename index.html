@@ -64,12 +64,78 @@
 
     <script>
 	
-	document.addEventListener("DOMContentLoaded", () => {
-		updateLanguageButtons();
-		applyTranslations();
-		updateFilterVisibility();
-	});
-	
+document.addEventListener("DOMContentLoaded", () => {
+  updateLanguageButtons();
+  applyTranslations();
+  updateFilterVisibility();
+
+  const container = document.getElementById("rayonImages");
+  container.innerHTML = "";
+
+  // 🔥 on récupère les catégories dispo
+  fetch(API_URL + "?action=categories")
+    .then(res => res.json())
+    .then(categories => {
+
+      Object.keys(CATEGORY_IMAGES).forEach(cat => {
+
+        // ❌ si catégorie vide → on skip
+        if (!categories.includes(cat)) return;
+
+        const img = document.createElement("img");
+        const config = CATEGORY_IMAGES[cat];
+
+        img.src = IMG_URL + config.normal;
+        img.className = "rayon-img";
+        img.dataset.category = cat;
+        img.title = cat;
+
+        // hover
+        img.onmouseenter = () => {
+          if (selectedCategory !== cat) {
+            img.src = IMG_URL + config.hover;
+          }
+        };
+
+        img.onmouseleave = () => {
+          if (selectedCategory !== cat) {
+            img.src = IMG_URL + config.normal;
+          }
+        };
+
+        // click
+        img.onclick = () => {
+
+          if (selectedCategory === cat) {
+            selectedCategory = null;
+            resetCategories();
+            resetRayonFilter();
+            updateFilterVisibility();
+            renderCards([]);
+            return;
+          }
+
+          selectedCategory = cat;
+          updateCategoryImages();
+          updateFilterVisibility();
+
+          loadCategoryData(cat); // 🔥 fetch items
+        };
+
+        container.appendChild(img);
+      });
+
+      isLoading = false;
+	  document.getElementById("loadingState").style.display = "none";
+
+	  renderCards([]);
+    })
+    .catch(err => {
+      console.error("Erreur chargement catégories:", err);
+    });
+});
+
+
 	let currentLang = localStorage.getItem("lang");
 
 	if (!currentLang) {
@@ -77,7 +143,7 @@
 		localStorage.setItem("lang", currentLang);
 	}
 	
-	const API_URL = "https://script.google.com/macros/s/AKfycbzmEVTzK9y1-xMyQfzKR-MiUJKEDPqne-Y-WXeWmhsh7cw3XGuXM3wq_VEAWQpmFET9/exec";
+	const API_URL = "https://script.google.com/macros/s/AKfycbyRaPJqnyGXx38AXYxkjV8MLfFBY2vdRNmwr9KPA1XMVMWd1SKQwnWirE8BeGmU2Cta/exec";
 	const IMG_URL = "https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/img/"
 		
 	let data = [];
@@ -283,82 +349,39 @@
 			.join(" ");
 		}
 
-		// Charger les données côté serveur
-		fetch(API_URL)
-			.then(res => res.json())
-			.then(response => {
-				data = response;
-				const container = document.getElementById("rayonImages");
-				container.innerHTML = "";
+function loadCategoryData(category) {
+  isLoading = true;
 
-				Object.keys(CATEGORY_IMAGES).forEach(cat => {
-				
-				// 🔥 vérifier s'il existe au moins un item avec RAYON dans cette catégorie
-				const hasRayon = data.some(item =>
-					item.STORAGE === cat &&
-					item.RAYON && item.RAYON !== ""
-				);
+  // 🔥 cacher filtre pendant chargement
+  document.querySelector(".filter").style.display = "none";
 
-				if (!hasRayon) return; // ❌ on skip cette image
+  // 🔥 afficher loading seul
+  document.getElementById("loadingState").style.display = "block";
 
-				const img = document.createElement("img");
-				const config = CATEGORY_IMAGES[cat];
-	
-				img.src = IMG_URL + config.normal;
-				img.className = "rayon-img";
-				img.dataset.category = cat;
-				img.title = cat;
+  // 🔥 vider affichage
+  renderCards([]);
 
-				// hover
-				img.onmouseenter = () => {
-					if (selectedCategory !== cat) {
-					img.src = IMG_URL + config.hover;
-					}
-				};
-	
-				img.onmouseleave = () => {
-					if (selectedCategory !== cat) {
-					img.src = IMG_URL + config.normal;
-					}
-				};
+  fetch(API_URL + "?category=" + encodeURIComponent(category))
+    .then(res => res.json())
+    .then(response => {
+      data = response;
 
-				// click
-				img.onclick = () => {
-	
-				// 🔁 toggle OFF si recliqué
-				if (selectedCategory === cat) {
-					selectedCategory = null;
-					resetCategories();
-					resetRayonFilter();
-					updateFilterVisibility();
-					applyFilter();
-					return;
-				}
+      isLoading = false;
 
-				selectedCategory = cat;
-				updateCategoryImages();
-				updateRayonFilter();
-				updateFilterVisibility();
-				applyFilter();
-			};
+      // 🔥 cacher loading
+      document.getElementById("loadingState").style.display = "none";
 
-			container.appendChild(img);
-			});
+      // 🔥 remettre filtre
+      updateFilterVisibility();
 
-			// ✅ FIN DU LOADING
-			isLoading = false;
-			document.getElementById("loadingState").style.display = "none";
-
-			// affiche message initial
-			isLoading = false;
-			document.getElementById("loadingState").style.display = "none";
-			renderCards([]);
-
-		})
-		.catch(err => {
-		console.error("Erreur chargement data:", err);
-	});
-
+      updateRayonFilter();
+      applyFilter();
+    })
+    .catch(err => {
+      console.error("Erreur chargement data:", err);
+      isLoading = false;
+    });
+}
 	function updateCategoryImages() {
 		document.querySelectorAll(".rayon-img").forEach(img => {
 			const cat = img.dataset.category;
@@ -417,6 +440,7 @@
 
 	// Filtre par rayon et quantité
 	function applyFilter() {
+		if (isLoading) return;
 		updateFilterVisibility();
 		
 		const selectedRayon = document.getElementById('rayonFilter').value;
@@ -531,13 +555,10 @@
 		if (isLoading) {
 			loadingState.style.display = "block";
 
-			// on affiche aussi le message explicatif
-			document.getElementById("emptyText").innerHTML = t("empty");
+			// ❌ NE PAS afficher empty pendant loading
+			emptyState.style.display = "none";
 
-			emptyState.style.display = "block";
 			return;
-		} else {
-			loadingState.style.display = "none";
 		}
 		
 		// 📘 Message explicatif si aucune catégorie sélectionnée
