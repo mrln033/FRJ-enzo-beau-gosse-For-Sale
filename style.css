@@ -65,7 +65,7 @@ h1 {
 .card:hover .calc-icon {
   color: #000;
   opacity: 1;
-  transform: scale(1.1);
+  transform: scale(1.2);
 }
 
 .card h3 {
