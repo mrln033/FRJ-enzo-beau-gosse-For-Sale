@@ -475,11 +475,32 @@ function loadCategoryData(category) {
         // Applique le filtre
         applyFilter();
 	}
+	
+function parseMUDate(dateStr) {
+  if (!dateStr) return null;
+
+  const parts = dateStr.split(" ");
+  if (parts.length < 2) return null;
+
+  const d = parts[0].split("/");
+  const t = parts[1].split(":");
+
+  // ⚠️ FORCE FORMAT FR: dd/MM/yyyy
+  return new Date(
+    parseInt(d[2]),      // year
+    parseInt(d[1]) - 1,  // month
+    parseInt(d[0]),      // day
+    parseInt(t[0]),
+    parseInt(t[1] || 0),
+    parseInt(t[2] || 0)
+  );
+}
 	  
 	function formatDateMU(dateStr) {
 		if (!dateStr) return { display: "", full: "" };
 
-		const d = new Date(dateStr);
+		const d = parseMUDate(dateStr);
+		if (!d || isNaN(d.getTime())) return { display: "", full: "" };
 		const now = new Date();
 
 		const diffMs = now - d;
@@ -518,29 +539,32 @@ function loadCategoryData(category) {
 		return { display };
 	}
 	
-	function getMUColor(dateStr) {
-		if (!dateStr) return "#000";
+function getMUColor(dateStr) {
+  if (!dateStr) return "#000";
 
-		const d = new Date(dateStr);
-		const now = new Date();
+  const d = parseMUDate(dateStr);
+  if (!d || isNaN(d.getTime())) return "#000";
 
-		const diffMs = now - d;
-		const days = diffMs / (1000 * 60 * 60 * 24);
+  const now = new Date();
 
-		// > 7 jours → on ne doit plus afficher
-		if (days > 7) return null;
+  const diffMs = now - d; // ✅ ancienneté
+  const days = diffMs / (1000 * 60 * 60 * 24);
 
-		// < 1 jour → noir
-		if (days <= 1) return "#000000";
+  // ❗ si futur → considérer comme 0 jour (évite bugs noirs)
+  const safeDays = Math.max(0, days);
 
-		// Dégradé entre 1 et 8 jours
-		const ratio = (days - 1) / 7; // 0 → 1
+  // ❌ plus de 7 jours → on cache
+  if (safeDays > 7) return null;
 
-		// 0 = noir (0), 1 = gris clair (~200)
-		const gray = Math.round(0 + ratio * 200);
+  // ⚫ 0 à 1 jour → noir
+  if (safeDays <= 1) return "#000000";
 
-		return `rgb(${gray}, ${gray}, ${gray})`;
-	}
+  // 🎨 dégradé 1 → 8 jours
+  const ratio = (safeDays - 1) / 7;
+  const gray = Math.round(ratio * 200);
+
+  return `rgb(${gray}, ${gray}, ${gray})`;
+}
 
 	// Génère les cards HTML
 	function renderCards(items) {
@@ -632,23 +656,21 @@ function loadCategoryData(category) {
 			let calculatorHTML = "";
 
 			// Afficher uniquement si MU existe et n'est pas vide
-			if (item.MU !== "" && item.MU != null) {
+			
+
+			if (item.MU != null && item.MU !== "") {
 
 				const color = getMUColor(item.DATE_MU);
-
-				// Si trop ancien → on n'affiche rien
-				if (color === null) return;
 
 				const dateFormatted = formatDateMU(item.DATE_MU);
 
 				muHTML = `
-					<p title="${dateFormatted.display}">
-						<span class="MU-style" style="color:${color}">
-							MU: ${item.MU}
-						</span>
+					<p title="${dateFormatted?.display || ""}">
+					<span class="MU-style" style="color:${color}">
+						MU: ${item.MU}
+					</span>
 					</p>
 				`;
-			
 			}
 				
 			// 👉 afficher l'icône SEULEMENT si prix + MU existent + MU %
@@ -658,26 +680,21 @@ function loadCategoryData(category) {
 
 			if (hasPrice && hasMU && isPercentMU) {
 				calculatorHTML = `
-					<div class="calc-icon" onclick='openCalculator(${JSON.stringify(item).replace(/'/g, "&apos;")})'>
-  <svg viewBox="0 0 24 24" width="20" height="20">
-    <rect x="3" y="2" width="18" height="20" rx="3" fill="#444"/>
-    <rect x="6" y="5" width="12" height="3" fill="#fff"/>
+					<div class="calc-icon" onclick='onclick='openCalculator(${JSON.stringify(item).replace(/'/g, "&apos;")})'>
+  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+    <rect x="4" y="2" width="16" height="20" rx="3"/>
+    <rect x="7" y="6" width="10" height="3"/>
     
-    <!-- boutons -->
-    <circle cx="7" cy="11" r="1" fill="#fff"/>
-    <circle cx="12" cy="11" r="1" fill="#fff"/>
-    <circle cx="17" cy="11" r="1" fill="#fff"/>
+    <circle cx="8" cy="12" r="1"/>
+    <circle cx="12" cy="12" r="1"/>
+    <circle cx="16" cy="12" r="1"/>
     
-    <circle cx="7" cy="15" r="1" fill="#fff"/>
-    <circle cx="12" cy="15" r="1" fill="#fff"/>
-    <circle cx="17" cy="15" r="1" fill="#fff"/>
-    
-    <circle cx="7" cy="19" r="1" fill="#fff"/>
-    <circle cx="12" cy="19" r="1" fill="#fff"/>
-    <rect x="16" y="17" width="3" height="4" fill="#fff"/>
+    <circle cx="8" cy="16" r="1"/>
+    <circle cx="12" cy="16" r="1"/>
+    <circle cx="16" cy="16" r="1"/>
   </svg>
 </div>
-
+					
 				`;
 			}
 			
