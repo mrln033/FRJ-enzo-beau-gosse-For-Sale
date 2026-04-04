@@ -54,11 +54,16 @@ h1 {
   font-size: 18px;
   opacity: 0.7;
   transition: 0.2s;
+  color: #666;
 }
 
 .calc-icon:hover {
   opacity: 1;
   transform: scale(1.2);
+}
+
+.card:hover .calc-icon {
+  color: #000;
 }
 
 .card h3 {
