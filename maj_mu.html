@@ -44,20 +44,26 @@
     window.location.href = "index.html";
   }
 
-  function sendData() {
-    const csv = document.getElementById("csvInput").value;
+function sendData() {
+  const csv = document.getElementById("csvInput").value;
 
-    if (!csv.trim()) {
-      alert("Vide !");
-      return;
-    }
-
-    google.script.run
-      .withSuccessHandler(res => {
-        alert(res);
-      })
-      .processMU(csv);
+  if (!csv.trim()) {
+    alert("Vide !");
+    return;
   }
+
+  fetch("https://script.google.com/macros/s/AKfycbxDLU93_rtARjYZKi10BusFYpMcKVS4Qu4I4zIqH8wtsS43pXM3afqsMm6KADE-dbxg/exec", {
+    method: "POST",
+    body: csv
+  })
+  .then(res => res.text())
+  .then(res => {
+    alert(res);
+  })
+  .catch(err => {
+    alert("Erreur : " + err);
+  });
+}
 </script>
 
 </body>
