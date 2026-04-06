@@ -681,7 +681,7 @@ function getMUColor(dateStr) {
 			if (hasPrice && hasMU && isPercentMU) {
 				calculatorHTML = `
 					<div class="calc-icon"
-						onclick='openCalculator(${JSON.stringify(item).replace(/'/g, "&apos;")})'>
+						onclick='openCalculator(event, ${JSON.stringify(item).replace(/'/g, "&apos;")})'>
     
 						<svg viewBox="0 0 24 24" width="20" height="20"
 							fill="none" stroke="currentColor" stroke-width="2"
@@ -743,8 +743,14 @@ function getMUColor(dateStr) {
 		}
 	}
 
-	function openCalculator(item) {
+	function openCalculator(e, item) {
 		const toast = document.getElementById("toastCalc");
+
+		// 🔥 position verticale selon souris
+		const mouseY = e.clientY;
+
+		toast.style.top = mouseY + "px";
+		toast.style.transform = "translateY(-50%)";
 
 		const prix = parseFloat(item.PRIX_UNITAIRE) || 0;
 		const mu = item.MU || "";

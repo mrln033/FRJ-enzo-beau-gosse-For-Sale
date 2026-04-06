@@ -272,8 +272,9 @@ h1 {
 
 .toast {
 	position: fixed;
-	bottom: 20px;
+	top: 50%; /* valeur par défaut */
 	right: 20px;
+	transform: translateY(-50%); /* centre vertical */
 	width: 300px;
 
 	background: #ffffff;
