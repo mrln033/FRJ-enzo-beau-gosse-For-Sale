@@ -34,7 +34,7 @@
 		FR
 		</button>
 	</div>
-	<a href="https://www.frenchjumper.fr" target="_blank">
+	<a href="https://www.frenchjumper.fr" target="_blank" id="logoLink">
 		<img src="./Logo FRJ.png" id="headerLogo" title="Frenchjumper">
 	</a>
     <div align="center"><h1 id="title"></h1></div>
@@ -817,6 +817,14 @@ function getMUColor(dateStr) {
 		}
 	});
 	
+	// 🔥 détecte si iframe
+	if (window.self !== window.top) {
+		const logo = document.getElementById("logoLink");
+		if (logo) {
+			logo.style.display = "none";
+		}
+	}
+
     </script>
   </body>
 </html>
