@@ -333,3 +333,11 @@ h1 {
 	margin: 10px 0;
 }
 
+#headerLogo {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  height: 60px;
+  z-index: 1000;
+}
+
