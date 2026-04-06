@@ -797,7 +797,16 @@ function getMUColor(dateStr) {
 		let muValue = 1;
 
 		if (muStr && muStr.includes("%")) {
-			muValue = parseFloat(muStr.replace("%", "")) / 100;
+			const clean = muStr
+				.replace("%", "")
+				.replace(",", ".")
+				.trim();
+
+			const parsed = parseFloat(clean);
+
+			if (!isNaN(parsed)) {
+				muValue = parsed / 100;
+			}	
 		}
 
 		const sell = tt * muValue;
