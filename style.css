@@ -1,51 +1,113 @@
+/* =========================
+   GLOBAL
+========================= */
 body {
-	font-family: Arial,	sans-serif;
-	padding: 20px;
-	background: #f5f5f5;
-}
-      
-h1 { 
-	text-align: center;
-	margin-bottom: 30px;
+  font-family: Arial, sans-serif;
+  padding: 20px;
+  background: #f5f5f5;
 }
 
+h1 {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+/* =========================
+   FILTER
+========================= */
 .filter {
-	margin-bottom: 20px;
-	display: flex;
-	align-items: center;
-	gap: 10px;
-	justify-content: center;
+  margin-bottom: 20px;
+  display: none; /* conservé comme tu l'avais */
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  transition: opacity 0.2s ease;
 }
-      
-.filter label { 
-	font-weight: bold;
+
+.filter label {
+  font-weight: bold;
 }
-      
+
 .filter select {
-	padding: 5px;
-	font-size: 1em;
+  padding: 5px;
+  font-size: 1em;
 }
 
-.card-container { 
-	display: flex;
-	flex-wrap: wrap;
-	gap: 15px;
-	justify-content: center;
+/* =========================
+   CARD CONTAINER
+========================= */
+.card-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  justify-content: center;
 }
 
+/* =========================
+   CARD BASE
+========================= */
 .card {
-	border: 1px solid #ccc;
-	border-radius: 8px;
-	width: 220px;
-	padding: 10px;
-	box-shadow: 2px 2px 6px rgba(0,0,0,0.1);
-	background: #fff;
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	position: relative;
+  position: relative;
+  width: 220px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 10px;
+  background: #fff;
+  box-shadow: 2px 2px 6px rgba(0,0,0,0.1);
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  overflow: hidden; /* IMPORTANT pour animation */
 }
 
+/* =========================
+   CARD FRONT / BACK ANIMATION
+========================= */
+.card-front,
+.card-back {
+  position: absolute;
+  inset: 0;
+  transition: transform 0.45s ease;
+}
+
+/* front visible */
+.card-front {
+  transform: translateY(0);
+}
+
+/* back hidden */
+.card-back {
+  transform: translateY(100%);
+  background: white;
+  padding: 10px;
+  overflow-y: auto;
+}
+
+/* état ouvert */
+.card.open .card-front {
+  transform: translateY(-100%);
+}
+
+.card.open .card-back {
+  transform: translateY(0);
+}
+
+/* bouton retour */
+.back-btn {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  border: none;
+  background: none;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+/* =========================
+   CALC ICON
+========================= */
 .calc-icon {
   position: absolute;
   bottom: 8px;
@@ -65,84 +127,93 @@ h1 {
 .card:hover .calc-icon {
   color: #000;
   opacity: 1;
-  transform: scale(1.2);
 }
 
+/* =========================
+   TEXTES CARD
+========================= */
 .card h3 {
-	margin: 10px 0 5px 0;
-	font-size: 1.1em;
-	text-align: center;
+  margin: 10px 0 5px 0;
+  font-size: 1.1em;
+  text-align: center;
 }
 
 .card h3 a {
-	text-decoration: none;
-	color: #333;
+  text-decoration: none;
+  color: #333;
 }
+
 .card h3 a:hover {
-	text-decoration: underline;
+  text-decoration: underline;
 }
 
 .card p {
-	margin: 5px 0;
-	font-size: 0.9em;
-	text-align: center;
+  margin: 5px 0;
+  font-size: 0.9em;
+  text-align: center;
 }
 
+/* =========================
+   IMAGES
+========================= */
 .image-container {
-	width: 100%;
-	height: 150px;
-	background: #fff;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	border-radius: 4px;
-	overflow: hidden;
-	border: 1px solid #ddd;
+  width: 100%;
+  height: 150px;
+  background: #fff;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid #ddd;
 }
 
 .image-container img {
-	max-width: 100%;
-	max-height: 100%;
-	object-fit: contain;
-	background: #fff;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
 }
 
 .placeholder {
-	width: 100%;
-	height: 150px;
-	background: #eee;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	color: #999;
-	font-size: 14px;
-	border-radius: 4px;
+  width: 100%;
+  height: 150px;
+  background: #eee;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+  font-size: 14px;
+  border-radius: 4px;
 }
+
+/* =========================
+   RAYON / HEADER
+========================= */
 .rayon-link {
-	text-decoration: none;
-	color: #337ab7;
-	cursor: pointer;
+  text-decoration: none;
+  color: #337ab7;
+  cursor: pointer;
 }
 
-      .rayon-link:hover {
-        text-decoration: none;
-        color: #285e8e;
-      }
+.rayon-link:hover {
+  color: #285e8e;
+}
 
-      /* Italique pour labels */
-      .label-italic { font-style: italic; }
+.label-italic {
+  font-style: italic;
+}
 
-      /* MU en petit */
-      .MU-style {
-        font-size: 8pt;
-        font-style: italic;
-      }
-	  
+.MU-style {
+  font-size: 8pt;
+  font-style: italic;
+}
+
 .rayon-images {
   display: flex;
-  flex-direction: column; /* 👈 clé */
+  flex-direction: column;
   gap: 10px;
-  justify-content: center;
 
   margin-bottom: 20px;
   background: #0a0d15;
@@ -158,13 +229,13 @@ h1 {
   justify-content: center;
 }
 
-	  .rayon-img {
-		width: 60px;
-		height: 60px;
-		cursor: pointer;
-	  }
-	  
-	  .rayon-header-container {
+.rayon-img {
+  width: 60px;
+  height: 60px;
+  cursor: pointer;
+}
+
+.rayon-header-container {
   text-align: center;
   margin-bottom: 10px;
 }
@@ -172,15 +243,21 @@ h1 {
 .rayon-header {
   max-width: 400px;
   width: 100%;
-  display: inline-block;
 }
 
+/* =========================
+   LOADING / EMPTY
+========================= */
 #loadingState {
   display: block;
   text-align: center;
   font-size: 16px;
   margin-top: 20px;
   color: #555;
+}
+
+#loadingState::before {
+  content: "⏳ ";
 }
 
 #emptyState {
@@ -194,31 +271,22 @@ h1 {
   box-shadow: 2px 2px 6px rgba(0,0,0,0.1);
 }
 
-#langToggle {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  padding: 5px 10px;
-  cursor: pointer;
-  font-size: 12px;
-}
-
 #emptyText {
-	text-align: left;
-	max-width: 700px;
-	margin: 0 auto;
-	line-height: 1.6;
-	color: #444;
+  text-align: left;
+  max-width: 700px;
+  margin: 0 auto;
+  line-height: 1.6;
+  color: #444;
 }
 
 #emptyText h2 {
-  margin-top: 0;
   text-align: center;
+  margin-top: 0;
 }
 
 #emptyText ul {
-  margin-top: 10px;
   padding-left: 20px;
+  margin-top: 10px;
 }
 
 #emptyText li {
@@ -229,6 +297,9 @@ h1 {
   color: #000;
 }
 
+/* =========================
+   LANG SWITCHER
+========================= */
 #langSwitcher {
   position: fixed;
   top: 10px;
@@ -247,10 +318,6 @@ h1 {
   gap: 5px;
 }
 
-#langSwitcher svg {
-  display: block;
-}
-
 #langSwitcher button.active {
   background: #333;
   color: #fff;
@@ -261,32 +328,26 @@ h1 {
   opacity: 0.8;
 }
 
-#loadingState::before {
-  content: "⏳ ";
-}
-
-.filter {
-  display: none;
-  transition: opacity 0.2s ease;
-}
-
+/* =========================
+   TOAST (si encore utilisé ailleurs)
+========================= */
 .toast {
-	position: fixed;
-	top: 50%; /* valeur par défaut */
-	right: 20px;
-	transform: translateY(-80%); /* centre vertical */
-	width: 300px;
+  position: fixed;
+  top: 50%;
+  right: 20px;
+  transform: translateY(-80%);
 
-	background: #ffffff;
-	border: 2px solid #4a90e2; /* couleur principale */
-	border-radius: 12px;
-	box-shadow: 0 8px 25px rgba(0,0,0,0.25);
+  width: 300px;
 
-	padding: 0; /* important pour header */
-	z-index: 9999;
+  background: #fff;
+  border: 2px solid #4a90e2;
+  border-radius: 12px;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.25);
 
-	text-align: center; /* 🔥 tout centré */
-	font-family: Arial, sans-serif;
+  padding: 0;
+  z-index: 9999;
+
+  text-align: center;
 }
 
 .hidden {
@@ -294,45 +355,30 @@ h1 {
 }
 
 .toast h3 {
-	margin: 0;
-	padding: 10px;
-
-	background: #4a90e2; /* même couleur que bordure */
-	color: white;
-	border-top-left-radius: 10px;
-	border-top-right-radius: 10px;
-
-	font-size: 16px;
-}
-
-.toast input {
-	width: 80px;
-	text-align: center;
-	padding: 4px;
-	border-radius: 6px;
-	border: 1px solid #ccc;
+  margin: 0;
+  padding: 10px;
+  background: #4a90e2;
+  color: white;
+  border-radius: 10px 10px 0 0;
 }
 
 .toast button {
-	margin: 10px 0 15px 0;
-	padding: 6px 12px;
-
-	background: #4a90e2;
-	color: white;
-	border: none;
-	border-radius: 6px;
-	cursor: pointer;
-	transition: 0.2s;
+  margin: 10px 0 15px;
+  padding: 6px 12px;
+  background: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
 }
 
 .toast button:hover {
-	background: #357abd;
+  background: #357abd;
 }
 
-.toast p {
-	margin: 10px 0;
-}
-
+/* =========================
+   HEADER LOGO
+========================= */
 #headerLogo {
   position: fixed;
   top: 20px;
@@ -341,6 +387,9 @@ h1 {
   z-index: 1000;
 }
 
+/* =========================
+   NAV ADMIN
+========================= */
 .nav-admin {
   position: fixed;
   top: 10px;
@@ -357,7 +406,6 @@ h1 {
   text-decoration: none;
   border-radius: 6px;
   font-weight: bold;
-  transition: 0.2s;
 }
 
 .nav-admin a:hover {
@@ -367,48 +415,4 @@ h1 {
 .nav-admin a.active {
   background: #333;
   color: #fff;
-}
-
-.card {
-  position: relative;
-  overflow: hidden;
-}
-
-/* animation transition */
-.card-front, .card-back {
-  position: absolute;
-  inset: 0;
-  transition: transform 0.45s ease;
-}
-
-/* état normal */
-.card-front {
-  transform: translateY(0);
-}
-
-/* caché */
-.card-back {
-  transform: translateY(100%);
-  background: white;
-  padding: 10px;
-}
-
-/* ouvert */
-.card.open .card-front {
-  transform: translateY(-100%);
-}
-
-.card.open .card-back {
-  transform: translateY(0);
-}
-
-/* bouton retour */
-.back-btn {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  border: none;
-  background: none;
-  font-size: 22px;
-  cursor: pointer;
 }
