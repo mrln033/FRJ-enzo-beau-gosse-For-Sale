@@ -85,7 +85,7 @@ h1 {
 /* back hidden */
 .card-back {
   transform: translateY(100%);
-  background: #f3f4f6;
+  background: #123123;
   padding: 12px;
 
   display: flex;
