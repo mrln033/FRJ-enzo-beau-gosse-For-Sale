@@ -825,6 +825,42 @@ function closeCalculator(btn) {
 		}
 	}
 
+let openCard = null;
+
+// ouvrir une card
+document.querySelectorAll(".calc-icon").forEach(icon => {
+  icon.addEventListener("click", (e) => {
+    e.stopPropagation();
+
+    const card = icon.closest(".card");
+
+    // si une autre card est ouverte → on la ferme
+    if (openCard && openCard !== card) {
+      openCard.classList.remove("open");
+    }
+
+    // toggle sur la card actuelle
+    const isOpen = card.classList.contains("open");
+    card.classList.toggle("open", !isOpen);
+
+    openCard = !isOpen ? card : null;
+  });
+});
+
+// clic ailleurs = fermeture
+document.addEventListener("click", () => {
+  if (openCard) {
+    openCard.classList.remove("open");
+    openCard = null;
+  }
+});
+
+document.querySelectorAll(".card").forEach(card => {
+  card.addEventListener("click", (e) => {
+    e.stopPropagation();
+  });
+});
+
     </script>
   </body>
 </html>
