@@ -823,14 +823,16 @@ function closeCalculator(btn) {
 		}
 	}
 
-document.addEventListener("click", () => {
+// empêcher fermeture quand on clique DANS une card
+document.addEventListener("click", (e) => {
+  if (e.target.closest(".card")) {
+    return; // on ne ferme pas
+  }
+
+  // sinon clic extérieur → on ferme tout
   document.querySelectorAll(".card.open").forEach(card => {
     card.classList.remove("open");
   });
-});
-
-document.querySelector("#cardContainer").addEventListener("click", (e) => {
-  e.stopPropagation();
 });
 
     </script>
