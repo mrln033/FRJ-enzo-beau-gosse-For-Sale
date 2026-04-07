@@ -62,8 +62,6 @@
 	</div>
 
 	<div class="card-container" id="cardContainer"></div>
-	
-	<div id="toastCalc" class="toast hidden"></div>
 
     <script>
 	
@@ -706,14 +704,19 @@ function getMUColor(dateStr) {
 			}
 			
 			card.innerHTML = `
-				${imgHTML}
-				<h3>${itemTitle}</h3>
-				${rayonHTML}
-				<p><span class="label-italic">${t("quantity")}</span>: ${item.QUANTITE}</p>
-				<p><span class="label-italic">${t("unitPrice")}</span>: ${prixUnitaire} peds</p>
-				<p><span class="label-italic">${t("total")}</span>: ${total} peds</p>
-				${muHTML}
-				${calculatorHTML}
+				<div class="card-front">
+					${imgHTML}
+					<h3>${itemTitle}</h3>
+					${rayonHTML}
+					<p><span class="label-italic">${t("quantity")}</span>: ${item.QUANTITE}</p>
+					<p><span class="label-italic">${t("unitPrice")}</span>: ${prixUnitaire} peds</p>
+					<p><span class="label-italic">${t("total")}</span>: ${total} peds</p>
+					${muHTML}
+
+					${calculatorHTML}
+				</div>
+
+				<div class="card-back"></div>
 			`;
 
 			container.appendChild(card);
@@ -747,119 +750,65 @@ function getMUColor(dateStr) {
 	}
 
 function openCalculator(iconEl, item) {
-	const toast = document.getElementById("toastCalc");
+  const card = iconEl.closest(".card");
+  const back = card.querySelector(".card-back");
 
-	// 🔥 on trouve la card
-	const card = iconEl.closest(".card");
+  const prix = parseFloat(item.PRIX_UNITAIRE) || 0;
+  const mu = item.MU || "";
 
-	// afficher pour mesurer
-	toast.classList.remove("hidden");
+  back.innerHTML = `
+    <button class="back-btn" onclick="closeCalculator(this)">←</button>
 
-	// reset position temporaire
-	toast.style.top = "0px";
-	toast.style.left = "0px";
+    <h3>${item.ITEM}</h3>
 
-	const rect = card.getBoundingClientRect();
+    <p>
+      ${t("quantity")}:
+      <input type="number" id="calcQty" value="${item.QUANTITE}" min="1">
+    </p>
 
-	const toastHeight = toast.offsetHeight;
-	const toastWidth = toast.offsetWidth;
+    <p>${t("unitPrice")}: ${prix.toFixed(2)} peds</p>
 
-	const margin = 10;
+    <p>TT: <span id="calcTT"></span> peds</p>
 
-	// -------------------------
-	// POSITION : à droite de la card
-	// -------------------------
-	let left = rect.right + margin;
-	let top = rect.top;
+    <p>MU: ${mu}</p>
 
-	// 🔥 si ça sort à droite → on passe à gauche de la card
-	if (left + toastWidth > window.innerWidth) {
-		left = rect.left - toastWidth - margin;
-	}
+    <p>${t("calcSell")}: <span id="calcSell"></span></p>
+  `;
 
-	// 🔥 si ça sort en bas → on remonte
-	if (top + toastHeight > window.innerHeight) {
-		top = window.innerHeight - toastHeight - margin;
-	}
+  card.classList.add("open");
 
-	// 🔥 si ça sort en haut → on bloque
-	if (top < margin) {
-		top = margin;
-	}
+  // init calc
+  setTimeout(() => {
+    const qtyInput = back.querySelector("#calcQty");
+    qtyInput.addEventListener("input", () => {
+      updateCalc(card, prix, mu);
+    });
 
-	toast.style.left = left + "px";
-	toast.style.top = top + "px";
-
-	// -------------------------
-	// contenu
-	// -------------------------
-	const prix = parseFloat(item.PRIX_UNITAIRE) || 0;
-	const mu = item.MU || "";
-
-	toast.innerHTML = `
-		<h3>${item.ITEM}</h3>
-
-		<p>
-		${t("quantity")}:
-		<input type="number" id="calcQty" value="${item.QUANTITE}" min="1">
-		</p>
-
-		<p>${t("unitPrice")}: ${prix.toFixed(2)} peds</p>
-
-		<p>TT: <span id="calcTT">${(item.QUANTITE * prix).toFixed(2)}</span> peds</p>
-
-		<p>MU: ${mu}</p>
-
-		<p>${t("calcSell")}: <span id="calcSell">--</span></p>
-
-		<button onclick="closeToast()">${t("close")}</button>
-	`;
-
-	document.getElementById("calcQty").addEventListener("input", () => {
-		updateCalc(prix, mu);
-	});
-
-	updateCalc(prix, mu);
+    updateCalc(card, prix, mu);
+  }, 0);
 }
-	
-	function updateCalc(prix, muStr) {
-		const qty = parseFloat(document.getElementById("calcQty").value) || 0;
 
-		const tt = qty * prix;
-		document.getElementById("calcTT").innerText = tt.toFixed(2);
+function updateCalc(card, prix, muStr) {
+  const qty = parseFloat(card.querySelector("#calcQty").value) || 0;
 
-		// Extraction MU (ex: "105%" → 1.05)
-		let muValue = 1;
+  const tt = qty * prix;
+  card.querySelector("#calcTT").innerText = tt.toFixed(2);
 
-		if (muStr && muStr.includes("%")) {
-			const clean = muStr
-				.replace("%", "")
-				.replace(",", ".")
-				.trim();
+  let muValue = 1;
 
-			const parsed = parseFloat(clean);
+  if (muStr && muStr.includes("%")) {
+    const parsed = parseFloat(muStr.replace("%", "").replace(",", "."));
+    if (!isNaN(parsed)) muValue = parsed / 100;
+  }
 
-			if (!isNaN(parsed)) {
-				muValue = parsed / 100;
-			}	
-		}
+  const sell = tt * muValue;
+  card.querySelector("#calcSell").innerText = sell.toFixed(2);
+}
 
-		const sell = tt * muValue;
-
-		document.getElementById("calcSell").innerText = sell.toFixed(2) + " peds";
-	}
-	
-	function closeToast() {
-		document.getElementById("toastCalc").classList.add("hidden");
-	}
-
-
-	document.addEventListener("click", (e) => {
-		const toast = document.getElementById("toastCalc");
-		if (!toast.contains(e.target) && !e.target.classList.contains("calc-icon")) {
-			toast.classList.add("hidden");
-		}
-	});
+function closeCalculator(btn) {
+  const card = btn.closest(".card");
+  card.classList.remove("open");
+}
 	
 	// 🔥 détecte si iframe
 	if (window.self !== window.top) {

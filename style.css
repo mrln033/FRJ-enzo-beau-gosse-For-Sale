@@ -368,3 +368,47 @@ h1 {
   background: #333;
   color: #fff;
 }
+
+.card {
+  position: relative;
+  overflow: hidden;
+}
+
+/* animation transition */
+.card-front, .card-back {
+  position: absolute;
+  inset: 0;
+  transition: transform 0.45s ease;
+}
+
+/* état normal */
+.card-front {
+  transform: translateY(0);
+}
+
+/* caché */
+.card-back {
+  transform: translateY(100%);
+  background: white;
+  padding: 10px;
+}
+
+/* ouvert */
+.card.open .card-front {
+  transform: translateY(-100%);
+}
+
+.card.open .card-back {
+  transform: translateY(0);
+}
+
+/* bouton retour */
+.back-btn {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  border: none;
+  background: none;
+  font-size: 22px;
+  cursor: pointer;
+}
