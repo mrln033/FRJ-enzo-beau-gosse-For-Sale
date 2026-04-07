@@ -756,38 +756,57 @@ function openCalculator(iconEl, item) {
   const prix = parseFloat(item.PRIX_UNITAIRE) || 0;
   const mu = item.MU || "";
 
+  function openCalculator(iconEl, item) {
+  const card = iconEl.closest(".card");
+  const back = card.querySelector(".card-back");
+
+  // 👉 empêcher le click global de se déclencher
+  event.stopPropagation();
+
+  // 👉 fermer ancienne card si différente
+  if (openCard && openCard !== card) {
+    openCard.classList.remove("open");
+  }
+
+  // 👉 toggle si même card
+  if (card === openCard) {
+    card.classList.remove("open");
+    openCard = null;
+    return;
+  }
+
+  openCard = card;
+
+  const prix = parseFloat(item.PRIX_UNITAIRE) || 0;
+  const mu = item.MU || "";
+
   back.innerHTML = `
+    <div class="back-header">
+      <h3>${item.ITEM}</h3>
+    </div>
 
-	<div class="back-header">
-		<h3>${item.ITEM}</h3>
-	</div>
-	<div class="back-content">
-		<div class="qty-row">
-			<span>Quantité</span>
-			<input type="number" id="calcQty" value="${item.QUANTITE}" min="1">
-		</div>
+    <div class="back-content">
+      <div class="qty-row">
+        <span>Quantité</span>
+        <input type="number" id="calcQty" value="${item.QUANTITE}" min="1">
+      </div>
 
-		<p>${t("unitPrice")}: ${prix.toFixed(2)} peds</p>
+      <p>${t("unitPrice")}: ${prix.toFixed(2)} peds</p>
+      <p>TT: <span id="calcTT"></span> peds</p>
+      <p>MU: ${mu}</p>
+      <p>${t("calcSell")}: <span id="calcSell"></span></p>
+    </div>
 
-		<p>TT: <span id="calcTT"></span> peds</p>
-
-		<p>MU: ${mu}</p>
-
-		<p>${t("calcSell")}: <span id="calcSell"></span></p>
-	</div>
-
-	<button class="back-btn" onclick="closeCalculator(this)">←</button>
+    <button class="back-btn" onclick="closeCalculator(this)">←</button>
   `;
 
+  card.classList.add("open");
 
-	card.classList.add("open");
-
-	// init calc
-	setTimeout(() => {
-		const qtyInput = back.querySelector("#calcQty");
-		qtyInput.addEventListener("input", () => {
-		updateCalc(card, prix, mu);
-	});
+  setTimeout(() => {
+    const qtyInput = back.querySelector("#calcQty");
+    qtyInput.addEventListener("input", () => {
+      updateCalc(card, prix, mu);
+    });
 
     updateCalc(card, prix, mu);
   }, 0);
@@ -813,6 +832,7 @@ function updateCalc(card, prix, muStr) {
 function closeCalculator(btn) {
   const card = btn.closest(".card");
   card.classList.remove("open");
+  openCard = null;
 }
 	
 	// 🔥 détecte si iframe
@@ -823,16 +843,17 @@ function closeCalculator(btn) {
 		}
 	}
 
-// empêcher fermeture quand on clique DANS une card
-document.addEventListener("click", (e) => {
-  if (e.target.closest(".card")) {
-    return; // on ne ferme pas
-  }
+let openCard = null;
 
-  // sinon clic extérieur → on ferme tout
-  document.querySelectorAll(".card.open").forEach(card => {
-    card.classList.remove("open");
-  });
+document.addEventListener("click", (e) => {
+  if (!openCard) return;
+
+  // si clic dans la card ouverte → on ne fait rien
+  if (e.target.closest(".card") === openCard) return;
+
+  // sinon → clic ailleurs → on ferme
+  openCard.classList.remove("open");
+  openCard = null;
 });
 
     </script>
