@@ -753,13 +753,6 @@ function openCalculator(iconEl, item) {
   const card = iconEl.closest(".card");
   const back = card.querySelector(".card-back");
 
-  const prix = parseFloat(item.PRIX_UNITAIRE) || 0;
-  const mu = item.MU || "";
-
-  function openCalculator(iconEl, item) {
-  const card = iconEl.closest(".card");
-  const back = card.querySelector(".card-back");
-
   // 👉 empêcher le click global de se déclencher
   event.stopPropagation();
 
