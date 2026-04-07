@@ -777,6 +777,8 @@ function openCalculator(iconEl, item) {
 	</div>
 
 	<button class="back-btn" onclick="closeCalculator(this)">←</button>
+  `;
+
 
 	card.classList.add("open");
 
@@ -827,10 +829,8 @@ document.addEventListener("click", () => {
   });
 });
 
-document.addEventListener("click", (e) => {
-  if (e.target.closest(".card")) {
-    e.stopPropagation();
-  }
+document.querySelector("#cardContainer").addEventListener("click", (e) => {
+  e.stopPropagation();
 });
 
     </script>
