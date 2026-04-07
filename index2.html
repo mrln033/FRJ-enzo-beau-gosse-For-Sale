@@ -34,7 +34,7 @@
 		FR
 		</button>
 	</div>
-	<a href="https://www.frenchjumper.fr" target="_blank">
+	<a href="https://www.frenchjumper.fr" target="_blank" id="logoLink">
 		<img src="./Logo FRJ.png" id="headerLogo" title="Frenchjumper">
 	</a>
     <div align="center"><h1 id="title"></h1></div>
@@ -746,46 +746,80 @@ function getMUColor(dateStr) {
 		}
 	}
 
-	function openCalculator(e, item) {
-		const toast = document.getElementById("toastCalc");
+function openCalculator(e, item) {
+	const toast = document.getElementById("toastCalc");
 
-		// 🔥 position verticale selon souris
-		const mouseY = e.clientY;
+	const mouseX = e.clientX;
+	const mouseY = e.clientY;
 
-		toast.style.top = mouseY + "px";
-		toast.style.transform = "translateY(-50%)";
+	// affiche d'abord pour mesurer la hauteur réelle
+	toast.classList.remove("hidden");
 
-		const prix = parseFloat(item.PRIX_UNITAIRE) || 0;
-		const mu = item.MU || "";
+	const offsetX = 15;
+	const offsetY = 10;
 
-		toast.innerHTML = `
-			<h3>${item.ITEM}</h3>
+	const toastHeight = toast.offsetHeight;
+	const toastWidth = toast.offsetWidth;
 
-			<p>
-			${t("quantity")}:
-			<input type="number" id="calcQty" value="${item.QUANTITE}" min="1">
-			</p>
+	const padding = 10;
 
-			<p>${t("unitPrice")}: ${prix.toFixed(2)} peds</p>
+	// -------------------------
+	// POSITION X (évite overflow droite)
+	// -------------------------
+	let left = mouseX + offsetX;
 
-			<p>TT: <span id="calcTT">${(item.QUANTITE * prix).toFixed(2)}</span> peds</p>
-
-			<p>MU: ${mu}</p>
-
-			<p>${t("calcSell")}: <span id="calcSell">--</span></p>
-
-			<button onclick="closeToast()">${t("close")}</button>
-		`;
-
-		toast.classList.remove("hidden");
-
-		// recalcul live
-		document.getElementById("calcQty").addEventListener("input", () => {
-			updateCalc(prix, mu);
-		});
-
-		updateCalc(prix, mu);
+	if (left + toastWidth > window.innerWidth) {
+		left = mouseX - toastWidth - offsetX;
 	}
+
+	// -------------------------
+	// POSITION Y (bas aligné curseur)
+	// -------------------------
+	let top = mouseY - toastHeight;
+
+	// 🔥 si dépasse haut de l'écran
+	if (top < padding) {
+		top = padding;
+	}
+
+	// 🔥 si dépasse bas de l'écran
+	if (mouseY + offsetY > window.innerHeight - toastHeight) {
+		top = window.innerHeight - toastHeight - padding;
+	}
+
+	toast.style.left = left + "px";
+	toast.style.top = top + "px";
+
+	// contenu
+	const prix = parseFloat(item.PRIX_UNITAIRE) || 0;
+	const mu = item.MU || "";
+
+	toast.innerHTML = `
+		<h3>${item.ITEM}</h3>
+
+		<p>
+		${t("quantity")}:
+		<input type="number" id="calcQty" value="${item.QUANTITE}" min="1">
+		</p>
+
+		<p>${t("unitPrice")}: ${prix.toFixed(2)} peds</p>
+
+		<p>TT: <span id="calcTT">${(item.QUANTITE * prix).toFixed(2)}</span> peds</p>
+
+		<p>MU: ${mu}</p>
+
+		<p>${t("calcSell")}: <span id="calcSell">--</span></p>
+
+		<button onclick="closeToast()">${t("close")}</button>
+	`;
+
+	// recalcul
+	document.getElementById("calcQty").addEventListener("input", () => {
+		updateCalc(prix, mu);
+	});
+
+	updateCalc(prix, mu);
+}
 	
 	function updateCalc(prix, muStr) {
 		const qty = parseFloat(document.getElementById("calcQty").value) || 0;
@@ -797,7 +831,16 @@ function getMUColor(dateStr) {
 		let muValue = 1;
 
 		if (muStr && muStr.includes("%")) {
-			muValue = parseFloat(muStr.replace("%", "")) / 100;
+			const clean = muStr
+				.replace("%", "")
+				.replace(",", ".")
+				.trim();
+
+			const parsed = parseFloat(clean);
+
+			if (!isNaN(parsed)) {
+				muValue = parsed / 100;
+			}	
 		}
 
 		const sell = tt * muValue;
@@ -817,6 +860,14 @@ function getMUColor(dateStr) {
 		}
 	});
 	
+	// 🔥 détecte si iframe
+	if (window.self !== window.top) {
+		const logo = document.getElementById("logoLink");
+		if (logo) {
+			logo.style.display = "none";
+		}
+	}
+
     </script>
   </body>
 </html>
