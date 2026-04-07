@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="#top">
+	<link rel="icon" href="./favicon.ico">
+	<link rel="stylesheet" href="./style.css">
+	<meta charset="UTF-8">
+	<title>MAJ MU</title>
+
+	<style>
+		body {
+		font-family: Arial;
+		padding: 20px;
+		background: #f5f5f5;
+		}
+
+		textarea {
+		width: 100%;
+		height: 300px;
+		font-family: monospace;
+		padding: 10px;
+		}
+
+		button {
+		margin-top: 10px;
+		padding: 10px 20px;
+		cursor: pointer;
+		}
+	</style>
+</head>
+
+<body>
+
+    <div align="center"><h1 id="title">[FRJ] - enzo beau gosse = A VENDRE</h1></div>
+    <hr>
+<h2>MAJ Inventaire enzo beau gosse (Admin)</h2>
+
+<textarea id="csvInput" placeholder="Colle ton CSV ici..."></textarea>
+<br>
+<button onclick="sendData()">Envoi</button>
+
+<script>
+  // 🔐 Vérification admin
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("admin") !== "1") {
+    window.location.href = "./";
+  }
+
+
+
+function sendData() {
+  const btn = document.querySelector("button");
+  const csv = document.getElementById("csvInput").value;
+
+  if (!csv.trim()) {
+    alert("Vide !");
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerText = "Envoi en cours...";
+
+  fetch("https://script.google.com/macros/s/AKfycbxDLU93_rtARjYZKi10BusFYpMcKVS4Qu4I4zIqH8wtsS43pXM3afqsMm6KADE-dbxg/exec?type=inventory", {
+    method: "POST",
+    body: csv
+  })
+  .then(res => res.text())
+  .then(res => {
+    alert("✅ " + res);
+    document.getElementById("csvInput").value = "";
+  })
+  .catch(err => {
+    alert("❌ " + err);
+  })
+  .finally(() => {
+    btn.disabled = false;
+    btn.innerText = "Envoi";
+  });
+}
+
+</script>
+
+</body>
+</html>
