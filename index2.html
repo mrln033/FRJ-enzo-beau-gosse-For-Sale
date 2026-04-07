@@ -757,39 +757,35 @@ function openCalculator(iconEl, item) {
   const mu = item.MU || "";
 
   back.innerHTML = `
-    <div class="card-back">
 
-		<div class="back-header">
-			<h3>${item.ITEM}</h3>
-		</div>
-		<div class="back-content">
-			<div class="qty-row">
-				<span>Quantité</span>
-				<input type="number" id="calcQty" value="${item.QUANTITE}" min="1">
-			</div>
-
-			<p>${t("unitPrice")}: ${prix.toFixed(2)} peds</p>
-
-			<p>TT: <span id="calcTT"></span> peds</p>
-
-			<p>MU: ${mu}</p>
-
-			<p>${t("calcSell")}: <span id="calcSell"></span></p>
-		</div>
-
-		<button class="back-btn" onclick="closeCalculator(this)">←</button>
-  
+	<div class="back-header">
+		<h3>${item.ITEM}</h3>
 	</div>
-  `;
+	<div class="back-content">
+		<div class="qty-row">
+			<span>Quantité</span>
+			<input type="number" id="calcQty" value="${item.QUANTITE}" min="1">
+		</div>
 
-  card.classList.add("open");
+		<p>${t("unitPrice")}: ${prix.toFixed(2)} peds</p>
 
-  // init calc
-  setTimeout(() => {
-    const qtyInput = back.querySelector("#calcQty");
-    qtyInput.addEventListener("input", () => {
-      updateCalc(card, prix, mu);
-    });
+		<p>TT: <span id="calcTT"></span> peds</p>
+
+		<p>MU: ${mu}</p>
+
+		<p>${t("calcSell")}: <span id="calcSell"></span></p>
+	</div>
+
+	<button class="back-btn" onclick="closeCalculator(this)">←</button>
+
+	card.classList.add("open");
+
+	// init calc
+	setTimeout(() => {
+		const qtyInput = back.querySelector("#calcQty");
+		qtyInput.addEventListener("input", () => {
+		updateCalc(card, prix, mu);
+	});
 
     updateCalc(card, prix, mu);
   }, 0);
@@ -825,40 +821,16 @@ function closeCalculator(btn) {
 		}
 	}
 
-let openCard = null;
-
-// ouvrir une card
-document.querySelectorAll(".calc-icon").forEach(icon => {
-  icon.addEventListener("click", (e) => {
-    e.stopPropagation();
-
-    const card = icon.closest(".card");
-
-    // si une autre card est ouverte → on la ferme
-    if (openCard && openCard !== card) {
-      openCard.classList.remove("open");
-    }
-
-    // toggle sur la card actuelle
-    const isOpen = card.classList.contains("open");
-    card.classList.toggle("open", !isOpen);
-
-    openCard = !isOpen ? card : null;
-  });
-});
-
-// clic ailleurs = fermeture
 document.addEventListener("click", () => {
-  if (openCard) {
-    openCard.classList.remove("open");
-    openCard = null;
-  }
+  document.querySelectorAll(".card.open").forEach(card => {
+    card.classList.remove("open");
+  });
 });
 
-document.querySelectorAll(".card").forEach(card => {
-  card.addEventListener("click", (e) => {
+document.addEventListener("click", (e) => {
+  if (e.target.closest(".card")) {
     e.stopPropagation();
-  });
+  }
 });
 
     </script>
