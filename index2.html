@@ -765,7 +765,7 @@ function openCalculator(iconEl, item) {
 		<div class="back-content">
 			<div class="qty-row">
 				<span>Quantité</span>
-				<input type="number">
+				<input type="number" id="calcQty" value="${item.QUANTITE}" min="1">
 			</div>
 
 			<p>${t("unitPrice")}: ${prix.toFixed(2)} peds</p>
@@ -777,7 +777,7 @@ function openCalculator(iconEl, item) {
 			<p>${t("calcSell")}: <span id="calcSell"></span></p>
 		</div>
 
-		<button class="back-btn">←</button>
+		<button class="back-btn" onclick="closeCalculator(this)">←</button>
   
 	</div>
   `;
