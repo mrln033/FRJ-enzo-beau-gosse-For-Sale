@@ -757,30 +757,29 @@ function openCalculator(iconEl, item) {
   const mu = item.MU || "";
 
   back.innerHTML = `
-<div class="card-back">
+    <div class="card-back">
 
-  <div class="back-header">
-    <h3>Nom item</h3>
-  </div>
+		<div class="back-header">
+			<h3>${item.ITEM}</h3>
+		</div>
+		<div class="back-content">
+			<div class="qty-row">
+				<span>Quantité</span>
+				<input type="number">
+			</div>
 
-  <div class="back-content">
-    <div class="qty-row">
-      <span>Quantité</span>
-      <input type="number">
-    </div>
+			<p>${t("unitPrice")}: ${prix.toFixed(2)} peds</p>
 
-		<p>${t("unitPrice")}: ${prix.toFixed(2)} peds</p>
+			<p>TT: <span id="calcTT"></span> peds</p>
 
-		<p>TT: <span id="calcTT"></span> peds</p>
+			<p>MU: ${mu}</p>
 
-		<p>MU: ${mu}</p>
+			<p>${t("calcSell")}: <span id="calcSell"></span></p>
+		</div>
 
-		<p>${t("calcSell")}: <span id="calcSell"></span></p>
-  </div>
-
-  <button class="back-btn">←</button>
-
-</div>
+		<button class="back-btn">←</button>
+  
+	</div>
   `;
 
   card.classList.add("open");
