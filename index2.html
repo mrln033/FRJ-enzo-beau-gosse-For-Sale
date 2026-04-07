@@ -684,7 +684,7 @@ function getMUColor(dateStr) {
 			if (hasPrice && hasMU && isPercentMU) {
 				calculatorHTML = `
 					<div class="calc-icon"
-						onclick='openCalculator(event, ${JSON.stringify(item).replace(/'/g, "&apos;")})'>
+						onclick='openCalculator(this, ${JSON.stringify(item).replace(/'/g, "&apos;")})'>
     
 						<svg viewBox="0 0 24 24" width="20" height="20"
 							fill="none" stroke="currentColor" stroke-width="2"
@@ -746,51 +746,53 @@ function getMUColor(dateStr) {
 		}
 	}
 
-function openCalculator(e, item) {
+function openCalculator(iconEl, item) {
 	const toast = document.getElementById("toastCalc");
 
-	const mouseX = e.clientX;
-	const mouseY = e.clientY;
+	// 🔥 on trouve la card
+	const card = iconEl.closest(".card");
 
-	// affiche d'abord pour mesurer la hauteur réelle
+	// afficher pour mesurer
 	toast.classList.remove("hidden");
 
-	const offsetX = 15;
-	const offsetY = 10;
+	// reset position temporaire
+	toast.style.top = "0px";
+	toast.style.left = "0px";
+
+	const rect = card.getBoundingClientRect();
 
 	const toastHeight = toast.offsetHeight;
 	const toastWidth = toast.offsetWidth;
 
-	const padding = 10;
+	const margin = 10;
 
 	// -------------------------
-	// POSITION X (évite overflow droite)
+	// POSITION : à droite de la card
 	// -------------------------
-	let left = mouseX + offsetX;
+	let left = rect.right + margin;
+	let top = rect.top;
 
+	// 🔥 si ça sort à droite → on passe à gauche de la card
 	if (left + toastWidth > window.innerWidth) {
-		left = mouseX - toastWidth - offsetX;
+		left = rect.left - toastWidth - margin;
 	}
 
-	// -------------------------
-	// POSITION Y (bas aligné curseur)
-	// -------------------------
-	let top = mouseY - toastHeight;
-
-	// 🔥 si dépasse haut de l'écran
-	if (top < padding) {
-		top = padding;
+	// 🔥 si ça sort en bas → on remonte
+	if (top + toastHeight > window.innerHeight) {
+		top = window.innerHeight - toastHeight - margin;
 	}
 
-	// 🔥 si dépasse bas de l'écran
-	if (mouseY + offsetY > window.innerHeight - toastHeight) {
-		top = window.innerHeight - toastHeight - padding;
+	// 🔥 si ça sort en haut → on bloque
+	if (top < margin) {
+		top = margin;
 	}
 
 	toast.style.left = left + "px";
 	toast.style.top = top + "px";
 
+	// -------------------------
 	// contenu
+	// -------------------------
 	const prix = parseFloat(item.PRIX_UNITAIRE) || 0;
 	const mu = item.MU || "";
 
@@ -813,7 +815,6 @@ function openCalculator(e, item) {
 		<button onclick="closeToast()">${t("close")}</button>
 	`;
 
-	// recalcul
 	document.getElementById("calcQty").addEventListener("input", () => {
 		updateCalc(prix, mu);
 	});
