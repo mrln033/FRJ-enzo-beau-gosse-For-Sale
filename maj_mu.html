@@ -30,6 +30,10 @@
 </head>
 
 <body>
+<div class="nav-admin">
+  <a href="maj_mu.html" id="btnMU">MàJ MU</a>
+  <a href="maj_inventaire-enzo.html" id="btnINV">MàJ Inventaire</a>
+</div>
 
     <div align="center"><h1 id="title">[FRJ] - enzo beau gosse = A VENDRE</h1></div>
     <hr>
@@ -79,6 +83,16 @@ function sendData() {
 }
 
 </script>
+<script>
+  const path = window.location.pathname;
 
+  if (path.includes("maj_mu")) {
+    document.getElementById("btnMU").classList.add("active");
+  }
+
+  if (path.includes("maj_inventaire")) {
+    document.getElementById("btnINV").classList.add("active");
+  }
+</script>
 </body>
 </html>

@@ -341,3 +341,30 @@ h1 {
   z-index: 1000;
 }
 
+.nav-admin {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  gap: 10px;
+  z-index: 9999;
+}
+
+.nav-admin a {
+  padding: 8px 14px;
+  background: #ddd;
+  color: #000;
+  text-decoration: none;
+  border-radius: 6px;
+  font-weight: bold;
+  transition: 0.2s;
+}
+
+.nav-admin a:hover {
+  background: #bbb;
+}
+
+.nav-admin a.active {
+  background: #333;
+  color: #fff;
+}
