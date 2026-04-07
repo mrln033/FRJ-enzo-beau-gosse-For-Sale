@@ -4,6 +4,7 @@
     <base target="#top">
 	<link rel="icon" href="./favicon.ico">
 	<link rel="stylesheet" href="./style.css">
+	<title>[FRJ] - enzo beau gosse : Item List</title>
   </head>
   <body>
 	<div id="langSwitcher">
@@ -62,8 +63,6 @@
 	</div>
 
 	<div class="card-container" id="cardContainer"></div>
-	
-	<div id="toastCalc" class="toast hidden"></div>
 
     <script>
 	
@@ -684,7 +683,7 @@ function getMUColor(dateStr) {
 			if (hasPrice && hasMU && isPercentMU) {
 				calculatorHTML = `
 					<div class="calc-icon"
-						onclick='openCalculator(event, ${JSON.stringify(item).replace(/'/g, "&apos;")})'>
+						onclick='openCalculator(this, ${JSON.stringify(item).replace(/'/g, "&apos;")})'>
     
 						<svg viewBox="0 0 24 24" width="20" height="20"
 							fill="none" stroke="currentColor" stroke-width="2"
@@ -706,14 +705,19 @@ function getMUColor(dateStr) {
 			}
 			
 			card.innerHTML = `
-				${imgHTML}
-				<h3>${itemTitle}</h3>
-				${rayonHTML}
-				<p><span class="label-italic">${t("quantity")}</span>: ${item.QUANTITE}</p>
-				<p><span class="label-italic">${t("unitPrice")}</span>: ${prixUnitaire} peds</p>
-				<p><span class="label-italic">${t("total")}</span>: ${total} peds</p>
-				${muHTML}
-				${calculatorHTML}
+				<div class="card-front">
+					${imgHTML}
+					<h3>${itemTitle}</h3>
+					${rayonHTML}
+					<p><span class="label-italic">${t("quantity")}</span>: ${item.QUANTITE}</p>
+					<p><span class="label-italic">${t("unitPrice")}</span>: ${prixUnitaire} peds</p>
+					<p><span class="label-italic">${t("total")}</span>: ${total} peds</p>
+					${muHTML}
+
+					${calculatorHTML}
+				</div>
+
+				<div class="card-back"></div>
 			`;
 
 			container.appendChild(card);
@@ -746,85 +750,84 @@ function getMUColor(dateStr) {
 		}
 	}
 
-	function openCalculator(e, item) {
-		const toast = document.getElementById("toastCalc");
+function openCalculator(iconEl, item) {
+  const card = iconEl.closest(".card");
+  const back = card.querySelector(".card-back");
 
-		// 🔥 position verticale selon souris
-		const mouseY = e.clientY;
+  // 👉 empêcher le click global de se déclencher
+  event.stopPropagation();
 
-		toast.style.top = mouseY + "px";
-		toast.style.transform = "translateY(-50%)";
+  // 👉 fermer ancienne card si différente
+  if (openCard && openCard !== card) {
+    openCard.classList.remove("open");
+  }
 
-		const prix = parseFloat(item.PRIX_UNITAIRE) || 0;
-		const mu = item.MU || "";
+  // 👉 toggle si même card
+  if (card === openCard) {
+    card.classList.remove("open");
+    openCard = null;
+    return;
+  }
 
-		toast.innerHTML = `
-			<h3>${item.ITEM}</h3>
+  openCard = card;
 
-			<p>
-			${t("quantity")}:
-			<input type="number" id="calcQty" value="${item.QUANTITE}" min="1">
-			</p>
+  const prix = parseFloat(item.PRIX_UNITAIRE) || 0;
+  const mu = item.MU || "";
 
-			<p>${t("unitPrice")}: ${prix.toFixed(2)} peds</p>
+  back.innerHTML = `
+    <div class="back-header">
+      <h3>${item.ITEM}</h3>
+    </div>
 
-			<p>TT: <span id="calcTT">${(item.QUANTITE * prix).toFixed(2)}</span> peds</p>
+    <div class="back-content">
+      <div class="qty-row">
+        <span>Quantité</span>
+        <input type="number" id="calcQty" value="${item.QUANTITE}" min="1">
+      </div>
 
-			<p>MU: ${mu}</p>
+      <p>${t("unitPrice")}: ${prix.toFixed(2)} peds</p>
+      <p>TT: <span id="calcTT"></span> peds</p>
+      <p>MU: ${mu}</p>
+      <p>${t("calcSell")}: <span id="calcSell"></span></p>
+    </div>
 
-			<p>${t("calcSell")}: <span id="calcSell">--</span></p>
+    <button class="back-btn" onclick="closeCalculator(this)">←</button>
+  `;
 
-			<button onclick="closeToast()">${t("close")}</button>
-		`;
+  card.classList.add("open");
 
-		toast.classList.remove("hidden");
+  setTimeout(() => {
+    const qtyInput = back.querySelector("#calcQty");
+    qtyInput.addEventListener("input", () => {
+      updateCalc(card, prix, mu);
+    });
 
-		// recalcul live
-		document.getElementById("calcQty").addEventListener("input", () => {
-			updateCalc(prix, mu);
-		});
+    updateCalc(card, prix, mu);
+  }, 0);
+}
 
-		updateCalc(prix, mu);
-	}
-	
-	function updateCalc(prix, muStr) {
-		const qty = parseFloat(document.getElementById("calcQty").value) || 0;
+function updateCalc(card, prix, muStr) {
+  const qty = parseFloat(card.querySelector("#calcQty").value) || 0;
 
-		const tt = qty * prix;
-		document.getElementById("calcTT").innerText = tt.toFixed(2);
+  const tt = qty * prix;
+  card.querySelector("#calcTT").innerText = tt.toFixed(2);
 
-		// Extraction MU (ex: "105%" → 1.05)
-		let muValue = 1;
+  let muValue = 1;
 
-		if (muStr && muStr.includes("%")) {
-			const clean = muStr
-				.replace("%", "")
-				.replace(",", ".")
-				.trim();
+  if (muStr && muStr.includes("%")) {
+    const parsed = parseFloat(muStr.replace("%", "").replace(",", "."));
+    if (!isNaN(parsed)) muValue = parsed / 100;
+  }
 
-			const parsed = parseFloat(clean);
+  const sell = tt * muValue;
+  card.querySelector("#calcSell").innerText = sell.toFixed(2);
+}
 
-			if (!isNaN(parsed)) {
-				muValue = parsed / 100;
-			}	
-		}
-
-		const sell = tt * muValue;
-
-		document.getElementById("calcSell").innerText = sell.toFixed(2) + " peds";
-	}
-	
-	function closeToast() {
-		document.getElementById("toastCalc").classList.add("hidden");
-	}
-
-
-	document.addEventListener("click", (e) => {
-		const toast = document.getElementById("toastCalc");
-		if (!toast.contains(e.target) && !e.target.classList.contains("calc-icon")) {
-			toast.classList.add("hidden");
-		}
-	});
+function closeCalculator(btn) {
+  const card = btn.closest(".card");
+  card.classList.remove("open");
+  openCard = null;
+}
 	
 	// 🔥 détecte si iframe
 	if (window.self !== window.top) {
@@ -833,6 +836,19 @@ function getMUColor(dateStr) {
 			logo.style.display = "none";
 		}
 	}
+
+let openCard = null;
+
+document.addEventListener("click", (e) => {
+  if (!openCard) return;
+
+  // si clic dans la card ouverte → on ne fait rien
+  if (e.target.closest(".card") === openCard) return;
+
+  // sinon → clic ailleurs → on ferme
+  openCard.classList.remove("open");
+  openCard = null;
+});
 
     </script>
   </body>
