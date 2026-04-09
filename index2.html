@@ -786,9 +786,9 @@ function openCalculator(iconEl, item) {
       </div>
 
       <p>${t("unitPrice")}: ${prix.toFixed(2)} peds</p>
-      <p>TT: <span id="calcTT"></span> peds</p>
+      <p>Total TT: <span id="calcTT"></span> peds</p>
       <p>MU: ${mu}</p>
-      <p>${t("calcSell")}: <span id="calcSell"></span></p>
+      <p><strong>${t("calcSell")}: <span id="calcSell"></span> peds</strong></p>
     </div>
 
     <button class="back-btn" onclick="closeCalculator(this)">←</button>
@@ -812,15 +812,47 @@ function updateCalc(card, prix, muStr) {
   const tt = qty * prix;
   card.querySelector("#calcTT").innerText = tt.toFixed(2);
 
-  let muValue = 1;
+  const mu = parseMU(muStr);
 
-  if (muStr && muStr.includes("%")) {
-    const parsed = parseFloat(muStr.replace("%", "").replace(",", "."));
-    if (!isNaN(parsed)) muValue = parsed / 100;
+  let sell = tt;
+
+  // 🟢 CAS 1 : MU en %
+  if (mu.type === "percent") {
+    sell = tt * (1 + mu.value);
   }
 
-  const sell = tt * muValue;
+  // 🟡 CAS 2 : MU en PED (fixe par unité)
+  else if (mu.type === "ped") {
+    const muTotal = qty * mu.value;
+    sell = tt + muTotal;
+  }
+
+  // 🔴 CAS 3 : aucun MU → sell = TT
+
   card.querySelector("#calcSell").innerText = sell.toFixed(2);
+}
+function parseMU(muStr) {
+  if (!muStr) return { type: "none", value: 0 };
+
+  // cas PED
+  if (typeof muStr === "string" && muStr.trim().endsWith(" PED")) {
+    const val = parseFloat(muStr.replace(" PED", "").replace(",", "."));
+    return {
+      type: "ped",
+      value: isNaN(val) ? 0 : val
+    };
+  }
+
+  // cas %
+  if (typeof muStr === "string" && muStr.includes("%")) {
+    const val = parseFloat(muStr.replace("%", "").replace(",", "."));
+    return {
+      type: "percent",
+      value: isNaN(val) ? 0 : val / 100
+    };
+  }
+
+  return { type: "none", value: 0 };
 }
 
 function closeCalculator(btn) {
