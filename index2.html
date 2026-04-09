@@ -774,6 +774,8 @@ function openCalculator(iconEl, item) {
 
   const prix = parseFloat(item.PRIX_UNITAIRE) || 0;
   const mu = item.MU || "";
+  const muParsed = parseMU(mu);
+  const defaultQty = (muParsed.type === "ped") ? 1 : item.QUANTITE;
 
   back.innerHTML = `
     <div class="back-header">
@@ -783,7 +785,7 @@ function openCalculator(iconEl, item) {
     <div class="back-content">
       <div class="qty-row">
         <span>Quantité</span>
-        <input type="number" id="calcQty" value="${item.QUANTITE}" min="1">
+        <input type="number" id="calcQty" value="${defaultQty}" min="1">
       </div>
 
       <p>${t("unitPrice")}: ${prix.toFixed(2)} peds</p>
