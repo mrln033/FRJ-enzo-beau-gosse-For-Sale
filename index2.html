@@ -679,8 +679,9 @@ function getMUColor(dateStr) {
 			const hasPrice = item.PRIX_UNITAIRE !== "" && item.PRIX_UNITAIRE != null && !isNaN(item.PRIX_UNITAIRE);
 			const hasMU = item.MU !== "" && item.MU != null;
 			const isPercentMU = typeof item.MU === "string" && item.MU.includes("%");
+			const isPedMU = typeof item.MU === "string" && item.MU.trim().endsWith(" PED");
 
-			if (hasPrice && hasMU && isPercentMU) {
+			if (hasPrice && hasMU && (isPercentMU || isPedMU)) {
 				calculatorHTML = `
 					<div class="calc-icon"
 						onclick='openCalculator(this, ${JSON.stringify(item).replace(/'/g, "&apos;")})'>
