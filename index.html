@@ -679,8 +679,9 @@ function getMUColor(dateStr) {
 			const hasPrice = item.PRIX_UNITAIRE !== "" && item.PRIX_UNITAIRE != null && !isNaN(item.PRIX_UNITAIRE);
 			const hasMU = item.MU !== "" && item.MU != null;
 			const isPercentMU = typeof item.MU === "string" && item.MU.includes("%");
+			const isPedMU = typeof item.MU === "string" && item.MU.trim().endsWith(" PED");
 
-			if (hasPrice && hasMU && isPercentMU) {
+			if (hasPrice && hasMU && (isPercentMU || isPedMU)) {
 				calculatorHTML = `
 					<div class="calc-icon"
 						onclick='openCalculator(this, ${JSON.stringify(item).replace(/'/g, "&apos;")})'>
@@ -773,6 +774,8 @@ function openCalculator(iconEl, item) {
 
   const prix = parseFloat(item.PRIX_UNITAIRE) || 0;
   const mu = item.MU || "";
+  const muParsed = parseMU(mu);
+  const defaultQty = (muParsed.type === "ped") ? 1 : item.QUANTITE;
 
   back.innerHTML = `
     <div class="back-header">
@@ -782,12 +785,12 @@ function openCalculator(iconEl, item) {
     <div class="back-content">
       <div class="qty-row">
         <span>Quantité</span>
-        <input type="number" id="calcQty" value="${item.QUANTITE}" min="1">
+        <input type="number" id="calcQty" value="${defaultQty}" min="1">
       </div>
 
       <p>${t("unitPrice")}: ${prix.toFixed(2)} peds</p>
       <p>Total TT: <span id="calcTT"></span> peds</p>
-      <p>MU: ${mu}</p>
+      <p id="muLine"></p>
       <p><strong>${t("calcSell")}: <span id="calcSell"></span> peds</strong></p>
     </div>
 
@@ -805,22 +808,68 @@ function openCalculator(iconEl, item) {
     updateCalc(card, prix, mu);
   }, 0);
 }
-
 function updateCalc(card, prix, muStr) {
   const qty = parseFloat(card.querySelector("#calcQty").value) || 0;
 
   const tt = qty * prix;
   card.querySelector("#calcTT").innerText = tt.toFixed(2);
 
-  let muValue = 1;
+  const mu = parseMU(muStr);
 
-  if (muStr && muStr.includes("%")) {
-    const parsed = parseFloat(muStr.replace("%", "").replace(",", "."));
-    if (!isNaN(parsed)) muValue = parsed / 100;
+  let sell = tt;
+  let muDisplay = "";
+
+  // 🟢 CAS 1 : MU en %
+  if (mu.type === "percent") {
+    sell = tt * (1 + mu.value);
+
+    // affichage simple (inchangé)
+    muDisplay = `MU: ${muStr}`;
   }
 
-  const sell = tt * muValue;
+  // 🟡 CAS 2 : MU en PED (nouveau comportement dynamique)
+  else if (mu.type === "ped") {
+    const muTotal = qty * mu.value;
+    sell = tt + muTotal;
+
+    muDisplay = `Total MU: ${muTotal.toFixed(2)} peds`;
+  }
+
+  // 🔴 fallback (normalement jamais utilisé chez toi)
+  else {
+    muDisplay = "";
+  }
+
   card.querySelector("#calcSell").innerText = sell.toFixed(2);
+
+  const muLineEl = card.querySelector("#muLine");
+  if (muLineEl) {
+    muLineEl.innerText = muDisplay;
+  }
+}
+
+function parseMU(muStr) {
+  if (!muStr) return { type: "none", value: 0 };
+
+  // cas PED
+  if (typeof muStr === "string" && muStr.trim().endsWith(" PED")) {
+    const val = parseFloat(muStr.replace(" PED", "").replace(",", "."));
+    return {
+      type: "ped",
+      value: isNaN(val) ? 0 : val
+    };
+  }
+
+  // cas %
+  if (typeof muStr === "string" && muStr.includes("%")) {
+    const val = parseFloat(muStr.replace("%", "").replace(",", "."));
+    return {
+      type: "percent",
+      value: isNaN(val) ? 0 : val / 100
+    };
+  }
+
+  return { type: "none", value: 0 };
 }
 
 function closeCalculator(btn) {
