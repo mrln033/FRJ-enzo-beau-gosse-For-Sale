@@ -154,17 +154,8 @@ document.addEventListener("DOMContentLoaded", () => {
 	let isLoading = true;
 	let lastRenderedItems = [];
 	
-function setLanguage(lang) {
-	currentLang = lang;
 
-	// sauvegarde
-	localStorage.setItem("lang", lang);
-
-	// mise à jour UI
-	updateLanguageButtons();
-	applyTranslations();
-	renderCards(lastRenderedItems);
-}
+		
 	
 		
 	const CATEGORY_IMAGES = {
@@ -225,7 +216,21 @@ function setLanguage(lang) {
 		}
 	};
 	
+	function updateLanguageButtons() {
+		document.getElementById("btnEN").classList.remove("active");
+		document.getElementById("btnFR").classList.remove("active");
 
+		if (currentLang === "EN") {
+			document.getElementById("btnEN").classList.add("active");
+		} else {
+			document.getElementById("btnFR").classList.add("active");
+		}
+	}
+	
+	function t(key) {
+		return TRANSLATIONS[currentLang][key] || key;
+	}
+	
 	function applyTranslations() {
 		document.getElementById("title").innerText = t("title");
 		document.getElementById("subtitle").innerText = t("subtitle");
