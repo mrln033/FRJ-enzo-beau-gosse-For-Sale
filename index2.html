@@ -154,6 +154,17 @@ document.addEventListener("DOMContentLoaded", () => {
 	let isLoading = true;
 	let lastRenderedItems = [];
 	
+function setLanguage(lang) {
+	currentLang = lang;
+
+	// sauvegarde
+	localStorage.setItem("lang", lang);
+
+	// mise à jour UI
+	updateLanguageButtons();
+	applyTranslations();
+	renderCards(lastRenderedItems);
+}
 	
 		
 	const CATEGORY_IMAGES = {

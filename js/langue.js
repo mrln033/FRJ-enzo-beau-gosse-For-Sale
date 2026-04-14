@@ -84,19 +84,6 @@ const TRANSLATIONS = {
 };
 
 
-
-function setLanguage(lang) {
-	currentLang = lang;
-
-	// sauvegarde
-	localStorage.setItem("lang", lang);
-
-	// mise à jour UI
-	updateLanguageButtons();
-	applyTranslations();
-	renderCards(lastRenderedItems);
-}
-
 	function updateLanguageButtons() {
 		document.getElementById("btnEN").classList.remove("active");
 		document.getElementById("btnFR").classList.remove("active");
