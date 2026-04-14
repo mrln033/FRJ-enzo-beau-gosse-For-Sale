@@ -139,12 +139,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 
-	let currentLang = localStorage.getItem("lang");
 
-	if (!currentLang) {
-		currentLang = "EN";
-		localStorage.setItem("lang", currentLang);
-	}
 	
 	const API_URL = "https://script.google.com/macros/s/AKfycbxDLU93_rtARjYZKi10BusFYpMcKVS4Qu4I4zIqH8wtsS43pXM3afqsMm6KADE-dbxg/exec";
 	const IMG_URL = "https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/img/"
@@ -216,20 +211,6 @@ document.addEventListener("DOMContentLoaded", () => {
 		}
 	};
 	
-	function updateLanguageButtons() {
-		document.getElementById("btnEN").classList.remove("active");
-		document.getElementById("btnFR").classList.remove("active");
-
-		if (currentLang === "EN") {
-			document.getElementById("btnEN").classList.add("active");
-		} else {
-			document.getElementById("btnFR").classList.add("active");
-		}
-	}
-	
-	function t(key) {
-		return TRANSLATIONS[currentLang][key] || key;
-	}
 	
 	function applyTranslations() {
 		document.getElementById("title").innerText = t("title");

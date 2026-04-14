@@ -83,19 +83,39 @@ const TRANSLATIONS = {
 	}
 };
 
+let currentLang = localStorage.getItem("lang");
 
-	function updateLanguageButtons() {
-		document.getElementById("btnEN").classList.remove("active");
-		document.getElementById("btnFR").classList.remove("active");
+if (!currentLang) {
+	currentLang = "EN";
+	localStorage.setItem("lang", currentLang);
+}
 
-		if (currentLang === "EN") {
-			document.getElementById("btnEN").classList.add("active");
-		} else {
-			document.getElementById("btnFR").classList.add("active");
-		}
+function setLanguage(lang) {
+	currentLang = lang;
+
+	// sauvegarde
+	localStorage.setItem("lang", lang);
+
+	// mise à jour UI
+	updateLanguageButtons();
+	applyTranslations();
+	renderCards(lastRenderedItems);
+}
+
+
+
+function updateLanguageButtons() {
+	document.getElementById("btnEN").classList.remove("active");
+	document.getElementById("btnFR").classList.remove("active");
+
+	if (currentLang === "EN") {
+		document.getElementById("btnEN").classList.add("active");
+	} else {
+		document.getElementById("btnFR").classList.add("active");
 	}
+}
 	
-	function t(key) {
-		return TRANSLATIONS[currentLang][key] || key;
-	}
+function t(key) {
+	return TRANSLATIONS[currentLang][key] || key;
+}
 
