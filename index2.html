@@ -46,7 +46,7 @@
 	<a name="top"></a>
 	<div class="rayon-images">
 		<div class="rayon-header-container">
-			<img src="https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/img/storage/00_EnTete-Storage.png" class="rayon-header">
+			<img id="storageHeader" class="rayon-header">
 		</div>
 		<div id="rayonImages"></div>
 	</div>
@@ -139,8 +139,6 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 
-
-	
 	const API_URL = "https://script.google.com/macros/s/AKfycbxDLU93_rtARjYZKi10BusFYpMcKVS4Qu4I4zIqH8wtsS43pXM3afqsMm6KADE-dbxg/exec";
 	const IMG_URL = "https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/img/"
 		
@@ -148,9 +146,6 @@ document.addEventListener("DOMContentLoaded", () => {
 	let selectedCategory = null;
 	let isLoading = true;
 	let lastRenderedItems = [];
-	
-
-		
 	
 		
 	const CATEGORY_IMAGES = {
@@ -225,6 +220,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
 		if (!selectedCategory) {
 			select.innerHTML = `<option value="">${t("selectCategory")}</option>`;
+		}
+		const headerImg = document.getElementById("storageHeader");
+		if (headerImg && typeof IMG_URL !== "undefined") {
+			headerImg.src = IMG_URL + t("img_storage");
 		}
 	}
 

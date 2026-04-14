@@ -2,6 +2,8 @@ const TRANSLATIONS = {
 	EN: {
 		title: "[FRJ] - enzo beau gosse = FOR SALE",
 		subtitle: "PM Offer InGame @ enzo beau gosse  |  -=> New Oxford Storage <=-",
+		
+		img_storage: "storage/00_EnTete-Storage-EN.png"
 			
 		loadingState: "Loading in progress...",
 
@@ -43,6 +45,8 @@ const TRANSLATIONS = {
 	FR: {
 		title: "[FRJ] - enzo beau gosse = A VENDRE",
 		subtitle: "Faites une offre en jeu @ enzo beau gosse  |  -=> New Oxford Storage <=-",
+		
+		img_storage: "storage/00_EnTete-Storage-FR.png"
 			
 		loadingState: "Chargement en cours...",
 
