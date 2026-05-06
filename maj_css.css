@@ -1,20 +1,20 @@
-	<style>
-		body {
+<style>
+	body {
 		font-family: Arial;
 		padding: 20px;
 		background: #f5f5f5;
-		}
+	}
 
-		textarea {
+	textarea {
 		width: 97%;
 		height: 350px;
 		font-family: monospace;
 		padding: 10px;
-		}
+	}
 
-		button {
+	button {
 		margin-top: 10px;
 		padding: 10px 20px;
 		cursor: pointer;
-		}
-	</style>
+	}
+</style>
