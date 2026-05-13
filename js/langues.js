@@ -68,6 +68,11 @@ const TRANSLATIONS = {
 			Cette page vous permet de consulter tous les objets actuellement en vente.
 			</p>
 
+			<label class="frj-member-toggle">
+				<input type="checkbox" id="frjMemberCheckbox">
+				<span>Je suis membre FRJ</span>
+			</label>
+
 			<p>
 			Pour commencer, <strong>sélectionnez une catégorie d'inventaire</strong> ci-dessus.
 			</p>

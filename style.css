@@ -345,6 +345,22 @@ h1 {
   color: #000;
 }
 
+.frj-member-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 14px 0 18px;
+  font-weight: bold;
+  color: #222;
+}
+
+.frj-member-toggle input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
 /* =========================
    LANG SWITCHER
 ========================= */

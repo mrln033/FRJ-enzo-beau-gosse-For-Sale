@@ -146,6 +146,7 @@ document.addEventListener("DOMContentLoaded", () => {
 	let selectedCategory = null;
 	let isLoading = true;
 	let lastRenderedItems = [];
+	const FRJ_MEMBER_SESSION_KEY = "FRJ";
 	
 		
 	const CATEGORY_IMAGES = {
@@ -225,6 +226,25 @@ document.addEventListener("DOMContentLoaded", () => {
 		if (headerImg && typeof IMG_URL !== "undefined") {
 			headerImg.src = IMG_URL + t("img_storage");
 		}
+	}
+
+	function isFRJMember() {
+		return localStorage.getItem(FRJ_MEMBER_SESSION_KEY) === "TRUE";
+	}
+
+	function setFRJMember(value) {
+		localStorage.setItem(FRJ_MEMBER_SESSION_KEY, value ? "TRUE" : "FALSE");
+	}
+
+	function initFRJMemberCheckbox() {
+		const checkbox = document.getElementById("frjMemberCheckbox");
+		if (!checkbox) return;
+
+		checkbox.checked = isFRJMember();
+		checkbox.addEventListener("change", () => {
+			setFRJMember(checkbox.checked);
+			renderCards(lastRenderedItems);
+		});
 	}
 
 	function formatRayon(rayon) {
@@ -454,6 +474,29 @@ function getMUColor(dateStr) {
   return `rgb(${gray}, ${gray}, ${gray})`;
 }
 
+function formatMUValue(value) {
+  return Number(value.toFixed(2)).toString();
+}
+
+function getEffectiveMU(muStr) {
+  const mu = parseMU(muStr);
+
+  if (!isFRJMember()) {
+    return muStr;
+  }
+
+  if (mu.type === "ped") {
+    return `${formatMUValue(mu.value / 2)} PED`;
+  }
+
+  if (mu.type === "percent") {
+    const adjustedPercent = (1 + ((mu.value - 1) / 2)) * 100;
+    return `${formatMUValue(adjustedPercent)} %`;
+  }
+
+  return muStr;
+}
+
 	// Génère les cards HTML
 	function renderCards(items) {
         const container = document.getElementById('cardContainer');
@@ -477,6 +520,7 @@ function getMUColor(dateStr) {
 		if (!selectedCategory || items.length === 0) {
 
 			document.getElementById("emptyText").innerHTML = t("empty");
+			initFRJMemberCheckbox();
 	
 			emptyState.style.display = "block";
 			return;
@@ -551,11 +595,12 @@ function getMUColor(dateStr) {
 				const color = getMUColor(item.DATE_MU);
 
 				const dateFormatted = formatDateMU(item.DATE_MU);
+				const effectiveMU = getEffectiveMU(item.MU);
 
 				muHTML = `
 					<p title="${dateFormatted?.display || ""}">
 					<span class="MU-style" style="color:${color}">
-						MU: ${item.MU}
+						MU: ${effectiveMU}
 					</span>
 					</p>
 				`;
@@ -659,7 +704,7 @@ function openCalculator(iconEl, item) {
   openCard = card;
 
   const prix = parseFloat(item.PRIX_UNITAIRE) || 0;
-  const mu = item.MU || "";
+  const mu = getEffectiveMU(item.MU || "");
   const muParsed = parseMU(mu);
   const defaultQty = (muParsed.type === "ped") ? 1 : item.QUANTITE;
 
