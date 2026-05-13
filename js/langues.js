@@ -67,12 +67,6 @@ const TRANSLATIONS = {
 			<p>
 			Cette page vous permet de consulter tous les objets actuellement en vente.
 			</p>
-
-			<label class="frj-member-toggle">
-				<input type="checkbox" id="frjMemberCheckbox">
-				<span>Je suis membre FRJ</span>
-			</label>
-
 			<p>
 			Pour commencer, <strong>sélectionnez une catégorie d'inventaire</strong> ci-dessus.
 			</p>
@@ -84,6 +78,12 @@ const TRANSLATIONS = {
 				<li>Tous les items (L) sont Full TT !! Concernant les items non-(L), ils peuvent être à réparer, mais c'est bien la valeur Full TT qui est affichée.</li>
 				<li>Les MU sont actualisés régulièrement (survolez la ligne pour afficher la date de mise à jour) : ils s'effacent progressivement pour disparaitre après 7 jours<br><i><b>Membres FRJ =</b> remise de 50% du MU pour tous les membres</i></li>
 			</ul>
+
+			<label class="frj-member-toggle">
+				<input type="checkbox" id="frjMemberCheckbox">
+				<span>Je suis membre FRJ</span>
+			</label>
+
 
 			<p>
 			<strong>Astuce :</strong> vous pouvez recliquer sur la catégorie sélectionnée pour afficher ce message à nouveau.
