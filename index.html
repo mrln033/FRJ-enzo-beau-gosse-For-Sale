@@ -481,7 +481,7 @@ function formatMUValue(value) {
 function getEffectiveMU(muStr) {
   const mu = parseMU(muStr);
 
-  if (!isFRJMember()) {
+  if (currentLang !== "FR" || !isFRJMember()) {
     return muStr;
   }
 
@@ -596,11 +596,12 @@ function getEffectiveMU(muStr) {
 
 				const dateFormatted = formatDateMU(item.DATE_MU);
 				const effectiveMU = getEffectiveMU(item.MU);
+				const muLabel = currentLang === "FR" && isFRJMember() ? "MU Frj" : "MU";
 
 				muHTML = `
 					<p title="${dateFormatted?.display || ""}">
 					<span class="MU-style" style="color:${color}">
-						MU: ${effectiveMU}
+						${muLabel}: ${effectiveMU}
 					</span>
 					</p>
 				`;
@@ -706,6 +707,7 @@ function openCalculator(iconEl, item) {
   const prix = parseFloat(item.PRIX_UNITAIRE) || 0;
   const mu = getEffectiveMU(item.MU || "");
   const muParsed = parseMU(mu);
+  const muLabel = currentLang === "FR" && isFRJMember() ? "MU Frj" : "MU";
   const defaultQty = (muParsed.type === "ped") ? 1 : item.QUANTITE;
 
   back.innerHTML = `
@@ -733,13 +735,13 @@ function openCalculator(iconEl, item) {
   setTimeout(() => {
     const qtyInput = back.querySelector("#calcQty");
     qtyInput.addEventListener("input", () => {
-      updateCalc(card, prix, mu);
+      updateCalc(card, prix, mu, muLabel);
     });
 
-    updateCalc(card, prix, mu);
+    updateCalc(card, prix, mu, muLabel);
   }, 0);
 }
-function updateCalc(card, prix, muStr) {
+function updateCalc(card, prix, muStr, muLabel = "MU") {
   const qty = parseFloat(card.querySelector("#calcQty").value) || 0;
 
   const tt = qty * prix;
@@ -753,7 +755,7 @@ function updateCalc(card, prix, muStr) {
   // 🟢 CAS 1 : MU en %
   if (mu.type === "percent") {
     sell = tt * mu.value;
-    muDisplay = `MU: ${muStr}`;
+    muDisplay = `${muLabel}: ${muStr}`;
   }
 
   // 🟡 CAS 2 : MU en PED (nouveau comportement dynamique)
@@ -761,7 +763,7 @@ function updateCalc(card, prix, muStr) {
     const muTotal = qty * mu.value;
     sell = tt + muTotal;
 
-    muDisplay = `Total MU: ${muTotal.toFixed(2)} peds`;
+    muDisplay = `Total ${muLabel}: ${muTotal.toFixed(2)} peds`;
   }
 
   // 🔴 fallback (normalement jamais utilisé chez toi)
