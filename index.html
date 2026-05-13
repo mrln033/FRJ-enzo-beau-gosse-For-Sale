@@ -596,7 +596,7 @@ function getEffectiveMU(muStr) {
 
 				const dateFormatted = formatDateMU(item.DATE_MU);
 				const effectiveMU = getEffectiveMU(item.MU);
-				const muLabel = currentLang === "FR" && isFRJMember() ? "MU Frj" : "MU";
+				const muLabel = currentLang === "FR" && isFRJMember() ? "MU FRJ" : "MU";
 
 				muHTML = `
 					<p title="${dateFormatted?.display || ""}">
@@ -707,7 +707,7 @@ function openCalculator(iconEl, item) {
   const prix = parseFloat(item.PRIX_UNITAIRE) || 0;
   const mu = getEffectiveMU(item.MU || "");
   const muParsed = parseMU(mu);
-  const muLabel = currentLang === "FR" && isFRJMember() ? "MU Frj" : "MU";
+  const muLabel = currentLang === "FR" && isFRJMember() ? "MU FRJ" : "MU";
   const defaultQty = (muParsed.type === "ped") ? 1 : item.QUANTITE;
 
   back.innerHTML = `
