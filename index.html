@@ -475,7 +475,7 @@ function getMUColor(dateStr) {
 }
 
 function formatMUValue(value) {
-  return Number(value.toFixed(2)).toString();
+  return value.toFixed(2).replace(".", ",");
 }
 
 function getEffectiveMU(muStr) {
@@ -763,7 +763,7 @@ function updateCalc(card, prix, muStr, muLabel = "MU") {
     const muTotal = qty * mu.value;
     sell = tt + muTotal;
 
-    muDisplay = `Total ${muLabel}: ${muTotal.toFixed(2)} peds`;
+    muDisplay = `Total ${muLabel}: ${formatMUValue(muTotal)} peds`;
   }
 
   // 🔴 fallback (normalement jamais utilisé chez toi)
