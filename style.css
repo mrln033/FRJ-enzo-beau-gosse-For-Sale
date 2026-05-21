@@ -12,6 +12,33 @@ h1 {
   margin-bottom: 30px;
 }
 
+#subtitle {
+  line-height: 1.5;
+}
+
+.copy-player-name {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: #1f5fbf;
+  font: inherit;
+  font-weight: bold;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.copy-player-icon {
+  display: inline-block;
+  margin-left: 0.25em;
+  font-size: 0.9em;
+  text-decoration: none;
+}
+
+.copy-player-name:hover,
+.copy-player-name:focus-visible {
+  color: #123d7a;
+}
+
 /* =========================
    FILTER
 ========================= */

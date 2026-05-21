@@ -118,6 +118,16 @@ function getAvailableCategories() {
   return [...categories];
 }
 
+function getInventoryDate() {
+  const SS_ID = "1C-TWYWKI7Vge3wywEUHjYAKm3GOBP4rgiaBbAch0Jng";
+  const SHEET_NAME = "Inventaire Enzo";
+
+  const sheet = SpreadsheetApp.openById(SS_ID).getSheetByName(SHEET_NAME);
+  if (!sheet) return "";
+
+  return sheet.getRange("B1").getDisplayValue();
+}
+
 function processMU(csv) {
 
   const SS_ID = "13r_PzIZE8dJiPFU8w7UXxtEednHhS-yijNgTiYLqYP0";
@@ -211,6 +221,12 @@ function doGet(e) {
     const cats = getAvailableCategories();
     return ContentService
       .createTextOutput(JSON.stringify(cats))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (action === "inventoryDate") {
+    return ContentService
+      .createTextOutput(JSON.stringify({ inventoryDate: getInventoryDate() }))
       .setMimeType(ContentService.MimeType.JSON);
   }
 

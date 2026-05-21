@@ -1,7 +1,10 @@
 const TRANSLATIONS = {
 	EN: {
 		title: "[FRJ] - enzo beau gosse = FOR SALE",
-		subtitle: "PM Offer InGame @ enzo beau gosse  |  -=> New Oxford Storage <=-",
+		subtitleStart: "PM Offer InGame @ ",
+		subtitleEnd: "  |  -=> New Oxford Storage <=-",
+		copyPlayerTooltip: "Click to copy, then paste in the in-game chat",
+		copyPlayerSuccess: "Copied!",
 		
 		img_storage: "storage/00_EnTete-Storage-EN.png",
 			
@@ -44,7 +47,10 @@ const TRANSLATIONS = {
 
 	FR: {
 		title: "[FRJ] - enzo beau gosse = A VENDRE",
-		subtitle: "Faites une offre en jeu @ enzo beau gosse  |  -=> New Oxford Storage <=-",
+		subtitleStart: "Faites une offre en jeu @ ",
+		subtitleEnd: "  |  -=> New Oxford Storage <=-",
+		copyPlayerTooltip: "Cliquez pour copier puis coller dans le chat IG",
+		copyPlayerSuccess: "Copié !",
 		
 		img_storage: "storage/00_EnTete-Storage-FR.png",
 			

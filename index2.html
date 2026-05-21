@@ -70,6 +70,7 @@
 document.addEventListener("DOMContentLoaded", () => {
   updateLanguageButtons();
   applyTranslations();
+  loadInventoryDate();
   updateFilterVisibility();
 
   const container = document.getElementById("rayonImages");
@@ -146,6 +147,9 @@ document.addEventListener("DOMContentLoaded", () => {
 	let selectedCategory = null;
 	let isLoading = true;
 	let lastRenderedItems = [];
+	let inventoryDate = "";
+	const PLAYER_NAME = "enzo beau gosse";
+	const WHISPER_COMMAND = "/wp enzo beau gosse";
 	
 		
 	const CATEGORY_IMAGES = {
@@ -207,9 +211,74 @@ document.addEventListener("DOMContentLoaded", () => {
 	};
 	
 	
+	function renderSubtitle() {
+		const subtitle = document.getElementById("subtitle");
+		subtitle.innerHTML = "";
+
+		const playerButton = document.createElement("button");
+		playerButton.type = "button";
+		playerButton.className = "copy-player-name";
+		playerButton.innerHTML = `${PLAYER_NAME} <span class="copy-player-icon" aria-hidden="true">⧉</span>`;
+		playerButton.title = t("copyPlayerTooltip");
+		playerButton.setAttribute("aria-label", t("copyPlayerTooltip"));
+		playerButton.addEventListener("click", () => copyWhisperCommand(playerButton));
+
+		subtitle.append(
+			document.createTextNode(t("subtitleStart")),
+			playerButton,
+			document.createTextNode(t("subtitleEnd") + (inventoryDate ? ` | ${inventoryDate}` : ""))
+		);
+	}
+
+	function copyWhisperCommand(button) {
+		const markCopied = () => {
+			button.title = t("copyPlayerSuccess");
+			button.setAttribute("aria-label", t("copyPlayerSuccess"));
+			setTimeout(() => {
+				button.title = t("copyPlayerTooltip");
+				button.setAttribute("aria-label", t("copyPlayerTooltip"));
+			}, 1500);
+		};
+
+		if (navigator.clipboard && window.isSecureContext) {
+			navigator.clipboard.writeText(WHISPER_COMMAND).then(markCopied).catch(() => {
+				copyWhisperCommandFallback();
+				markCopied();
+			});
+			return;
+		}
+
+		copyWhisperCommandFallback();
+		markCopied();
+	}
+
+	function copyWhisperCommandFallback() {
+		const input = document.createElement("textarea");
+		input.value = WHISPER_COMMAND;
+		input.setAttribute("readonly", "");
+		input.style.position = "fixed";
+		input.style.opacity = "0";
+		document.body.appendChild(input);
+		input.select();
+		document.execCommand("copy");
+		document.body.removeChild(input);
+	}
+
+	function loadInventoryDate() {
+		fetch(API_URL + "?action=inventoryDate")
+			.then(res => res.json())
+			.then(response => {
+				inventoryDate = response.inventoryDate || "";
+				renderSubtitle();
+			})
+			.catch(err => {
+				console.error("Erreur chargement date inventaire:", err);
+			});
+	}
+
 	function applyTranslations() {
 		document.getElementById("title").innerText = t("title");
-		document.getElementById("subtitle").innerText = t("subtitle");
+		renderSubtitle();
 		document.getElementById("loadingState").innerText = t("loadingState");
 
 		document.getElementById("filterLabel").innerHTML =
