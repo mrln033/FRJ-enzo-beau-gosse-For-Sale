@@ -121,11 +121,23 @@ function getAvailableCategories() {
 function getInventoryDate() {
   const SS_ID = "1C-TWYWKI7Vge3wywEUHjYAKm3GOBP4rgiaBbAch0Jng";
   const SHEET_NAME = "Inventaire Enzo";
+  const TIMEZONE = "Europe/Paris";
 
   const sheet = SpreadsheetApp.openById(SS_ID).getSheetByName(SHEET_NAME);
   if (!sheet) return "";
 
-  return sheet.getRange("B1").getDisplayValue();
+  const cell = sheet.getRange("B1");
+  const date = cell.getValue();
+  const displayDate = cell.getDisplayValue();
+
+  if (!(date instanceof Date)) {
+    return displayDate;
+  }
+
+  const offset = Utilities.formatDate(date, TIMEZONE, "Z");
+  const offsetLabel = `UTC${offset.slice(0, 3)}:${offset.slice(3)}`;
+
+  return `${displayDate} (${offsetLabel})`;
 }
 
 function processMU(csv) {

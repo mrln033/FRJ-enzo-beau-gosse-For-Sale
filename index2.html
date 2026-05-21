@@ -140,7 +140,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 
-	const API_URL = "https://script.google.com/macros/s/AKfycbxDLU93_rtARjYZKi10BusFYpMcKVS4Qu4I4zIqH8wtsS43pXM3afqsMm6KADE-dbxg/exec";
+	const API_URL = "https://script.google.com/macros/s/AKfycbxD_sOPcjLT-eWPrDMfLgaSx16yAeH17SCd8xByP2faU24z8ge5AiAWOueVBRanHjGx/exec";
 	const IMG_URL = "https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/img/"
 		
 	let data = [];
@@ -148,6 +148,7 @@ document.addEventListener("DOMContentLoaded", () => {
 	let isLoading = true;
 	let lastRenderedItems = [];
 	let inventoryDate = "";
+	const FRJ_MEMBER_SESSION_KEY = "FRJ";
 	const PLAYER_NAME = "enzo beau gosse";
 	
 		
@@ -293,6 +294,25 @@ document.addEventListener("DOMContentLoaded", () => {
 		if (headerImg && typeof IMG_URL !== "undefined") {
 			headerImg.src = IMG_URL + t("img_storage");
 		}
+	}
+
+	function isFRJMember() {
+		return localStorage.getItem(FRJ_MEMBER_SESSION_KEY) === "TRUE";
+	}
+
+	function setFRJMember(value) {
+		localStorage.setItem(FRJ_MEMBER_SESSION_KEY, value ? "TRUE" : "FALSE");
+	}
+
+	function initFRJMemberCheckbox() {
+		const checkbox = document.getElementById("frjMemberCheckbox");
+		if (!checkbox) return;
+
+		checkbox.checked = isFRJMember();
+		checkbox.addEventListener("change", () => {
+			setFRJMember(checkbox.checked);
+			renderCards(lastRenderedItems);
+		});
 	}
 
 	function formatRayon(rayon) {
@@ -522,6 +542,29 @@ function getMUColor(dateStr) {
   return `rgb(${gray}, ${gray}, ${gray})`;
 }
 
+function formatMUValue(value) {
+  return value.toFixed(2).replace(".", ",");
+}
+
+function getEffectiveMU(muStr) {
+  const mu = parseMU(muStr);
+
+  if (currentLang !== "FR" || !isFRJMember()) {
+    return muStr;
+  }
+
+  if (mu.type === "ped") {
+    return `${formatMUValue(mu.value / 2)} PED`;
+  }
+
+  if (mu.type === "percent") {
+    const adjustedPercent = (1 + ((mu.value - 1) / 2)) * 100;
+    return `${formatMUValue(adjustedPercent)} %`;
+  }
+
+  return muStr;
+}
+
 	// Génère les cards HTML
 	function renderCards(items) {
         const container = document.getElementById('cardContainer');
@@ -545,6 +588,7 @@ function getMUColor(dateStr) {
 		if (!selectedCategory || items.length === 0) {
 
 			document.getElementById("emptyText").innerHTML = t("empty");
+			initFRJMemberCheckbox();
 	
 			emptyState.style.display = "block";
 			return;
@@ -619,11 +663,13 @@ function getMUColor(dateStr) {
 				const color = getMUColor(item.DATE_MU);
 
 				const dateFormatted = formatDateMU(item.DATE_MU);
+				const effectiveMU = getEffectiveMU(item.MU);
+				const muLabel = currentLang === "FR" && isFRJMember() ? "MU FRJ" : "MU";
 
 				muHTML = `
 					<p title="${dateFormatted?.display || ""}">
 					<span class="MU-style" style="color:${color}">
-						MU: ${item.MU}
+						${muLabel}: ${effectiveMU}
 					</span>
 					</p>
 				`;
@@ -727,8 +773,9 @@ function openCalculator(iconEl, item) {
   openCard = card;
 
   const prix = parseFloat(item.PRIX_UNITAIRE) || 0;
-  const mu = item.MU || "";
+  const mu = getEffectiveMU(item.MU || "");
   const muParsed = parseMU(mu);
+  const muLabel = currentLang === "FR" && isFRJMember() ? "MU FRJ" : "MU";
   const defaultQty = (muParsed.type === "ped") ? 1 : item.QUANTITE;
 
   back.innerHTML = `
@@ -743,7 +790,7 @@ function openCalculator(iconEl, item) {
       </div>
 
       <p>${t("unitPrice")}: ${prix.toFixed(2)} peds</p>
-      <p>Total TT: <span id="calcTT"></span> peds</p>
+      <p>${t("total")}: <span id="calcTT"></span> peds</p>
       <p id="muLine"></p>
       <p><strong>${t("calcSell")}: <span id="calcSell"></span> peds</strong></p>
     </div>
@@ -756,13 +803,13 @@ function openCalculator(iconEl, item) {
   setTimeout(() => {
     const qtyInput = back.querySelector("#calcQty");
     qtyInput.addEventListener("input", () => {
-      updateCalc(card, prix, mu);
+      updateCalc(card, prix, mu, muLabel);
     });
 
-    updateCalc(card, prix, mu);
+    updateCalc(card, prix, mu, muLabel);
   }, 0);
 }
-function updateCalc(card, prix, muStr) {
+function updateCalc(card, prix, muStr, muLabel = "MU") {
   const qty = parseFloat(card.querySelector("#calcQty").value) || 0;
 
   const tt = qty * prix;
@@ -776,7 +823,7 @@ function updateCalc(card, prix, muStr) {
   // 🟢 CAS 1 : MU en %
   if (mu.type === "percent") {
     sell = tt * mu.value;
-    muDisplay = `MU: ${muStr}`;
+    muDisplay = `${muLabel}: ${muStr}`;
   }
 
   // 🟡 CAS 2 : MU en PED (nouveau comportement dynamique)
@@ -784,7 +831,7 @@ function updateCalc(card, prix, muStr) {
     const muTotal = qty * mu.value;
     sell = tt + muTotal;
 
-    muDisplay = `Total MU: ${muTotal.toFixed(2)} peds`;
+    muDisplay = `Total ${muLabel}: ${formatMUValue(muTotal)} peds`;
   }
 
   // 🔴 fallback (normalement jamais utilisé chez toi)
