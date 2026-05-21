@@ -23,7 +23,7 @@ h1 {
   color: #1f5fbf;
   font: inherit;
   font-weight: bold;
-  text-decoration: underline;
+  text-decoration: none;
   cursor: pointer;
 }
 

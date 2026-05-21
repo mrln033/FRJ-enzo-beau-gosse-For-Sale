@@ -5,6 +5,7 @@ const TRANSLATIONS = {
 		subtitleEnd: "  |  -=> New Oxford Storage <=-",
 		copyPlayerTooltip: "Click to copy, then paste in the in-game chat",
 		copyPlayerSuccess: "Copied!",
+		copyPlayerCommand: "/w enzo beau gosse PM from FRJ- For Sale",
 		
 		img_storage: "storage/00_EnTete-Storage-EN.png",
 			
@@ -51,6 +52,7 @@ const TRANSLATIONS = {
 		subtitleEnd: "  |  -=> New Oxford Storage <=-",
 		copyPlayerTooltip: "Cliquez pour copier puis coller dans le chat IG",
 		copyPlayerSuccess: "Copié !",
+		copyPlayerCommand: "/w enzo beau gosse Msg depuis FRJ - For Sale",
 		
 		img_storage: "storage/00_EnTete-Storage-FR.png",
 			

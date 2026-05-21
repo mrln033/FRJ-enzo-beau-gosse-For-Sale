@@ -149,7 +149,6 @@ document.addEventListener("DOMContentLoaded", () => {
 	let lastRenderedItems = [];
 	let inventoryDate = "";
 	const PLAYER_NAME = "enzo beau gosse";
-	const WHISPER_COMMAND = "/wp enzo beau gosse";
 	
 		
 	const CATEGORY_IMAGES = {
@@ -241,7 +240,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		};
 
 		if (navigator.clipboard && window.isSecureContext) {
-			navigator.clipboard.writeText(WHISPER_COMMAND).then(markCopied).catch(() => {
+			navigator.clipboard.writeText(t("copyPlayerCommand")).then(markCopied).catch(() => {
 				copyWhisperCommandFallback();
 				markCopied();
 			});
@@ -254,7 +253,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 	function copyWhisperCommandFallback() {
 		const input = document.createElement("textarea");
-		input.value = WHISPER_COMMAND;
+		input.value = t("copyPlayerCommand");
 		input.setAttribute("readonly", "");
 		input.style.position = "fixed";
 		input.style.opacity = "0";
