@@ -83,8 +83,8 @@ const TRANSLATIONS = {
 				<li>Parcourez les objets par catégorie d'inventaire</li>
 				<li>Filtrez par "Rayon"</li>
 				<li>Cliquez sur le nom d'un objet pour ouvrir le wiki</li>
-				<li>Tous les items (L) sont Full TT !! Concernant les items non-(L), ils peuvent être à réparer, mais c'est bien la valeur Full TT qui est affichée.</li>
-				<li>Les MU sont actualisés régulièrement (survolez la ligne pour afficher la date de mise à jour) : ils s'effacent progressivement pour disparaitre après 7 jours<br><i><b>Membres FRJ =</b> remise de 50% du MU pour tous les membres</i></li>
+				<li>Tous les items (L) sont Full TT !! Concernant les items non-(L), ils peuvent être à réparer, mais c'est toujours la valeur Full TT qui est affichée. N'hésitez pas à me demander.</li>
+				<li>Les MU sont actualisés régulièrement (survolez la ligne pour afficher la date de mise à jour) : ils s'effacent progressivement pour disparaitre après 7 jours.<br>Ils sont calculés automatiquement en fonction des MU et ventes jour/semaine/mois/année. N'hésitez à faire une offre.<br><i><b>Membres FRJ =</b> remise de 50% du MU pour tous les membres</i></li>
 			</ul>
 
 			<label class="frj-member-toggle">
