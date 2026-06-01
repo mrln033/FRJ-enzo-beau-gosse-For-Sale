@@ -36,8 +36,8 @@ const TRANSLATIONS = {
 				<li>Browse items by inventory category</li>
 				<li>Filter by "Rayon"</li>
 				<li>Click on an item's name to open the wiki</li>
-				<li>All (L) items are Full TT! un(L) items may need repairs, but the displayed value always corresponds to Full TT</li>
-				<li>MU values are updated regularly (hover to see the last update date): they gradually fade and disappear after 7 days</li>
+				<li>All (L) items are Full TT! un(L) items may need repairs, but the displayed value always corresponds to Full TT. Feel free to ask me.</li>
+				<li>MU values are updated regularly (hover to see the last update date): they gradually fade and disappear after 7 days.<br>They are calculated automatically based on MU and daily/weekly/monthly/annual sales. Feel free to make an offer.</li>
 			</ul>
 
 			<p>
