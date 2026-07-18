@@ -13,10 +13,13 @@
 <body>
 <div class="nav-admin">
   <a href="maj_mu.html?admin=1" id="btnMU">MàJ MU</a>
-  <a href="maj_inventaire-enzo.html?admin=1" id="btnINV">MàJ Inventaire</a>
+  <a href="maj_inventaire-enzo.html?admin=1&amp;avatar=enzo" class="inventory-link">MàJ Inventaire<br>[enzo beau gosse]</a>
+  <a href="maj_inventaire-enzo.html?admin=1&amp;avatar=arkaman" class="inventory-link">MàJ Inventaire<br>[FRJ enzo ArkaMan]</a>
+  <a href="maj_inventaire-enzo.html?admin=1&amp;avatar=kenza" class="inventory-link">MàJ Inventaire<br>[kenza la belle]</a>
+  <a href="maj_inventaire-enzo.html?admin=1&amp;avatar=nocturnal" class="inventory-link">MàJ Inventaire<br>[Nocturnal enzo FRJ]</a>
 </div>
 
-    <div align="center"><h1 id="title">[FRJ] - enzo beau gosse = A VENDRE</h1></div>
+    <div align="center"><h1 id="title">[FRJ] - Mise à Jour des MarkUp</h1></div>
     <hr>
 <h2>MAJ MU (Admin)</h2>
 
@@ -71,9 +74,6 @@ function sendData() {
     document.getElementById("btnMU").classList.add("active");
   }
 
-  if (path.includes("maj_inventaire")) {
-    document.getElementById("btnINV").classList.add("active");
-  }
 </script>
 </body>
 </html>
