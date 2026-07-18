@@ -6,20 +6,23 @@
 	<link rel="stylesheet" href="./style.css">
 	<link rel="stylesheet" href="./maj_css.css">
 	<meta charset="UTF-8">
-	<title>MAJ Inventaire enzo</title>
+	<title>MAJ Inventaire</title>
 
 </head>
 <body>
 <div class="nav-admin">
   <a href="maj_mu.html?admin=1" id="btnMU">MàJ MU</a>
-  <a href="maj_inventaire-enzo.html?admin=1" id="btnINV">MàJ Inventaire</a>
+  <a href="maj_inventaire-enzo.html?admin=1&amp;avatar=enzo" id="btnINV-enzo" class="inventory-link"><span>MàJ Inventaire</span><span>[enzo beau gosse]</span></a>
+  <a href="maj_inventaire-enzo.html?admin=1&amp;avatar=arkaman" id="btnINV-arkaman" class="inventory-link"><span>MàJ Inventaire</span><span>[FRJ enzo ArkaMan]</span></a>
+  <a href="maj_inventaire-enzo.html?admin=1&amp;avatar=kenza" id="btnINV-kenza" class="inventory-link"><span>MàJ Inventaire</span><span>[kenza la belle]</span></a>
+  <a href="maj_inventaire-enzo.html?admin=1&amp;avatar=nocturnal" id="btnINV-nocturnal" class="inventory-link"><span>MàJ Inventaire</span><span>[Nocturnal enzo FRJ]</span></a>
 </div>
 
-    <div align="center"><h1 id="title">[FRJ] - enzo beau gosse = A VENDRE</h1></div>
+    <div align="center"><h1 id="title"></h1></div>
     <hr>
-<h2>MAJ Inventaire enzo beau gosse (Admin)</h2>
+<h2 id="subtitle"></h2>
 
-<textarea id="csvInput" placeholder="Colle ici le CSV de l'inventaire de : [enzo beau gosse] uniquement, issu du site de MA, non groupés par container..."></textarea>
+<textarea id="csvInput"></textarea>
 <br>
 <button onclick="sendData()">Envoi</button>
 
@@ -30,6 +33,25 @@
     window.location.href = "./";
   }
 
+  const inventories = {
+    enzo: "enzo beau gosse",
+    arkaman: "FRJ enzo ArkaMan",
+    kenza: "kenza la belle",
+    nocturnal: "Nocturnal enzo FRJ"
+  };
+
+  // L'ancienne URL sans paramètre continue d'ouvrir l'inventaire d'enzo beau gosse.
+  const requestedAvatar = params.get("avatar");
+  const avatar = Object.prototype.hasOwnProperty.call(inventories, requestedAvatar)
+    ? requestedAvatar
+    : "enzo";
+  const avatarName = inventories[avatar];
+
+  document.title = `MAJ Inventaire ${avatarName}`;
+  document.getElementById("title").innerText = `[${avatarName}] = A VENDRE`;
+  document.getElementById("subtitle").innerText = `MAJ Inventaire ${avatarName} (Admin)`;
+  document.getElementById("csvInput").placeholder = `Colle ici le CSV de l'inventaire de : [${avatarName}] uniquement, issu du site de MA, non groupé par container...`;
+  document.getElementById(`btnINV-${avatar}`).classList.add("active");
 
 
 function sendData() {
@@ -44,7 +66,9 @@ function sendData() {
   btn.disabled = true;
   btn.innerText = "Envoi en cours...";
 
-  fetch("https://script.google.com/macros/s/AKfycbxDLU93_rtARjYZKi10BusFYpMcKVS4Qu4I4zIqH8wtsS43pXM3afqsMm6KADE-dbxg/exec?type=inventory", {
+  const endpoint = "https://script.google.com/macros/s/AKfycbxDLU93_rtARjYZKi10BusFYpMcKVS4Qu4I4zIqH8wtsS43pXM3afqsMm6KADE-dbxg/exec";
+
+  fetch(`${endpoint}?type=inventory&avatar=${encodeURIComponent(avatar)}`, {
     method: "POST",
     body: csv
   })
@@ -62,17 +86,6 @@ function sendData() {
   });
 }
 
-</script>
-<script>
-  const path = window.location.pathname;
-
-  if (path.includes("maj_mu")) {
-    document.getElementById("btnMU").classList.add("active");
-  }
-
-  if (path.includes("maj_inventaire")) {
-    document.getElementById("btnINV").classList.add("active");
-  }
 </script>
 </body>
 </html>

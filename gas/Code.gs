@@ -257,12 +257,27 @@ function doGet(e) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-function processInventory(csv) {
+function processInventory(csv, avatar) {
 
   const SS_ID = "1C-TWYWKI7Vge3wywEUHjYAKm3GOBP4rgiaBbAch0Jng";
-  const SHEET_NAME = "Inventaire Enzo";
+  const inventorySheets = {
+    enzo: "Inventaire Enzo",
+    arkaman: "Inventaire ArkaMan",
+    kenza: "Inventaire Kenza",
+    nocturnal: "Inventaire Nocturnal"
+  };
+  const inventoryId = avatar || "enzo";
+  const SHEET_NAME = inventorySheets[inventoryId];
+
+  if (!SHEET_NAME) {
+    throw new Error("Avatar d'inventaire inconnu : " + inventoryId);
+  }
 
   const sheet = SpreadsheetApp.openById(SS_ID).getSheetByName(SHEET_NAME);
+
+  if (!sheet) {
+    throw new Error("Feuille introuvable : " + SHEET_NAME);
+  }
 
   const data = Utilities.parseCsv(csv, "\t");
 
@@ -293,7 +308,7 @@ function processInventory(csv) {
   cell.setValue(new Date());
   cell.setNumberFormat("dd/MM/yyyy - HH:mm:ss");
 
-  return `✅ Import inventaire OK (${numRows} lignes)`;
+  return `✅ Import inventaire OK dans ${SHEET_NAME} (${numRows} lignes)`;
 }
 
 function doPost(e) {
@@ -304,7 +319,7 @@ function doPost(e) {
   }
 
   if (type === "inventory") {
-    return ContentService.createTextOutput(processInventory(e.postData.contents));
+    return ContentService.createTextOutput(processInventory(e.postData.contents, e.parameter.avatar));
   }
 
   return ContentService.createTextOutput("❌ Type reçu: " + type);
