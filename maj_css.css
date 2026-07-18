@@ -32,6 +32,6 @@
 	}
 
 	.nav-admin .inventory-link {
-		flex-direction: column;
+		display: block;
 		line-height: 1.25;
 	}
