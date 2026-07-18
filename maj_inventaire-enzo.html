@@ -3,19 +3,22 @@
 <head>
     <base target="_self">
 	<link rel="icon" href="./favicon.ico">
-	<link rel="stylesheet" href="./style.css">
-	<link rel="stylesheet" href="./maj_css.css">
+	<link rel="stylesheet" href="./style.css?v=20260718-1">
+	<link rel="stylesheet" href="./maj_css.css?v=20260718-1">
 	<meta charset="UTF-8">
+	<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+	<meta http-equiv="Pragma" content="no-cache">
+	<meta http-equiv="Expires" content="0">
 	<title>MAJ Inventaire</title>
 
 </head>
 <body>
 <div class="nav-admin">
   <a href="maj_mu.html?admin=1" id="btnMU">MàJ MU</a>
-  <a href="maj_inventaire-enzo.html?admin=1&amp;avatar=enzo" id="btnINV-enzo" class="inventory-link">MàJ Inventaire<br>[enzo beau gosse]</a>
-  <a href="maj_inventaire-enzo.html?admin=1&amp;avatar=arkaman" id="btnINV-arkaman" class="inventory-link">MàJ Inventaire<br>[FRJ enzo ArkaMan]</a>
-  <a href="maj_inventaire-enzo.html?admin=1&amp;avatar=kenza" id="btnINV-kenza" class="inventory-link">MàJ Inventaire<br>[kenza la belle]</a>
-  <a href="maj_inventaire-enzo.html?admin=1&amp;avatar=nocturnal" id="btnINV-nocturnal" class="inventory-link">MàJ Inventaire<br>[Nocturnal enzo FRJ]</a>
+  <a href="maj_inventaire-enzo.html?admin=1&amp;avatar=enzo&amp;v=20260718-1" id="btnINV-enzo" class="inventory-link">MàJ Inventaire<br>[enzo beau gosse]</a>
+  <a href="maj_inventaire-enzo.html?admin=1&amp;avatar=arkaman&amp;v=20260718-1" id="btnINV-arkaman" class="inventory-link">MàJ Inventaire<br>[FRJ enzo ArkaMan]</a>
+  <a href="maj_inventaire-enzo.html?admin=1&amp;avatar=kenza&amp;v=20260718-1" id="btnINV-kenza" class="inventory-link">MàJ Inventaire<br>[kenza la belle]</a>
+  <a href="maj_inventaire-enzo.html?admin=1&amp;avatar=nocturnal&amp;v=20260718-1" id="btnINV-nocturnal" class="inventory-link">MàJ Inventaire<br>[Nocturnal enzo FRJ]</a>
 </div>
 
     <div align="center"><h1 id="title"></h1></div>
@@ -71,15 +74,19 @@ async function sendData() {
 
   try {
     // Vérifie la destination avant l'envoi pour éviter d'écraser la mauvaise feuille.
-    const targetResponse = await fetch(`${endpoint}?action=inventoryTarget&avatar=${encodeURIComponent(avatar)}`);
+    const cacheBust = Date.now();
+    const targetResponse = await fetch(`${endpoint}?action=inventoryTarget&avatar=${encodeURIComponent(avatar)}&_=${cacheBust}`, {
+      cache: "no-store"
+    });
     const target = await targetResponse.json();
 
     if (target.avatar !== avatar || target.sheet !== avatarConfig.sheet) {
       throw new Error(`Le script Google Apps Script ne cible pas ${avatarConfig.sheet}. Redéploie sa dernière version avant de recommencer.`);
     }
 
-    const response = await fetch(`${endpoint}?type=inventory&avatar=${encodeURIComponent(avatar)}`, {
+    const response = await fetch(`${endpoint}?type=inventory&avatar=${encodeURIComponent(avatar)}&_=${cacheBust}`, {
       method: "POST",
+      cache: "no-store",
       body: csv
     });
     const res = await response.text();
