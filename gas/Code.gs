@@ -140,6 +140,17 @@ function getInventoryDate() {
   return `${displayDate} (${offsetLabel})`;
 }
 
+function getInventorySheetName(avatar) {
+  const inventorySheets = {
+    enzo: "Inventaire Enzo",
+    arkaman: "Inventaire ArkaMan",
+    kenza: "Inventaire Kenza",
+    nocturnal: "Inventaire Nocturnal"
+  };
+
+  return inventorySheets[avatar || "enzo"] || "";
+}
+
 function processMU(csv) {
 
   const SS_ID = "13r_PzIZE8dJiPFU8w7UXxtEednHhS-yijNgTiYLqYP0";
@@ -242,6 +253,16 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === "inventoryTarget") {
+    const avatar = e.parameter.avatar || "enzo";
+    return ContentService
+      .createTextOutput(JSON.stringify({
+        avatar: avatar,
+        sheet: getInventorySheetName(avatar)
+      }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   const category = e.parameter.category || null;
 
   if (!category) {
@@ -260,14 +281,8 @@ function doGet(e) {
 function processInventory(csv, avatar) {
 
   const SS_ID = "1C-TWYWKI7Vge3wywEUHjYAKm3GOBP4rgiaBbAch0Jng";
-  const inventorySheets = {
-    enzo: "Inventaire Enzo",
-    arkaman: "Inventaire ArkaMan",
-    kenza: "Inventaire Kenza",
-    nocturnal: "Inventaire Nocturnal"
-  };
   const inventoryId = avatar || "enzo";
-  const SHEET_NAME = inventorySheets[inventoryId];
+  const SHEET_NAME = getInventorySheetName(inventoryId);
 
   if (!SHEET_NAME) {
     throw new Error("Avatar d'inventaire inconnu : " + inventoryId);

@@ -34,10 +34,10 @@
   }
 
   const inventories = {
-    enzo: "enzo beau gosse",
-    arkaman: "FRJ enzo ArkaMan",
-    kenza: "kenza la belle",
-    nocturnal: "Nocturnal enzo FRJ"
+    enzo: { name: "enzo beau gosse", sheet: "Inventaire Enzo" },
+    arkaman: { name: "FRJ enzo ArkaMan", sheet: "Inventaire ArkaMan" },
+    kenza: { name: "kenza la belle", sheet: "Inventaire Kenza" },
+    nocturnal: { name: "Nocturnal enzo FRJ", sheet: "Inventaire Nocturnal" }
   };
 
   // L'ancienne URL sans paramètre continue d'ouvrir l'inventaire d'enzo beau gosse.
@@ -45,7 +45,8 @@
   const avatar = Object.prototype.hasOwnProperty.call(inventories, requestedAvatar)
     ? requestedAvatar
     : "enzo";
-  const avatarName = inventories[avatar];
+  const avatarConfig = inventories[avatar];
+  const avatarName = avatarConfig.name;
 
   document.title = `MAJ Inventaire ${avatarName}`;
   document.getElementById("title").innerText = `[${avatarName}] = A VENDRE`;
@@ -54,7 +55,7 @@
   document.getElementById(`btnINV-${avatar}`).classList.add("active");
 
 
-function sendData() {
+async function sendData() {
   const btn = document.querySelector("button");
   const csv = document.getElementById("csvInput").value;
 
@@ -68,22 +69,29 @@ function sendData() {
 
   const endpoint = "https://script.google.com/macros/s/AKfycbxDLU93_rtARjYZKi10BusFYpMcKVS4Qu4I4zIqH8wtsS43pXM3afqsMm6KADE-dbxg/exec";
 
-  fetch(`${endpoint}?type=inventory&avatar=${encodeURIComponent(avatar)}`, {
-    method: "POST",
-    body: csv
-  })
-  .then(res => res.text())
-  .then(res => {
+  try {
+    // Vérifie la destination avant l'envoi pour éviter d'écraser la mauvaise feuille.
+    const targetResponse = await fetch(`${endpoint}?action=inventoryTarget&avatar=${encodeURIComponent(avatar)}`);
+    const target = await targetResponse.json();
+
+    if (target.avatar !== avatar || target.sheet !== avatarConfig.sheet) {
+      throw new Error(`Le script Google Apps Script ne cible pas ${avatarConfig.sheet}. Redéploie sa dernière version avant de recommencer.`);
+    }
+
+    const response = await fetch(`${endpoint}?type=inventory&avatar=${encodeURIComponent(avatar)}`, {
+      method: "POST",
+      body: csv
+    });
+    const res = await response.text();
+
     alert("✅ " + res);
     document.getElementById("csvInput").value = "";
-  })
-  .catch(err => {
+  } catch (err) {
     alert("❌ " + err);
-  })
-  .finally(() => {
+  } finally {
     btn.disabled = false;
     btn.innerText = "Envoi";
-  });
+  }
 }
 
 </script>
