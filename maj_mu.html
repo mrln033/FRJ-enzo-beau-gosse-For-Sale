@@ -5,6 +5,7 @@
 	<link rel="icon" href="./favicon.ico">
 	<link rel="stylesheet" href="./style.css?v=20260718-1">
 	<link rel="stylesheet" href="./maj_css.css?v=20260718-1">
+	<script src="./js/api-client.js?v=20260812-1"></script>
 	<meta charset="UTF-8">
 	<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 	<meta http-equiv="Pragma" content="no-cache">
@@ -24,7 +25,7 @@
 
     <div align="center"><h1 id="title">[FRJ] - Mise à Jour des MarkUp</h1></div>
     <hr>
-<h2>MAJ MU (Admin)</h2>
+<h2 id="subtitle">MAJ MU (Admin)</h2>
 
 <textarea id="csvInput" placeholder="Colle ton CSV ici..."></textarea>
 <br>
@@ -39,7 +40,7 @@
 
 
 
-function sendData() {
+async function sendData() {
   const btn = document.querySelector("button");
   const csv = document.getElementById("csvInput").value;
 
@@ -51,22 +52,20 @@ function sendData() {
   btn.disabled = true;
   btn.innerText = "Envoi en cours...";
 
-  fetch("https://script.google.com/macros/s/AKfycbxD_sOPcjLT-eWPrDMfLgaSx16yAeH17SCd8xByP2faU24z8ge5AiAWOueVBRanHjGx/exec?type=mu", {
-    method: "POST",
-    body: csv
-  })
-  .then(res => res.text())
-  .then(res => {
+  try {
+    const response = await FRJ_API.fetch("?type=mu", {
+      method: "POST",
+      body: csv
+    });
+    const res = await response.text();
     alert("✅ " + res);
     document.getElementById("csvInput").value = "";
-  })
-  .catch(err => {
+  } catch (err) {
     alert("❌ " + err);
-  })
-  .finally(() => {
+  } finally {
     btn.disabled = false;
     btn.innerText = "Envoi";
-  });
+  }
 }
 
 </script>
@@ -76,6 +75,9 @@ function sendData() {
   if (path.includes("maj_mu")) {
     document.getElementById("btnMU").classList.add("active");
   }
+
+  document.getElementById("subtitle").innerText += ` — ${FRJ_API.label}`;
+  FRJ_API.preserveBackendInAdminLinks();
 
 </script>
 </body>

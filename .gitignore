@@ -1,0 +1,19 @@
+# Sauvegardes et données privées : ne jamais publier sur GitHub Pages.
+/save/
+/cloudflare/for-sale-api/seed/initial.sql
+
+# Copie d'audit d'un Worker appartenant à un autre projet.
+/cloudflare/worker.js
+
+# Fichiers de travail locaux Codex.
+/.codex-xlsx-analysis/
+
+# Cloudflare / Node local.
+**/node_modules/
+/.pnpm-store/
+**/.wrangler/
+**/worker-configuration.d.ts
+**/.dev.vars
+**/.env
+**/.env.*
+!**/.env.example
