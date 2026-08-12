@@ -79,21 +79,40 @@ export function computeWeightedMarkup(row) {
 
 export function normalizeInventoryRows(text) {
   const { headers, rows } = parseTsv(text);
-  const expected = ["Id", "Item", "Quantity", "Value(PED)", "Container", "ContainerRefId"];
+  const expected = ["Id", "Quantity", "Value(PED)", "Container", "ContainerRefId"];
   const missing = expected.filter((header) => !headers.includes(header));
+  const itemHeader = resolveInventoryItemHeader(headers);
+  if (itemHeader === null) missing.splice(1, 0, "Item");
   if (missing.length) throw new Error(`Colonnes inventaire manquantes : ${missing.join(", ")}`);
 
   return rows
     .map((row, index) => ({
       lineNo: index + 2,
       sourceId: String(row.Id || "").trim() || null,
-      itemName: String(row.Item || "").trim(),
+      itemName: String(row[itemHeader] || "").trim(),
       quantity: Number(String(row.Quantity || "0").replace(",", ".")),
       valuePed: nullableNumber(row["Value(PED)"]),
       container: String(row.Container || "").trim() || null,
       containerRefId: String(row.ContainerRefId || "").trim() || null
     }))
     .filter((row) => row.itemName && Number.isFinite(row.quantity));
+}
+
+function resolveInventoryItemHeader(headers) {
+  const aliases = new Set(["item", "name", "item name"]);
+  const namedHeader = headers.find((header) => aliases.has(header.toLowerCase()));
+  if (namedHeader !== undefined) return namedHeader;
+
+  // GAS remplace B1 par la date d'import. Une copie depuis la feuille conserve donc
+  // les cinq en-têtes standard, mais la colonne des articles porte une date en B1.
+  const hasLegacySheetLayout = headers.length >= 6
+    && headers[0] === "Id"
+    && headers[2] === "Quantity"
+    && headers[3] === "Value(PED)"
+    && headers[4] === "Container"
+    && headers[5] === "ContainerRefId";
+
+  return hasLegacySheetLayout ? headers[1] : null;
 }
 
 export function normalizeMarketRows(text, observedAt) {
