@@ -8,20 +8,64 @@ const PED_UNITS = new Map([
 ]);
 
 export function parseTsv(text) {
-  const lines = String(text || "")
-    .replace(/^\uFEFF/, "")
-    .split(/\r?\n/)
-    .filter((line) => line.trim() !== "");
+  const records = parseTabularRecords(String(text || "").replace(/^\uFEFF/, ""))
+    .filter((record) => record.some((value) => value.trim() !== ""));
 
-  if (lines.length === 0) return { headers: [], rows: [] };
+  if (records.length === 0) return { headers: [], rows: [] };
 
-  const headers = lines[0].split("\t").map((value) => value.trim());
-  const rows = lines.slice(1).map((line) => {
-    const values = line.split("\t");
+  const headers = records[0].map((value) => value.trim());
+  const rows = records.slice(1).map((values) => {
     return Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""]));
   });
 
   return { headers, rows };
+}
+
+function parseTabularRecords(text) {
+  const records = [];
+  let record = [];
+  let field = "";
+  let quoted = false;
+
+  const finishField = () => {
+    record.push(field);
+    field = "";
+  };
+
+  const finishRecord = () => {
+    finishField();
+    records.push(record);
+    record = [];
+  };
+
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+
+    if (quoted) {
+      if (character === '"' && text[index + 1] === '"') {
+        field += '"';
+        index += 1;
+      } else if (character === '"') {
+        quoted = false;
+      } else {
+        field += character;
+      }
+      continue;
+    }
+
+    if (character === '"' && field === "") {
+      quoted = true;
+    } else if (character === "\t") {
+      finishField();
+    } else if (character === "\n") {
+      finishRecord();
+    } else if (character !== "\r") {
+      field += character;
+    }
+  }
+
+  if (field !== "" || record.length > 0) finishRecord();
+  return records;
 }
 
 export function parsePedVolume(raw) {

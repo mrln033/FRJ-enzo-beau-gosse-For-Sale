@@ -14,6 +14,16 @@ test("parseTsv conserve les colonnes attendues", () => {
   assert.equal(parsed.rows[0].Quantity, "2");
 });
 
+test("parseTsv retire les guillemets ajoutés aux cellules contenant une virgule", () => {
+  const parsed = parseTsv([
+    "Item\tContainer",
+    '"Pixie Arm Guards, Adjusted (F)"\t"Pitbull Mk. 1 (C,L)"'
+  ].join("\n"));
+
+  assert.equal(parsed.rows[0].Item, "Pixie Arm Guards, Adjusted (F)");
+  assert.equal(parsed.rows[0].Container, "Pitbull Mk. 1 (C,L)");
+});
+
 test("parsePedVolume normalise PEC, PED, K et M", () => {
   assert.equal(parsePedVolume("91.000 PEC"), 0.91);
   assert.equal(parsePedVolume("2.400K PED"), 2400);
