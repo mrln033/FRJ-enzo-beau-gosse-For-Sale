@@ -5,6 +5,7 @@
 	<link rel="icon" href="./favicon.ico">
 	<link rel="stylesheet" href="./style.css?v=20260718-1">
 	<link rel="stylesheet" href="./maj_css.css?v=20260718-1">
+	<script src="./js/api-client.js?v=20260812-1"></script>
 	<meta charset="UTF-8">
 	<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 	<meta http-equiv="Pragma" content="no-cache">
@@ -56,6 +57,8 @@
   document.getElementById("subtitle").innerText = `MAJ Inventaire ${avatarName} (Admin)`;
   document.getElementById("csvInput").placeholder = `Colle ici le CSV de l'inventaire de : [${avatarName}] uniquement, issu du site de MA, non groupé par container...`;
   document.getElementById(`btnINV-${avatar}`).classList.add("active");
+  document.getElementById("subtitle").innerText += ` — ${FRJ_API.label}`;
+  FRJ_API.preserveBackendInAdminLinks();
 
 
 async function sendData() {
@@ -70,12 +73,10 @@ async function sendData() {
   btn.disabled = true;
   btn.innerText = "Envoi en cours...";
 
-  const endpoint = "https://script.google.com/macros/s/AKfycbxD_sOPcjLT-eWPrDMfLgaSx16yAeH17SCd8xByP2faU24z8ge5AiAWOueVBRanHjGx/exec";
-
   try {
     // Vérifie la destination avant l'envoi pour éviter d'écraser la mauvaise feuille.
     const cacheBust = Date.now();
-    const targetResponse = await fetch(`${endpoint}?action=inventoryTarget&avatar=${encodeURIComponent(avatar)}&_=${cacheBust}`, {
+    const targetResponse = await FRJ_API.fetch(`?action=inventoryTarget&avatar=${encodeURIComponent(avatar)}&_=${cacheBust}`, {
       cache: "no-store"
     });
     const target = await targetResponse.json();
@@ -84,7 +85,7 @@ async function sendData() {
       throw new Error(`Le script Google Apps Script ne cible pas ${avatarConfig.sheet}. Redéploie sa dernière version avant de recommencer.`);
     }
 
-    const response = await fetch(`${endpoint}?type=inventory&avatar=${encodeURIComponent(avatar)}&_=${cacheBust}`, {
+    const response = await FRJ_API.fetch(`?type=inventory&avatar=${encodeURIComponent(avatar)}&_=${cacheBust}`, {
       method: "POST",
       cache: "no-store",
       body: csv

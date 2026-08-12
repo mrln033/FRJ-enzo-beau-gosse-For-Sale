@@ -1,0 +1,25 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "frj-for-sale-api",
+	"main": "src/index.js",
+	"compatibility_date": "2026-08-11",
+	"compatibility_flags": ["nodejs_compat"],
+	"observability": {
+		"enabled": true,
+		"logs": {
+			"head_sampling_rate": 1
+		},
+		"traces": {
+			"enabled": true,
+			"head_sampling_rate": 0.01
+		}
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "frj-for-sale",
+			"database_id": "6afa102c-94a4-4b40-a61b-0fdc2e0a2b86",
+			"migrations_dir": "migrations"
+		}
+	]
+}

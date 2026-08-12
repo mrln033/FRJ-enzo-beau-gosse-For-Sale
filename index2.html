@@ -5,6 +5,7 @@
 	<link rel="icon" href="./favicon.ico">
 	<link rel="stylesheet" href="./style.css">
 	<script src="./js/langues.js"></script>
+	<script src="./js/api-client.js?v=20260812-1"></script>
 	<title>[FRJ] - enzo beau gosse : Item List</title>
   </head>
   <body>
@@ -77,7 +78,7 @@ document.addEventListener("DOMContentLoaded", () => {
   container.innerHTML = "";
 
   // 🔥 on récupère les catégories dispo
-  fetch(API_URL + "?action=categories")
+  FRJ_API.fetch("?action=categories")
     .then(res => res.json())
     .then(categories => {
 
@@ -140,7 +141,6 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 
-	const API_URL = "https://script.google.com/macros/s/AKfycbxD_sOPcjLT-eWPrDMfLgaSx16yAeH17SCd8xByP2faU24z8ge5AiAWOueVBRanHjGx/exec";
 	const IMG_URL = "https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/img/"
 		
 	let data = [];
@@ -265,7 +265,7 @@ document.addEventListener("DOMContentLoaded", () => {
 	}
 
 	function loadInventoryDate() {
-		fetch(API_URL + "?action=inventoryDate")
+		FRJ_API.fetch("?action=inventoryDate")
 			.then(res => res.json())
 			.then(response => {
 				inventoryDate = response.inventoryDate || "";
@@ -337,7 +337,7 @@ function loadCategoryData(category) {
   // 🔥 vider affichage
   renderCards([]);
 
-  fetch(API_URL + "?category=" + encodeURIComponent(category))
+  FRJ_API.fetch("?category=" + encodeURIComponent(category))
     .then(res => res.json())
     .then(response => {
       data = response;

@@ -1,0 +1,21 @@
+{
+  "name": "frj-for-sale-api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "test": "node --test",
+    "types": "wrangler types",
+    "smoke": "node tools/smoke.mjs https://frj-for-sale-api.merlin-merzhin-lesage.workers.dev",
+    "deploy": "wrangler deploy",
+    "db:build-seed": "python tools/build_seed.py",
+    "db:migrate:local": "wrangler d1 migrations apply frj-for-sale --local",
+    "db:migrate:remote": "wrangler d1 migrations apply frj-for-sale --remote",
+    "db:seed:local": "wrangler d1 execute frj-for-sale --local --file=./seed/initial.sql",
+    "db:seed:remote": "wrangler d1 execute frj-for-sale --remote --file=./seed/initial.sql"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260811.1",
+    "wrangler": "^4.0.0"
+  }
+}
