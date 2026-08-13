@@ -93,11 +93,16 @@ async function sendData() {
     });
     const res = await response.text();
 
+    let syncWarning = "";
     if (FRJ_API.backend === "gas") {
-      await FRJ_API.requestSynchronization(`inventory:${avatar}`, "import-gas-inventory");
+      try {
+        await FRJ_API.requestSynchronization(`inventory:${avatar}`, "import-gas-inventory");
+      } catch (syncError) {
+        syncWarning = `\n⚠️ Import effectué, mais demande de synchronisation non enregistrée : ${syncError.message || syncError}`;
+      }
     }
 
-    alert("✅ " + res);
+    alert("✅ " + res + syncWarning);
     document.getElementById("csvInput").value = "";
   } catch (err) {
     alert("❌ " + err);

@@ -59,10 +59,15 @@ async function sendData() {
       body: csv
     });
     const res = await response.text();
+    let syncWarning = "";
     if (FRJ_API.backend === "gas") {
-      await FRJ_API.requestSynchronization("mu", "import-gas-mu");
+      try {
+        await FRJ_API.requestSynchronization("mu", "import-gas-mu");
+      } catch (syncError) {
+        syncWarning = `\n⚠️ Import effectué, mais demande de synchronisation non enregistrée : ${syncError.message || syncError}`;
+      }
     }
-    alert("✅ " + res);
+    alert("✅ " + res + syncWarning);
     document.getElementById("csvInput").value = "";
   } catch (err) {
     alert("❌ " + err);
