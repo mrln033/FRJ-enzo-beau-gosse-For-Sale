@@ -522,6 +522,68 @@ h1 {
   color: #fff;
 }
 
+.admin-token-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.admin-token-dialog {
+  width: min(420px, 100%);
+  padding: 24px;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.admin-token-dialog h2 {
+  margin: 0 0 18px;
+}
+
+.admin-token-field,
+.admin-token-persist {
+  display: flex;
+  gap: 8px;
+}
+
+.admin-token-field {
+  flex-direction: column;
+  font-weight: bold;
+}
+
+.admin-token-field input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 9px;
+  font-family: monospace;
+}
+
+.admin-token-persist {
+  align-items: center;
+  margin-top: 16px;
+}
+
+.admin-token-help {
+  margin: 7px 0 18px;
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.admin-token-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.admin-token-actions button {
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
 .nav-admin {
   position: fixed;
   top: 10px;

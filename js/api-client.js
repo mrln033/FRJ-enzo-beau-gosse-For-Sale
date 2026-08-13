@@ -45,7 +45,7 @@
     const headers = new Headers(options.headers || {});
 
     if (preferredBackend === "d1") {
-      headers.set("Authorization", `Bearer ${getAdminToken()}`);
+      headers.set("Authorization", `Bearer ${await getAdminToken()}`);
     }
 
     const response = await global.fetch(buildUrl(preferredBackend, query), {
@@ -69,7 +69,7 @@
 
   async function requestD1Admin(query, options = {}) {
     const headers = new Headers(options.headers || {});
-    headers.set("Authorization", `Bearer ${getAdminToken()}`);
+    headers.set("Authorization", `Bearer ${await getAdminToken()}`);
     const response = await global.fetch(buildUrl("d1", query), {
       ...options,
       headers
@@ -103,32 +103,94 @@
     return `${backends[backend]}/${suffix}`;
   }
 
-  function getAdminToken() {
-    let token = "";
+  async function getAdminToken() {
+    let token = readStoredToken(global.sessionStorage, "sessionStorage");
+    if (!token) token = readStoredToken(global.localStorage, "localStorage");
+
+    if (token) return token;
+
+    const credentials = await requestAdminToken();
+    token = credentials.token;
+    if (!token) throw new Error("Import annulé : aucun jeton administrateur fourni.");
+
+    const storage = credentials.persist ? global.localStorage : global.sessionStorage;
     try {
-      token = global.sessionStorage.getItem(ADMIN_TOKEN_KEY) || "";
+      storage.setItem(ADMIN_TOKEN_KEY, token);
     } catch (error) {
-      console.warn("sessionStorage indisponible pour le jeton administrateur.", error);
+      console.warn("Impossible d'enregistrer le jeton administrateur dans le stockage demandé.", error);
     }
-
-    if (!token) {
-      token = String(global.prompt("Jeton administrateur D1 (demandé une seule fois dans cet onglet) :") || "").trim();
-      if (!token) throw new Error("Import annulé : aucun jeton administrateur fourni.");
-      try {
-        global.sessionStorage.setItem(ADMIN_TOKEN_KEY, token);
-      } catch (error) {
-        console.warn("Le jeton restera en mémoire uniquement pour cet envoi.", error);
-      }
-    }
-
     return token;
   }
 
-  function clearAdminToken() {
+  function readStoredToken(storage, storageName) {
     try {
-      global.sessionStorage.removeItem(ADMIN_TOKEN_KEY);
+      return storage?.getItem(ADMIN_TOKEN_KEY) || "";
     } catch (error) {
-      console.warn("Impossible d'effacer le jeton de session.", error);
+      console.warn(`${storageName} indisponible pour le jeton administrateur.`, error);
+      return "";
+    }
+  }
+
+  function requestAdminToken() {
+    if (typeof document === "undefined" || !document.body) {
+      return Promise.resolve({
+        token: String(global.prompt("Jeton administrateur D1 :") || "").trim(),
+        persist: false
+      });
+    }
+
+    return new Promise((resolve) => {
+      const overlay = document.createElement("div");
+      overlay.className = "admin-token-overlay";
+      const form = document.createElement("form");
+      form.className = "admin-token-dialog";
+      form.innerHTML = `
+        <h2>Accès administrateur D1</h2>
+        <label class="admin-token-field">
+          Jeton administrateur
+          <input type="password" name="token" autocomplete="current-password" required>
+        </label>
+        <label class="admin-token-persist">
+          <input type="checkbox" name="persist">
+          Enregistrer sur cette machine
+        </label>
+        <p class="admin-token-help">Décoché : le jeton est oublié à la fermeture de cet onglet.</p>
+        <div class="admin-token-actions">
+          <button type="button" class="secondary" data-action="cancel">Annuler</button>
+          <button type="submit">Valider</button>
+        </div>`;
+      overlay.appendChild(form);
+      document.body.appendChild(overlay);
+
+      const finish = (result) => {
+        overlay.remove();
+        resolve(result);
+      };
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const data = new FormData(form);
+        finish({
+          token: String(data.get("token") || "").trim(),
+          persist: data.get("persist") === "on"
+        });
+      });
+      form.querySelector('[data-action="cancel"]').addEventListener("click", () => {
+        finish({ token: "", persist: false });
+      });
+      form.querySelector('input[name="token"]').focus();
+    });
+  }
+
+  function clearAdminToken() {
+    for (const [storage, storageName] of [
+      [global.sessionStorage, "sessionStorage"],
+      [global.localStorage, "localStorage"]
+    ]) {
+      try {
+        storage?.removeItem(ADMIN_TOKEN_KEY);
+      } catch (error) {
+        console.warn(`Impossible d'effacer le jeton de ${storageName}.`, error);
+      }
     }
   }
 

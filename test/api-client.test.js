@@ -5,7 +5,7 @@ import vm from "node:vm";
 
 const source = await readFile(new URL("../js/api-client.js", import.meta.url), "utf8");
 
-function loadClient(search, fetchImpl, promptImpl = () => "") {
+function loadClient(search, fetchImpl, promptImpl = () => "", localValues = new Map()) {
   const values = new Map();
   const events = [];
   const window = {
@@ -17,6 +17,11 @@ function loadClient(search, fetchImpl, promptImpl = () => "") {
       getItem: (key) => values.get(key) || null,
       setItem: (key, value) => values.set(key, value),
       removeItem: (key) => values.delete(key)
+    },
+    localStorage: {
+      getItem: (key) => localValues.get(key) || null,
+      setItem: (key, value) => localValues.set(key, value),
+      removeItem: (key) => localValues.delete(key)
     }
   };
   const context = vm.createContext({
@@ -33,7 +38,7 @@ function loadClient(search, fetchImpl, promptImpl = () => "") {
     }
   });
   vm.runInContext(source, context);
-  return { api: window.FRJ_API, events, values };
+  return { api: window.FRJ_API, events, localValues, values };
 }
 
 test("GAS reste le backend de lecture par défaut", async () => {
@@ -101,4 +106,21 @@ test("le rapport administrateur lit uniquement D1 avec le jeton", async () => {
   assert.equal(requests[1].options.headers.get("Authorization"), "Bearer jeton-rapport");
   assert.equal(promptCount, 1);
   assert.equal(api.activeBackend, "d1");
+});
+
+test("un jeton enregistré sur cette machine est réutilisé sans nouvelle saisie", async () => {
+  const localValues = new Map([["FRJ_D1_ADMIN_TOKEN", "jeton-persistant"]]);
+  let promptCount = 0;
+  const { api } = loadClient("?admin=1&backend=d1", async (_url, options) => {
+    assert.equal(options.headers.get("Authorization"), "Bearer jeton-persistant");
+    return new Response("[]", { status: 200 });
+  }, () => {
+    promptCount++;
+    return "autre-jeton";
+  }, localValues);
+
+  await api.fetchD1Admin("/admin/sync-report");
+  assert.equal(promptCount, 0);
+  api.clearAdminToken();
+  assert.equal(localValues.size, 0);
 });
