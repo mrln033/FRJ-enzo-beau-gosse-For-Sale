@@ -117,6 +117,10 @@
 		border-left: 5px solid #b00020;
 	}
 
+	.summary-card.pending {
+		border-left: 5px solid #c47a00;
+	}
+
 	.report-panel {
 		margin-bottom: 20px;
 	}

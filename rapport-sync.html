@@ -114,7 +114,11 @@
       const summary = document.getElementById("syncSummary");
       summary.replaceChildren();
       const cards = [
-        ["État global", report.status === "error" ? "Erreur" : "Opérationnel", report.status],
+        [
+          "État global",
+          report.status === "error" ? "Erreur" : (report.status === "pending" ? "En attente du prochain trigger" : "Opérationnel"),
+          report.status
+        ],
         ["Datasets suivis", String(report.datasets.length), ""],
         ["Dernière exécution GAS", formatDate(report.system?.createdAt), ""],
         ["Rapport généré", formatDate(report.generatedAt), ""]

@@ -249,7 +249,7 @@ async function handleAdminGet(url, env) {
 
   return json({
     generatedAt: new Date().toISOString(),
-    status: system?.action === "sync-run-failed" ? "error" : "ok",
+    status: !system ? "pending" : (system.action === "sync-run-failed" ? "error" : "ok"),
     system,
     datasets,
     events: eventsResult.results.map(mapSyncAuditRow)
