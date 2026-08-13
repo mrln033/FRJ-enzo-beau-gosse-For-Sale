@@ -5,7 +5,7 @@
 	<link rel="icon" href="./favicon.ico">
 	<link rel="stylesheet" href="./style.css">
 	<script src="./js/langues.js"></script>
-	<script src="./js/api-client.js?v=20260812-1"></script>
+	<script src="./js/api-client.js?v=20260813-1"></script>
 	<title>[FRJ] - enzo beau gosse : Item List</title>
   </head>
   <body>
@@ -69,6 +69,7 @@
     <script>
 	
 document.addEventListener("DOMContentLoaded", () => {
+  window.addEventListener("frj:backendchange", renderFilterLabel);
   updateLanguageButtons();
   applyTranslations();
   loadInventoryDate();
@@ -281,8 +282,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		renderSubtitle();
 		document.getElementById("loadingState").innerText = t("loadingState");
 
-		document.getElementById("filterLabel").innerHTML =
-			`<span class="label-italic">${t("filterLabel")}</span>:`;
+		renderFilterLabel();
 
 		// Select
 		const select = document.getElementById("rayonFilter");
@@ -294,6 +294,14 @@ document.addEventListener("DOMContentLoaded", () => {
 		if (headerImg && typeof IMG_URL !== "undefined") {
 			headerImg.src = IMG_URL + t("img_storage");
 		}
+	}
+
+	function renderFilterLabel() {
+		const backend = currentLang === "FR"
+			? ` <small class="backend-indicator">(${FRJ_API.activeBackend.toUpperCase()})</small>`
+			: "";
+		document.getElementById("filterLabel").innerHTML =
+			`<span class="label-italic">${t("filterLabel")}</span>${backend}:`;
 	}
 
 	function isFRJMember() {
