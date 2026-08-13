@@ -10,7 +10,8 @@ var FRJ_SYNC_CONFIG = Object.freeze({
   syncDelayMs: 5 * 60 * 1000,
   auditDelayMs: 30 * 60 * 1000,
   dailyAuditHour: 2,
-  schedulerVersion: "2026-08-13-v2",
+  schedulerVersion: "2026-08-13-v3",
+  outboxProperty: "FRJ_GAS_OUTBOX",
   inventorySheets: {
     enzo: "Inventaire Enzo",
     arkaman: "Inventaire ArkaMan",
@@ -155,6 +156,7 @@ function frjDeferredSyncTrigger() {
     throw error;
   }
   var completedAt = Date.now();
+  frjAcknowledgeGasOutbox_(summary);
   properties.setProperty("FRJ_SYNC_LAST_RUN_AT", String(completedAt));
   if (Number(properties.getProperty("FRJ_SYNC_DIRTY_AT") || 0) <= dirtyAt) {
     properties.deleteProperty("FRJ_SYNC_DIRTY_AT");
@@ -191,18 +193,39 @@ function frjDailyAuditTrigger() {
 
 function frjD1SignalPollTrigger() {
   frjEnsureSchedulerVersion_();
-  var pending = frjD1Request_("/sync/pending").request;
-  if (!pending || !pending.id) return "Aucune demande D1";
   var properties = PropertiesService.getScriptProperties();
-  var lastSeen = Number(properties.getProperty("FRJ_D1_LAST_REQUEST_ID") || 0);
-  if (pending.id <= lastSeen) return "Aucune nouvelle demande D1";
-  properties.setProperty("FRJ_D1_LAST_REQUEST_ID", String(pending.id));
-  return frjRequestSynchronization_(pending.reason || "modification-d1", pending.dataset || "", pending.createdAt);
+  var outbox = frjCaptureGasOutbox_();
+  var scheduled = [];
+
+  // La détection locale reste opérationnelle même si Cloudflare/D1 est indisponible.
+  if (outbox.length) {
+    var datasets = outbox.map(function(entry) { return entry.dataset; }).join(",");
+    var alreadyWaitedAt = new Date(Date.now() - FRJ_SYNC_CONFIG.syncDelayMs).toISOString();
+    frjRequestSynchronization_("gas-outbox", datasets, alreadyWaitedAt, true);
+    scheduled.push("GAS:" + datasets);
+  }
+
+  try {
+    var pending = frjD1Request_("/sync/pending").request;
+    var lastSeen = Number(properties.getProperty("FRJ_D1_LAST_REQUEST_ID") || 0);
+    if (pending && pending.id && pending.id > lastSeen) {
+      properties.setProperty("FRJ_D1_LAST_REQUEST_ID", String(pending.id));
+      frjRequestSynchronization_(pending.reason || "modification-d1", pending.dataset || "", pending.createdAt);
+      scheduled.push("D1:" + (pending.dataset || "tous"));
+    }
+    properties.deleteProperty("FRJ_D1_POLL_LAST_ERROR");
+  } catch (error) {
+    properties.setProperty("FRJ_D1_POLL_LAST_ERROR", new Date().toISOString() + " — " + error.message);
+    console.error(JSON.stringify({ message: "D1 indisponible pendant le contrôle de l'outbox", error: error.message }));
+  }
+
+  return scheduled.length ? "Synchronisation programmée : " + scheduled.join(" / ") : "Aucune modification détectée";
 }
 
 function frjRunIntegrityAudit_(reason) {
   try {
     var summary = frjRunSync_(true);
+    frjAcknowledgeGasOutbox_(summary);
     var changed = summary.some(function(item) { return item.action !== "identique"; });
     if (changed) {
       var completedAt = Date.now();
@@ -220,7 +243,7 @@ function frjRunIntegrityAudit_(reason) {
   }
 }
 
-function frjRequestSynchronization_(reason, dataset, changedAt) {
+function frjRequestSynchronization_(reason, dataset, changedAt, skipRemoteEvent) {
   var properties = PropertiesService.getScriptProperties();
   var now = Date.now();
   properties.setProperties({
@@ -231,8 +254,81 @@ function frjRequestSynchronization_(reason, dataset, changedAt) {
   var sourceChangedAt = isFinite(parsedChangedAt) ? parsedChangedAt : now;
   var runAt = frjComputeSyncRunAt_(sourceChangedAt, now);
   frjScheduleOneShot_("frjDeferredSyncTrigger", runAt, "FRJ_SYNC_TRIGGER_AT", true);
-  frjReportAudit_("_system", "sync-requested", "", "", { reason: reason, dataset: dataset, scheduledAt: new Date(runAt).toISOString() });
+  if (!skipRemoteEvent) {
+    frjReportAudit_("_system", "sync-requested", "", "", { reason: reason, dataset: dataset, scheduledAt: new Date(runAt).toISOString() });
+  }
   return { ok: true, scheduledAt: new Date(runAt).toISOString() };
+}
+
+function frjDatasetKeys_() {
+  return Object.keys(FRJ_SYNC_CONFIG.inventorySheets).map(function(avatar) {
+    return "inventory:" + avatar;
+  }).concat(["mu", "catalog"]);
+}
+
+function frjReadGasOutbox_() {
+  var raw = PropertiesService.getScriptProperties().getProperty(FRJ_SYNC_CONFIG.outboxProperty) || "[]";
+  try {
+    var entries = JSON.parse(raw);
+    return Array.isArray(entries) ? entries : [];
+  } catch (error) {
+    console.error(JSON.stringify({ message: "Outbox GAS illisible, réinitialisation", error: error.message }));
+    return [];
+  }
+}
+
+function frjWriteGasOutbox_(entries) {
+  var properties = PropertiesService.getScriptProperties();
+  if (!entries.length) {
+    properties.deleteProperty(FRJ_SYNC_CONFIG.outboxProperty);
+    return;
+  }
+  properties.setProperty(FRJ_SYNC_CONFIG.outboxProperty, JSON.stringify(entries));
+}
+
+function frjCaptureGasOutbox_() {
+  var existing = frjReadGasOutbox_();
+  var byDataset = {};
+  existing.forEach(function(entry) { byDataset[entry.dataset] = entry; });
+  var now = new Date().toISOString();
+
+  frjDatasetKeys_().forEach(function(dataset) {
+    var local = frjReadLocalDataset_(dataset);
+    var baseHash = frjGetBaseHash_(dataset);
+    if (baseHash && local.hash === baseHash) {
+      delete byDataset[dataset];
+      return;
+    }
+    var previous = byDataset[dataset];
+    if (!previous || previous.hash !== local.hash) {
+      byDataset[dataset] = {
+        id: Utilities.getUuid(),
+        dataset: dataset,
+        hash: local.hash,
+        rowCount: local.rows.length,
+        updatedAt: local.updatedAt,
+        detectedAt: now
+      };
+    }
+  });
+
+  var entries = frjDatasetKeys_().filter(function(dataset) {
+    return Boolean(byDataset[dataset]);
+  }).map(function(dataset) {
+    return byDataset[dataset];
+  });
+  frjWriteGasOutbox_(entries);
+  return entries;
+}
+
+function frjAcknowledgeGasOutbox_(summary) {
+  var completed = {};
+  (summary || []).forEach(function(item) { completed[item.dataset] = true; });
+  var remaining = frjReadGasOutbox_().filter(function(entry) {
+    return !completed[entry.dataset];
+  });
+  frjWriteGasOutbox_(remaining);
+  return remaining;
 }
 
 function frjScheduleIntegrityAudit_(lastRunAt) {
@@ -264,6 +360,7 @@ function frjScheduleOneShot_(handler, runAt, propertyName, keepEarlier) {
 
 function runFrjSyncNow() {
   var summary = frjRunSync_(false);
+  frjAcknowledgeGasOutbox_(summary);
   var completedAt = Date.now();
   PropertiesService.getScriptProperties().setProperty("FRJ_SYNC_LAST_RUN_AT", String(completedAt));
   frjScheduleIntegrityAudit_(completedAt);
@@ -292,6 +389,8 @@ function getFrjSyncStatus() {
     dirtyReason: properties.getProperty("FRJ_SYNC_DIRTY_REASON") || "",
     lastRunAt: properties.getProperty("FRJ_SYNC_LAST_RUN_AT") || "",
     schedulerVersion: properties.getProperty("FRJ_SYNC_SCHEDULER_VERSION") || "",
+    gasOutbox: frjReadGasOutbox_(),
+    d1PollLastError: properties.getProperty("FRJ_D1_POLL_LAST_ERROR") || "",
     triggers: triggers
   };
 }

@@ -9,6 +9,7 @@ import {
   marketContentHash
 } from "../cloudflare/for-sale-api/src/sync.js";
 
+const scriptProperties = new Map();
 const context = {
   console,
   Date,
@@ -28,6 +29,16 @@ const context = {
     computeDigest(_algorithm, value) {
       return [...crypto.createHash("sha256").update(value, "utf8").digest()]
         .map((byte) => byte > 127 ? byte - 256 : byte);
+    },
+    getUuid: () => crypto.randomUUID()
+  },
+  PropertiesService: {
+    getScriptProperties() {
+      return {
+        getProperty: (key) => scriptProperties.get(key) || null,
+        setProperty: (key, value) => scriptProperties.set(key, String(value)),
+        deleteProperty: (key) => scriptProperties.delete(key)
+      };
     }
   }
 };
@@ -113,4 +124,16 @@ test("un signal D1 déjà âgé de cinq minutes déclenche la synchronisation sa
   const changedAt = Date.parse("2026-08-13T12:00:00+02:00");
   const detectedAt = changedAt + 5 * 60 * 1000;
   assert.equal(context.frjComputeSyncRunAt_(changedAt, detectedAt), detectedAt + 1000);
+});
+
+test("l'outbox GAS conserve les datasets non traités et acquitte les autres", () => {
+  context.frjWriteGasOutbox_([
+    { id: "evt-mu", dataset: "mu", hash: "hash-mu" },
+    { id: "evt-enzo", dataset: "inventory:enzo", hash: "hash-enzo" }
+  ]);
+  const remaining = context.frjAcknowledgeGasOutbox_([{ dataset: "mu" }]);
+  assert.deepEqual(JSON.parse(JSON.stringify(remaining)), [
+    { id: "evt-enzo", dataset: "inventory:enzo", hash: "hash-enzo" }
+  ]);
+  assert.equal(context.frjReadGasOutbox_()[0].id, "evt-enzo");
 });
