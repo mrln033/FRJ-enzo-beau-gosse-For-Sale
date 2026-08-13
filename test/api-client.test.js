@@ -83,15 +83,22 @@ test("une écriture D1 envoie le jeton sans repli automatique", async () => {
 
 test("le rapport administrateur lit uniquement D1 avec le jeton", async () => {
   const requests = [];
+  let promptCount = 0;
   const { api } = loadClient("?admin=1", async (url, options) => {
     requests.push({ url, options });
     return new Response(JSON.stringify({ status: "ok", datasets: [], events: [] }), { status: 200 });
-  }, () => "jeton-rapport");
+  }, () => {
+    promptCount++;
+    return "jeton-rapport";
+  });
 
   const response = await api.fetchD1Admin("/admin/sync-report");
+  await api.fetchD1Admin("/admin/sync-report?limit=20");
   assert.equal(response.status, 200);
-  assert.equal(requests.length, 1);
+  assert.equal(requests.length, 2);
   assert.match(requests[0].url, /workers\.dev\/admin\/sync-report$/);
   assert.equal(requests[0].options.headers.get("Authorization"), "Bearer jeton-rapport");
+  assert.equal(requests[1].options.headers.get("Authorization"), "Bearer jeton-rapport");
+  assert.equal(promptCount, 1);
   assert.equal(api.activeBackend, "d1");
 });

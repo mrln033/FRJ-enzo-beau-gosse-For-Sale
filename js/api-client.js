@@ -112,7 +112,7 @@
     }
 
     if (!token) {
-      token = String(global.prompt("Jeton administrateur D1 :") || "").trim();
+      token = String(global.prompt("Jeton administrateur D1 (demandé une seule fois dans cet onglet) :") || "").trim();
       if (!token) throw new Error("Import annulé : aucun jeton administrateur fourni.");
       try {
         global.sessionStorage.setItem(ADMIN_TOKEN_KEY, token);

@@ -36,6 +36,7 @@
     items.forEach((item) => {
       const link = document.createElement("a");
       link.href = item.href;
+      link.target = "_self";
       link.textContent = item.label;
       if (item.section === section && (!item.backend || item.backend === backend)) {
         link.classList.add("active");
