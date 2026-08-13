@@ -8,7 +8,7 @@
   <link rel="icon" href="./favicon.ico">
   <link rel="stylesheet" href="./style.css?v=20260813-3">
   <link rel="stylesheet" href="./maj_css.css?v=20260813-3">
-  <script src="./js/api-client.js?v=20260813-5"></script>
+  <script src="./js/api-client.js?v=20260813-6"></script>
   <script defer src="./js/admin-menu.js?v=20260813-2"></script>
   <title>Rapport de synchronisation GAS ↔ D1</title>
 </head>
@@ -110,7 +110,8 @@
         "reconciled": "Réconcilié",
         "snapshot-imported": "Snapshot enregistré",
         "sync-run-completed": "Synchronisation terminée",
-        "sync-run-failed": "Échec de synchronisation"
+        "sync-run-failed": "Échec de synchronisation",
+        "gas-state-observed": "État GAS observé"
       };
       return labels[action] || action || "—";
     }
@@ -132,6 +133,7 @@
         verified: "Identique — vérifié",
         "pending-audit": "Identique — audit attendu",
         different: "Différent — synchronisation requise",
+        "change-observed": "Modification GAS observée — synchronisation programmée",
         unknown: "État GAS non encore observé"
       };
       return labels[status] || status || "—";

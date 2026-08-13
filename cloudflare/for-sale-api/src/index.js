@@ -11,6 +11,7 @@ import {
 } from "./sync.js";
 
 const MAX_IMPORT_BYTES = 1_800_000;
+const MAX_OBSERVATION_BYTES = 2_200_000;
 const INVENTORY_RETENTION_COUNT = 5;
 const SYNC_AUDIT_RETENTION_COUNT = 500;
 
@@ -26,6 +27,7 @@ const AVATAR_SHEETS = {
   kenza: "Inventaire Kenza",
   nocturnal: "Inventaire Nocturnal"
 };
+const SYNC_DATASETS = new Set(["catalog", "mu", ...Object.keys(AVATAR_SHEETS).map((avatar) => `inventory:${avatar}`)]);
 
 const SALEABLE_CONTAINER_SQL = `(
   lower(coalesce(ii.container, '')) LIKE '%calypso%'
@@ -205,7 +207,7 @@ async function handleAdminGet(url, env) {
 
   const requestedLimit = Number(url.searchParams.get("limit") || 100);
   const limit = Math.min(Math.max(Number.isFinite(requestedLimit) ? Math.trunc(requestedLimit) : 100, 20), 200);
-  const [statesResult, latestResult, eventsResult, latestRunResult] = await env.DB.batch([
+  const [statesResult, latestResult, eventsResult, latestRunResult, observedResult] = await env.DB.batch([
     env.DB.prepare(`
       SELECT
         dataset_key, content_checksum, source_updated_at, source_origin,
@@ -245,6 +247,12 @@ async function handleAdminGet(url, env) {
         AND action = 'sync-run-completed'
       ORDER BY id DESC
       LIMIT 1
+    `),
+    env.DB.prepare(`
+      SELECT dataset_key, content_checksum, row_count, source_updated_at,
+             observed_at, event_id, provisional
+      FROM sync_observed_state
+      WHERE side = 'gas'
     `)
   ]);
 
@@ -254,7 +262,7 @@ async function handleAdminGet(url, env) {
   const latestRun = latestRunResult.results[0] || null;
   let latestRunDetails = {};
   try { latestRunDetails = latestRun?.details ? JSON.parse(latestRun.details) : {}; } catch {}
-  const gasByDataset = Object.fromEntries(
+  const gasFromRuns = Object.fromEntries(
     (Array.isArray(latestRunDetails.datasets) ? latestRunDetails.datasets : [])
       .filter((item) => item?.dataset)
       .map((item) => [item.dataset, {
@@ -264,6 +272,21 @@ async function handleAdminGet(url, env) {
         observedAt: normalizeSyncTimestamp(latestRunDetails.completedAt || latestRun?.created_at)
       }])
   );
+  const gasByDataset = { ...gasFromRuns };
+  observedResult.results.forEach((row) => {
+    const observed = {
+      hash: String(row.content_checksum || ""),
+      rowCount: Number(row.row_count || 0),
+      updatedAt: normalizeSyncTimestamp(row.source_updated_at),
+      observedAt: normalizeSyncTimestamp(row.observed_at),
+      eventId: row.event_id || null,
+      provisional: Number(row.provisional || 0) === 1
+    };
+    const fromRun = gasByDataset[row.dataset_key];
+    if (!fromRun || new Date(observed.observedAt).getTime() >= new Date(fromRun.observedAt).getTime()) {
+      gasByDataset[row.dataset_key] = observed;
+    }
+  });
   const datasets = statesResult.results.map((row) => {
     const d1 = {
       ...mapSyncState(row),
@@ -276,7 +299,7 @@ async function handleAdminGet(url, env) {
       updatedAt: lastAudit.createdAt,
       observedAt: lastAudit.createdAt
     } : null);
-    const hashesMatch = Boolean(gas?.hash && d1.hash && gas.hash === d1.hash);
+    const hashesMatch = Boolean(!gas?.provisional && gas?.hash && d1.hash && gas.hash === d1.hash);
     const auditMatchesCurrent = Boolean(
       hashesMatch
       && lastAudit?.action === "verified"
@@ -287,17 +310,21 @@ async function handleAdminGet(url, env) {
       dataset: row.dataset_key,
       gas,
       d1,
-      concordance: !gas ? "unknown" : (auditMatchesCurrent ? "verified" : (hashesMatch ? "pending-audit" : "different")),
+      concordance: !gas ? "unknown" : (gas.provisional ? "change-observed" : (auditMatchesCurrent ? "verified" : (hashesMatch ? "pending-audit" : "different"))),
       lastAudit
     };
   });
   const system = latestByDataset._system || null;
+  const lastGasObservationAt = Object.values(gasByDataset).reduce((latest, state) => {
+    const value = state?.observedAt || "";
+    return !latest || new Date(value).getTime() > new Date(latest).getTime() ? value : latest;
+  }, "");
 
   return json({
     generatedAt: new Date().toISOString(),
     status: !system ? "pending" : (system.action === "sync-run-failed" ? "error" : "ok"),
     system,
-    lastGasRunAt: normalizeSyncTimestamp(latestRunDetails.completedAt || latestRun?.created_at),
+    lastGasRunAt: lastGasObservationAt || normalizeSyncTimestamp(latestRunDetails.completedAt || latestRun?.created_at),
     datasets,
     events: eventsResult.results.map(mapSyncAuditRow)
   });
@@ -412,6 +439,19 @@ async function handleSyncPost(request, url, env) {
   const body = await readTextBody(request, MAX_IMPORT_BYTES);
   const payload = parseJsonBody(body);
   const expectedHash = String(request.headers.get("X-Expected-Hash") || "").trim();
+
+  if (url.pathname === "/sync/observation") {
+    return json(await storeGasObservation(env, payload));
+  }
+  if (url.pathname === "/sync/observations") {
+    const observations = Array.isArray(payload.observations) ? payload.observations : [];
+    if (observations.length === 0 || observations.length > SYNC_DATASETS.size) {
+      throw new ApiError(400, "Lot d'observations GAS invalide");
+    }
+    const results = [];
+    for (const observation of observations) results.push(await storeGasObservation(env, observation));
+    return json({ ok: true, results });
+  }
 
   if (url.pathname === "/sync/inventory") {
     const avatar = url.searchParams.get("avatar") || "enzo";
@@ -1179,14 +1219,95 @@ function mapSyncState(row) {
 }
 
 async function handleAdminPost(request, url, env) {
-  if (url.pathname !== "/admin/sync-request") {
-    return json({ error: "Endpoint administrateur inconnu" }, 404);
+  if (url.pathname === "/admin/sync-observation") {
+    const body = await readTextBody(request, MAX_OBSERVATION_BYTES);
+    const payload = parseJsonBody(body);
+    const dataset = String(payload.dataset || "").trim();
+    const raw = String(payload.raw || "");
+    const eventId = String(payload.eventId || crypto.randomUUID()).trim();
+    const observedAt = new Date().toISOString();
+    let rows;
+    let hash;
+    let provisional = false;
+
+    if (dataset.startsWith("inventory:")) {
+      const avatar = dataset.slice("inventory:".length);
+      if (!AVATAR_SHEETS[avatar]) throw new ApiError(400, `Dataset inconnu : ${dataset}`);
+      rows = parseImport(() => normalizeInventoryRows(raw));
+      hash = await inventoryContentHash(rows);
+    } else if (dataset === "mu") {
+      const incomingRows = parseImport(() => normalizeMarketRows(raw, observedAt));
+      rows = mergeMarketRows((await readMarketSnapshot(env)).rows, incomingRows);
+      hash = await marketContentHash(rows);
+      // Le timestamp exact est créé par GAS : l'outbox remplacera cette observation
+      // prévisionnelle par l'empreinte relue dans Google Sheets au prochain contrôle.
+      provisional = true;
+    } else {
+      throw new ApiError(400, `Dataset d'import GAS inconnu : ${dataset || "absent"}`);
+    }
+
+    const observation = await storeGasObservation(env, {
+      dataset,
+      hash,
+      rowCount: rows.length,
+      updatedAt: observedAt,
+      observedAt,
+      eventId,
+      provisional
+    });
+    const signal = await notifyGasDataChanged(env, dataset, `import-gas-${dataset === "mu" ? "mu" : "inventory"}`);
+    return json({ ok: true, observation, signal });
   }
+
+  if (url.pathname !== "/admin/sync-request") return json({ error: "Endpoint administrateur inconnu" }, 404);
   const body = await readTextBody(request, 20_000);
   const payload = parseJsonBody(body);
   const dataset = String(payload.dataset || "").trim();
   const reason = String(payload.reason || "modification-gas").trim();
   return json(await notifyGasDataChanged(env, dataset, reason));
+}
+
+async function storeGasObservation(env, payload) {
+  const dataset = String(payload.dataset || "").trim();
+  const hash = String(payload.hash || "").trim().toLowerCase();
+  const rowCount = Number(payload.rowCount);
+  const eventId = String(payload.eventId || "").trim() || null;
+  const updatedAt = normalizeSyncTimestamp(payload.updatedAt || payload.observedAt);
+  const observedAt = normalizeSyncTimestamp(payload.observedAt);
+  const provisional = payload.provisional === true || Number(payload.provisional || 0) === 1;
+  if (!SYNC_DATASETS.has(dataset)) throw new ApiError(400, `Dataset inconnu : ${dataset || "absent"}`);
+  if (!/^[a-f0-9]{64}$/.test(hash)) throw new ApiError(400, "Empreinte GAS invalide");
+  if (!Number.isInteger(rowCount) || rowCount < 0) throw new ApiError(400, "Nombre de lignes GAS invalide");
+
+  if (eventId) {
+    const duplicate = await env.DB.prepare(`
+      SELECT dataset_key FROM sync_observed_state WHERE event_id = ? LIMIT 1
+    `).bind(eventId).first();
+    if (duplicate) return { ok: true, duplicate: true, dataset };
+  }
+
+  await env.DB.batch([
+    env.DB.prepare(`
+      INSERT INTO sync_observed_state (
+        dataset_key, side, content_checksum, row_count, source_updated_at,
+        observed_at, event_id, provisional
+      ) VALUES (?, 'gas', ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(dataset_key, side) DO UPDATE SET
+        content_checksum = excluded.content_checksum,
+        row_count = excluded.row_count,
+        source_updated_at = excluded.source_updated_at,
+        observed_at = excluded.observed_at,
+        event_id = excluded.event_id,
+        provisional = excluded.provisional
+    `).bind(dataset, hash, rowCount, updatedAt, observedAt, eventId, provisional ? 1 : 0),
+    env.DB.prepare(`
+      INSERT INTO sync_audit (
+        dataset_key, direction, action, source_checksum, target_checksum, details
+      ) VALUES (?, 'gas-observation', 'gas-state-observed', ?, NULL, ?)
+    `).bind(dataset, hash, JSON.stringify({ rowCount, updatedAt, observedAt, eventId, provisional })),
+    syncAuditRetentionStatement(env, dataset)
+  ]);
+  return { ok: true, duplicate: false, dataset, hash, rowCount, updatedAt, observedAt, provisional };
 }
 
 async function notifyGasDataChanged(env, dataset, reason) {

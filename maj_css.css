@@ -185,6 +185,7 @@
 	}
 
 	.status-pending-audit,
+	.status-change-observed,
 	.status-unknown {
 		color: #9a5b00;
 		font-weight: bold;

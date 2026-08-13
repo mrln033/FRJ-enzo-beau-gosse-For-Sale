@@ -140,3 +140,19 @@ test("un import GAS enregistre une demande de synchronisation côté D1", async 
     reason: "import-gas-inventory"
   });
 });
+
+test("un import GAS publie immédiatement son observation sans écrire le snapshot D1", async () => {
+  const requests = [];
+  const { api } = loadClient("?admin=1", async (url, options) => {
+    requests.push({ url, options });
+    return new Response(JSON.stringify({ ok: true }), { status: 200 });
+  }, () => "jeton-observation");
+
+  await api.publishGasObservation("mu", "Item\tTier\nTest\t1");
+  assert.match(requests[0].url, /workers\.dev\/admin\/sync-observation$/);
+  assert.equal(requests[0].options.headers.get("Authorization"), "Bearer jeton-observation");
+  const payload = JSON.parse(requests[0].options.body);
+  assert.equal(payload.dataset, "mu");
+  assert.equal(payload.raw, "Item\tTier\nTest\t1");
+  assert.match(payload.eventId, /^gas-/);
+});

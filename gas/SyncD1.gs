@@ -133,6 +133,8 @@ function frjSpreadsheetChangedTrigger(e) {
   frjEnsureSchedulerVersion_();
   var sourceId = "";
   try { sourceId = e && e.source ? e.source.getId() : ""; } catch (ignored) {}
+  var outbox = frjCaptureGasOutbox_();
+  frjPublishGasObservations_(outbox);
   return frjRequestSynchronization_("modification-google-sheet", sourceId);
 }
 
@@ -195,6 +197,7 @@ function frjD1SignalPollTrigger() {
   frjEnsureSchedulerVersion_();
   var properties = PropertiesService.getScriptProperties();
   var outbox = frjCaptureGasOutbox_();
+  frjPublishGasObservations_(outbox);
   var scheduled = [];
 
   // La détection locale reste opérationnelle même si Cloudflare/D1 est indisponible.
@@ -331,6 +334,46 @@ function frjAcknowledgeGasOutbox_(summary) {
   return remaining;
 }
 
+function frjPublishGasObservations_(entries) {
+  if (!entries || !entries.length) return true;
+  try {
+    frjD1Request_("/sync/observations", {
+      method: "post",
+      payload: JSON.stringify({
+        observations: entries.map(function(entry) {
+          return {
+            dataset: entry.dataset,
+            hash: entry.hash,
+            rowCount: entry.rowCount,
+            updatedAt: entry.updatedAt,
+            observedAt: entry.detectedAt || new Date().toISOString(),
+            eventId: entry.id,
+            provisional: false
+          };
+        })
+      })
+    });
+    return true;
+  } catch (error) {
+    console.error(JSON.stringify({ message: "Observations GAS conservées dans l'outbox", error: error.message }));
+    return false;
+  }
+}
+
+function frjPublishSyncSummary_(summary, observedAt) {
+  var entries = (summary || []).map(function(item) {
+    return {
+      id: Utilities.getUuid(),
+      dataset: item.dataset,
+      hash: item.hash,
+      rowCount: item.rows,
+      updatedAt: item.updatedAt || observedAt,
+      detectedAt: observedAt
+    };
+  });
+  return frjPublishGasObservations_(entries);
+}
+
 function frjScheduleIntegrityAudit_(lastRunAt) {
   frjScheduleOneShot_("frjDeferredAuditTrigger", lastRunAt + FRJ_SYNC_CONFIG.auditDelayMs, "FRJ_AUDIT_TRIGGER_AT");
 }
@@ -419,6 +462,7 @@ function frjRunSync_(forceAudit) {
       summary.push(frjSynchronizeDataset_("catalog", remoteStates.catalog, forceAudit, 0));
 
       var completedAt = new Date().toISOString();
+      frjPublishSyncSummary_(summary, completedAt);
       properties.setProperties({
         FRJ_SYNC_LAST_SUCCESS: completedAt,
         FRJ_SYNC_LAST_ERROR: "",

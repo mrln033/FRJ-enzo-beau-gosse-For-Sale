@@ -5,7 +5,7 @@
 	<link rel="icon" href="./favicon.ico">
 	<link rel="stylesheet" href="./style.css?v=20260813-3">
 	<link rel="stylesheet" href="./maj_css.css?v=20260718-1">
-	<script src="./js/api-client.js?v=20260813-5"></script>
+	<script src="./js/api-client.js?v=20260813-6"></script>
 	<script defer src="./js/admin-menu.js?v=20260813-2"></script>
 	<meta charset="UTF-8">
 	<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -62,7 +62,7 @@ async function sendData() {
     let syncWarning = "";
     if (FRJ_API.backend === "gas") {
       try {
-        await FRJ_API.requestSynchronization("mu", "import-gas-mu");
+        await FRJ_API.publishGasObservation("mu", csv);
       } catch (syncError) {
         syncWarning = `\n⚠️ Import effectué, mais demande de synchronisation non enregistrée : ${syncError.message || syncError}`;
       }

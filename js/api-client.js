@@ -96,6 +96,17 @@
     });
   }
 
+  async function publishGasObservation(dataset, raw) {
+    const eventId = global.crypto?.randomUUID
+      ? global.crypto.randomUUID()
+      : `gas-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    return requestD1Admin("/admin/sync-observation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dataset, raw, eventId })
+    });
+  }
+
   function setActiveBackend(backend) {
     activeBackend = backend;
     global.dispatchEvent(new CustomEvent("frj:backendchange", {
@@ -215,6 +226,7 @@
     fetch: request,
     fetchD1Admin: requestD1Admin,
     requestSynchronization,
+    publishGasObservation,
     backend: preferredBackend,
     get activeBackend() { return activeBackend; },
     label: preferredBackend === "d1" ? "Cloudflare D1" : "Google Sheets / GAS",
