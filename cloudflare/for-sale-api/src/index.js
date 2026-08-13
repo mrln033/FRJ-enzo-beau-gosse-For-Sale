@@ -1,6 +1,7 @@
 import { normalizeInventoryRows, normalizeMarketRows } from "./domain.js";
 
 const MAX_IMPORT_BYTES = 1_800_000;
+const INVENTORY_RETENTION_COUNT = 5;
 
 const PUBLIC_ORIGINS = new Set([
   "https://mrln033.github.io",
@@ -218,7 +219,23 @@ async function handlePost(request, url, env) {
       env.DB.prepare(`
         INSERT INTO active_inventory (avatar_id, import_id) VALUES (?, ?)
         ON CONFLICT (avatar_id) DO UPDATE SET import_id = excluded.import_id
-      `).bind(avatar, importId)
+      `).bind(avatar, importId),
+      env.DB.prepare(`
+        DELETE FROM inventory_imports
+        WHERE avatar_id = ?
+          AND id NOT IN (
+            SELECT id
+            FROM inventory_imports
+            WHERE avatar_id = ?
+            ORDER BY datetime(imported_at) DESC, created_at DESC, id DESC
+            LIMIT ?
+          )
+          AND id NOT IN (
+            SELECT import_id
+            FROM active_inventory
+            WHERE avatar_id = ?
+          )
+      `).bind(avatar, avatar, INVENTORY_RETENTION_COUNT, avatar)
     ]);
 
     return legacyText(

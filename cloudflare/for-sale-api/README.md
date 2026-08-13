@@ -62,4 +62,10 @@ Ne pas remplacer l’URL GAS dans le front avant validation des réponses locale
 ## Retour arrière
 
 Chaque import crée une version immuable, puis change uniquement le pointeur `active_inventory` ou
-`active_market_import`. Une version antérieure peut être réactivée sans réimporter les données.
+`active_market_import`. Pour chaque avatar, les cinq instantanés d’inventaire les plus récents sont conservés ;
+les plus anciens et leurs lignes sont supprimés automatiquement après un import réussi. L’import actif est
+toujours explicitement protégé de la purge. Une des quatre versions précédentes peut donc être réactivée sans
+réimporter les données.
+
+Les observations MU ne suivent pas cette politique : elles restent historisées afin de conserver l’évolution
+des prix.

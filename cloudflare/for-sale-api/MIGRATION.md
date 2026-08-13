@@ -19,6 +19,8 @@
 - Les lectures sont publiques et acceptent l’origine `https://mrln033.github.io`.
 - Les imports exigent un secret Worker `ADMIN_TOKEN`, envoyé en Bearer token.
 - Chaque import est immuable. Un pointeur désigne la version active, ce qui permet un retour arrière rapide.
+- Les cinq derniers instantanés d’inventaire sont conservés par avatar ; les plus anciens sont purgés après
+  chaque import réussi. L’historique MU reste complet.
 
 Un domaine Cloudflare n’est pas nécessaire : le front GitHub Pages peut appeler l’URL `workers.dev` du
 nouveau Worker grâce aux en-têtes CORS.
