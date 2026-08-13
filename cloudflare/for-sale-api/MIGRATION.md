@@ -19,8 +19,12 @@
 - Les lectures sont publiques et acceptent l’origine `https://mrln033.github.io`.
 - Les imports exigent un secret Worker `ADMIN_TOKEN`, envoyé en Bearer token.
 - Chaque import est immuable. Un pointeur désigne la version active, ce qui permet un retour arrière rapide.
-- Les cinq derniers instantanés d’inventaire sont conservés par avatar ; les plus anciens sont purgés après
-  chaque import réussi. L’historique MU reste complet.
+- Les cinq derniers instantanés sont conservés pour chaque inventaire, les MU et le catalogue ; les plus
+  anciens sont purgés après chaque import réussi.
+- Deux triggers GAS assurent une synchronisation toutes les 15 minutes et un audit complet toutes les
+  30 minutes. Les empreintes évitent de transférer les datasets inchangés.
+- Inventaires et MU sont fusionnés dans les deux sens à partir du dernier snapshot commun. `BDD_APP` reste
+  provisoirement maître du catalogue tant que ses colonnes de référentiel utilisent `IMPORTRANGE`.
 
 Un domaine Cloudflare n’est pas nécessaire : le front GitHub Pages peut appeler l’URL `workers.dev` du
 nouveau Worker grâce aux en-têtes CORS.
@@ -44,7 +48,7 @@ formule Google `QUERY`, tandis que SQL utilise une jointure sûre. Cet écart es
    publié n'est pas encore modifié.
 7. [x] Créer `ADMIN_TOKEN` et adapter localement les pages d'import : jeton en `sessionStorage`, aucune écriture
    de secours automatique, contrôle authentifié sans mutation réussi.
-8. [ ] Basculer les écritures, puis conserver GAS et les feuilles en lecture seule pendant la période de contrôle.
+8. [ ] Déployer la synchronisation privée, installer les triggers 15/30 minutes et réussir l’audit initial.
 9. [ ] Retirer le secours GAS seulement après validation des imports réels et d’un exercice de retour arrière.
 
 ## Données privées

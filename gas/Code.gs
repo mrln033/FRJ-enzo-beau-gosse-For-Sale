@@ -327,15 +327,17 @@ function processInventory(csv, avatar) {
 }
 
 function doPost(e) {
-  const type = e.parameter.type;
+  return withFrjDataLock_(function() {
+    const type = e.parameter.type;
 
-  if (type === "mu") {
-    return ContentService.createTextOutput(processMU(e.postData.contents));
-  }
+    if (type === "mu") {
+      return ContentService.createTextOutput(processMU(e.postData.contents));
+    }
 
-  if (type === "inventory") {
-    return ContentService.createTextOutput(processInventory(e.postData.contents, e.parameter.avatar));
-  }
+    if (type === "inventory") {
+      return ContentService.createTextOutput(processInventory(e.postData.contents, e.parameter.avatar));
+    }
 
-  return ContentService.createTextOutput("❌ Type reçu: " + type);
+    return ContentService.createTextOutput("❌ Type reçu: " + type);
+  });
 }
