@@ -201,7 +201,7 @@ function frjScheduleOneShot_(handler, runAt, propertyName) {
   ScriptApp.getProjectTriggers().forEach(function(trigger) {
     if (trigger.getHandlerFunction() === handler) ScriptApp.deleteTrigger(trigger);
   });
-  ScriptApp.newTrigger(handler).timeBased().at(new Date(Math.max(Date.now() + 1000, runAt))).create();
+  ScriptApp.newTrigger(handler).timeBased().after(Math.max(1000, runAt - Date.now())).create();
   properties.setProperty(propertyName, String(runAt));
 }
 
