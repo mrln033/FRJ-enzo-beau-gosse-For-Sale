@@ -8,6 +8,8 @@
   const preferredBackend = requestedBackend === "d1" ? "d1" : "gas";
   let activeBackend = preferredBackend;
 
+  reflectBackend(preferredBackend);
+
   const backends = {
     gas: GAS_URL,
     d1: D1_URL
@@ -26,6 +28,7 @@
 
     for (const backend of [preferredBackend, fallbackBackend]) {
       try {
+        setActiveBackend(backend);
         const response = await global.fetch(buildUrl(backend, query), options);
         if (!response.ok) {
           throw new Error(`${backend.toUpperCase()} répond ${response.status}`);
@@ -48,6 +51,7 @@
       headers.set("Authorization", `Bearer ${await getAdminToken()}`);
     }
 
+    setActiveBackend(preferredBackend);
     const response = await global.fetch(buildUrl(preferredBackend, query), {
       ...options,
       headers
@@ -70,6 +74,7 @@
   async function requestD1Admin(query, options = {}) {
     const headers = new Headers(options.headers || {});
     headers.set("Authorization", `Bearer ${await getAdminToken()}`);
+    setActiveBackend("d1");
     const response = await global.fetch(buildUrl("d1", query), {
       ...options,
       headers
@@ -109,9 +114,15 @@
 
   function setActiveBackend(backend) {
     activeBackend = backend;
+    reflectBackend(backend);
     global.dispatchEvent(new CustomEvent("frj:backendchange", {
       detail: { backend }
     }));
+  }
+
+  function reflectBackend(backend) {
+    const root = global.document?.documentElement;
+    if (root) root.dataset.frjBackend = backend;
   }
 
   function buildUrl(backend, query) {

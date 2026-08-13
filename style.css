@@ -57,14 +57,15 @@ h1 {
 
 .backend-status-dot {
   position: fixed;
-  top: 8px;
-  left: 8px;
+  top: 6px;
+  left: 6px;
   z-index: 11000;
-  width: 12px;
-  height: 12px;
-  border: 2px solid rgba(255, 255, 255, 0.95);
+  width: 8px;
+  height: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.95);
   border-radius: 50%;
-  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.45);
+  background: #d71920;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
 .backend-status-dot.backend-gas {
@@ -72,6 +73,14 @@ h1 {
 }
 
 .backend-status-dot.backend-d1 {
+  background: #1b9e3e;
+}
+
+html[data-frj-backend="gas"] .backend-status-dot {
+  background: #d71920;
+}
+
+html[data-frj-backend="d1"] .backend-status-dot {
   background: #1b9e3e;
 }
 
