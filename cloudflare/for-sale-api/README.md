@@ -7,7 +7,7 @@ Ce projet est volontairement séparé de `../worker.js`, qui gère Discord pour 
 - Worker déployé : <https://frj-for-sale-api.merlin-merzhin-lesage.workers.dev>
 - D1 distant : `frj-for-sale` (`6afa102c-94a4-4b40-a61b-0fdc2e0a2b86`), région WEUR.
 - Données chargées : 1 113 articles, 1 113 classements, 3 097 lignes d’inventaire et 802 observations MU.
-- Le front GitHub Pages appelle encore GAS : la production existante n’a pas été basculée.
+- Le front GitHub Pages peut utiliser GAS ou D1 sans changer son adresse publique.
 - Les lectures D1 sont publiques ; `ADMIN_TOKEN` est configuré dans les secrets Cloudflare.
 - Le frontend local possède une bascule progressive, mais ces modifications ne sont pas encore publiées sur GitHub Pages.
 
@@ -62,4 +62,33 @@ Ne pas remplacer l’URL GAS dans le front avant validation des réponses locale
 ## Retour arrière
 
 Chaque import crée une version immuable, puis change uniquement le pointeur `active_inventory` ou
-`active_market_import`. Une version antérieure peut être réactivée sans réimporter les données.
+`active_market_import`. Pour chaque avatar, les cinq instantanés d’inventaire les plus récents sont conservés ;
+les plus anciens et leurs lignes sont supprimés automatiquement après un import réussi. L’import actif est
+toujours explicitement protégé de la purge. Une des quatre versions précédentes peut donc être réactivée sans
+réimporter les données.
+
+Les cinq instantanés les plus récents sont conservés pour chacun des quatre inventaires, le catalogue et les
+MU. L’import actif est toujours protégé. Le journal de synchronisation conserve les 500 dernières opérations
+par dataset. D1 Time Travel fournit en plus une restauration à la minute, automatiquement active côté
+Cloudflare.
+
+## Synchronisation GAS ↔ D1
+
+Le script `../../gas/SyncD1.gs` synchronise six datasets : catalogue, MU et les quatre inventaires. Deux
+déclencheurs temporels sont installés :
+
+- toutes les 15 minutes : comparaison des empreintes et transfert uniquement des datasets modifiés ;
+- toutes les 30 minutes : audit complet, recalcul des empreintes de toutes les lignes et réconciliation.
+
+Les inventaires et les MU sont bidirectionnels. Une modification indépendante de chaque côté est fusionnée
+ligne par ligne à partir du dernier snapshot commun ; une suppression fait partie du snapshot et est donc
+propagée. En cas de modification concurrente pendant le transfert, l’écriture est refusée puis retentée après
+relecture.
+
+Le catalogue est inclus afin de garantir la même liste d’articles vendables, mais `BDD_APP` reste
+provisoirement sa source maîtresse : les colonnes prix/image/wiki dépendent encore de formules
+`IMPORTRANGE`. D1 en reçoit un miroir complet sans écraser ces formules Google Sheets.
+
+Installation : activer l’API Google Apps Script dans les paramètres du compte, créer un projet Apps Script
+autonome, y pousser `SyncD1.gs`, configurer le même secret `SYNC_TOKEN` dans Cloudflare et les propriétés du
+script, puis exécuter `installFrjBidirectionalSync()` et un audit initial.

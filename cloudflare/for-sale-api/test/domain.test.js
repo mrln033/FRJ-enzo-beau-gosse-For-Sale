@@ -14,6 +14,16 @@ test("parseTsv conserve les colonnes attendues", () => {
   assert.equal(parsed.rows[0].Quantity, "2");
 });
 
+test("parseTsv retire les guillemets ajoutés aux cellules contenant une virgule", () => {
+  const parsed = parseTsv([
+    "Item\tContainer",
+    '"Pixie Arm Guards, Adjusted (F)"\t"Pitbull Mk. 1 (C,L)"'
+  ].join("\n"));
+
+  assert.equal(parsed.rows[0].Item, "Pixie Arm Guards, Adjusted (F)");
+  assert.equal(parsed.rows[0].Container, "Pitbull Mk. 1 (C,L)");
+});
+
 test("parsePedVolume normalise PEC, PED, K et M", () => {
   assert.equal(parsePedVolume("91.000 PEC"), 0.91);
   assert.equal(parsePedVolume("2.400K PED"), 2400);
@@ -38,4 +48,24 @@ test("computeWeightedMarkup reproduit la pondération Google Sheet", () => {
 
 test("normalizeInventoryRows refuse un format incomplet", () => {
   assert.throws(() => normalizeInventoryRows("Item\tQuantity\nA\t1"), /Colonnes inventaire manquantes/);
+});
+
+test("normalizeInventoryRows accepte la date GAS comme en-tête de la colonne Item", () => {
+  const rows = normalizeInventoryRows([
+    "Id\t12/08/2026 - 08:55:55\tQuantity\tValue(PED)\tContainer\tContainerRefId",
+    "1\tA.R.C. Guardian Arm Guards (F)\t1\t4.0000\tSTORAGE (Calypso)\tnull"
+  ].join("\n"));
+
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].itemName, "A.R.C. Guardian Arm Guards (F)");
+  assert.equal(rows[0].quantity, 1);
+});
+
+test("normalizeInventoryRows accepte Name comme alias de Item", () => {
+  const rows = normalizeInventoryRows([
+    "Id\tName\tQuantity\tValue(PED)\tContainer\tContainerRefId",
+    "1\tItem A\t2\t1.25\tCARRIED\tnull"
+  ].join("\n"));
+
+  assert.equal(rows[0].itemName, "Item A");
 });
