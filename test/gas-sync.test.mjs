@@ -103,3 +103,14 @@ test("la fusion propage une suppression si l'autre côté n'a pas modifié la li
   assert.equal(merged.some((row) => row.sourceId === "1"), false);
   assert.equal(merged.find((row) => row.sourceId === "2").quantity, 4);
 });
+
+test("une modification récente programme la synchronisation cinq minutes plus tard", () => {
+  const changedAt = Date.parse("2026-08-13T12:00:00+02:00");
+  assert.equal(context.frjComputeSyncRunAt_(changedAt, changedAt), changedAt + 5 * 60 * 1000);
+});
+
+test("un signal D1 déjà âgé de cinq minutes déclenche la synchronisation sans nouvelle attente", () => {
+  const changedAt = Date.parse("2026-08-13T12:00:00+02:00");
+  const detectedAt = changedAt + 5 * 60 * 1000;
+  assert.equal(context.frjComputeSyncRunAt_(changedAt, detectedAt), detectedAt + 1000);
+});

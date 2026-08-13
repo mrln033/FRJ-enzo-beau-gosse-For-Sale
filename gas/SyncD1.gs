@@ -7,9 +7,10 @@ var FRJ_SYNC_CONFIG = Object.freeze({
   marketSheetName: "MU_Pondérés",
   tokenProperty: "FRJ_D1_SYNC_TOKEN",
   basePropertyPrefix: "FRJ_SYNC_BASE_",
-  minSyncIntervalMs: 15 * 60 * 1000,
+  syncDelayMs: 5 * 60 * 1000,
   auditDelayMs: 30 * 60 * 1000,
   dailyAuditHour: 2,
+  schedulerVersion: "2026-08-13-v2",
   inventorySheets: {
     enzo: "Inventaire Enzo",
     arkaman: "Inventaire ArkaMan",
@@ -65,12 +66,33 @@ function installFrjBidirectionalSync() {
     .inTimezone("Europe/Paris")
     .create();
   // Ce trigger ne synchronise pas les données : il ne lit qu'un petit marqueur D1.
-  ScriptApp.newTrigger("frjD1SignalPollTrigger").timeBased().everyMinutes(15).create();
+  ScriptApp.newTrigger("frjD1SignalPollTrigger").timeBased().everyMinutes(5).create();
 
   var properties = PropertiesService.getScriptProperties();
   properties.deleteProperty("FRJ_SYNC_TRIGGER_AT");
   properties.deleteProperty("FRJ_AUDIT_TRIGGER_AT");
-  properties.setProperty("FRJ_SYNC_INSTALLED_AT", new Date().toISOString());
+  properties.setProperties({
+    FRJ_SYNC_INSTALLED_AT: new Date().toISOString(),
+    FRJ_SYNC_SCHEDULER_VERSION: FRJ_SYNC_CONFIG.schedulerVersion
+  });
+  var now = Date.now();
+  var dirtyAt = Number(properties.getProperty("FRJ_SYNC_DIRTY_AT") || 0);
+  if (dirtyAt) {
+    frjScheduleOneShot_(
+      "frjDeferredSyncTrigger",
+      frjComputeSyncRunAt_(dirtyAt, now),
+      "FRJ_SYNC_TRIGGER_AT",
+      true
+    );
+  }
+  var lastRunAt = Number(properties.getProperty("FRJ_SYNC_LAST_RUN_AT") || 0);
+  if (lastRunAt) {
+    frjScheduleOneShot_(
+      "frjDeferredAuditTrigger",
+      Math.max(now + 1000, lastRunAt + FRJ_SYNC_CONFIG.auditDelayMs),
+      "FRJ_AUDIT_TRIGGER_AT"
+    );
+  }
   return getFrjSyncStatus();
 }
 
@@ -107,6 +129,7 @@ function frjSyncAuditTrigger() {
 }
 
 function frjSpreadsheetChangedTrigger(e) {
+  frjEnsureSchedulerVersion_();
   var sourceId = "";
   try { sourceId = e && e.source ? e.source.getId() : ""; } catch (ignored) {}
   return frjRequestSynchronization_("modification-google-sheet", sourceId);
@@ -118,21 +141,32 @@ function frjDeferredSyncTrigger() {
   var dirtyAt = Number(properties.getProperty("FRJ_SYNC_DIRTY_AT") || 0);
   if (!dirtyAt) return "Aucune modification en attente";
 
-  var lastRunAt = Number(properties.getProperty("FRJ_SYNC_LAST_RUN_AT") || 0);
-  var earliest = lastRunAt + FRJ_SYNC_CONFIG.minSyncIntervalMs;
-  if (Date.now() < earliest) {
-    frjScheduleOneShot_("frjDeferredSyncTrigger", earliest, "FRJ_SYNC_TRIGGER_AT");
-    return "Synchronisation différée pour respecter les 15 minutes";
+  var summary;
+  try {
+    summary = frjRunSync_(false);
+  } catch (error) {
+    // La demande reste marquée comme sale et sera retentée cinq minutes plus tard.
+    frjScheduleOneShot_(
+      "frjDeferredSyncTrigger",
+      Date.now() + FRJ_SYNC_CONFIG.syncDelayMs,
+      "FRJ_SYNC_TRIGGER_AT",
+      true
+    );
+    throw error;
   }
-
-  var summary = frjRunSync_(false);
   var completedAt = Date.now();
   properties.setProperty("FRJ_SYNC_LAST_RUN_AT", String(completedAt));
   if (Number(properties.getProperty("FRJ_SYNC_DIRTY_AT") || 0) <= dirtyAt) {
     properties.deleteProperty("FRJ_SYNC_DIRTY_AT");
     properties.deleteProperty("FRJ_SYNC_DIRTY_REASON");
   } else {
-    frjScheduleOneShot_("frjDeferredSyncTrigger", completedAt + FRJ_SYNC_CONFIG.minSyncIntervalMs, "FRJ_SYNC_TRIGGER_AT");
+    var latestDirtyAt = Number(properties.getProperty("FRJ_SYNC_DIRTY_AT") || completedAt);
+    frjScheduleOneShot_(
+      "frjDeferredSyncTrigger",
+      frjComputeSyncRunAt_(latestDirtyAt, completedAt),
+      "FRJ_SYNC_TRIGGER_AT",
+      true
+    );
   }
   frjScheduleIntegrityAudit_(completedAt);
   return summary;
@@ -151,41 +185,52 @@ function frjDeferredAuditTrigger() {
 }
 
 function frjDailyAuditTrigger() {
+  frjEnsureSchedulerVersion_();
   return frjRunIntegrityAudit_("audit-quotidien-02h");
 }
 
 function frjD1SignalPollTrigger() {
+  frjEnsureSchedulerVersion_();
   var pending = frjD1Request_("/sync/pending").request;
   if (!pending || !pending.id) return "Aucune demande D1";
   var properties = PropertiesService.getScriptProperties();
   var lastSeen = Number(properties.getProperty("FRJ_D1_LAST_REQUEST_ID") || 0);
   if (pending.id <= lastSeen) return "Aucune nouvelle demande D1";
   properties.setProperty("FRJ_D1_LAST_REQUEST_ID", String(pending.id));
-  return frjRequestSynchronization_(pending.reason || "modification-d1", pending.dataset || "");
+  return frjRequestSynchronization_(pending.reason || "modification-d1", pending.dataset || "", pending.createdAt);
 }
 
 function frjRunIntegrityAudit_(reason) {
-  var summary = frjRunSync_(true);
-  var changed = summary.some(function(item) { return item.action !== "identique"; });
-  if (changed) {
-    var completedAt = Date.now();
-    PropertiesService.getScriptProperties().setProperty("FRJ_SYNC_LAST_RUN_AT", String(completedAt));
-    frjScheduleIntegrityAudit_(completedAt);
+  try {
+    var summary = frjRunSync_(true);
+    var changed = summary.some(function(item) { return item.action !== "identique"; });
+    if (changed) {
+      var completedAt = Date.now();
+      PropertiesService.getScriptProperties().setProperty("FRJ_SYNC_LAST_RUN_AT", String(completedAt));
+      // L'audit vient d'effectuer une correction : cette correction est une synchronisation,
+      // donc elle doit obligatoirement être vérifiée par un nouvel audit à +30 minutes.
+      frjScheduleIntegrityAudit_(completedAt);
+    }
+    frjReportAudit_("_system", "integrity-audit-completed", "", "", { reason: reason, changed: changed });
+    return summary;
+  } catch (error) {
+    // Une erreur technique ne doit jamais casser définitivement la chaîne de vérification.
+    frjScheduleOneShot_("frjDeferredAuditTrigger", Date.now() + FRJ_SYNC_CONFIG.auditDelayMs, "FRJ_AUDIT_TRIGGER_AT");
+    throw error;
   }
-  frjReportAudit_("_system", "integrity-audit-completed", "", "", { reason: reason, changed: changed });
-  return summary;
 }
 
-function frjRequestSynchronization_(reason, dataset) {
+function frjRequestSynchronization_(reason, dataset, changedAt) {
   var properties = PropertiesService.getScriptProperties();
   var now = Date.now();
   properties.setProperties({
     FRJ_SYNC_DIRTY_AT: String(now),
     FRJ_SYNC_DIRTY_REASON: JSON.stringify({ reason: String(reason || "modification"), dataset: String(dataset || ""), at: new Date(now).toISOString() })
   });
-  var lastRunAt = Number(properties.getProperty("FRJ_SYNC_LAST_RUN_AT") || 0);
-  var runAt = Math.max(now + 1000, lastRunAt + FRJ_SYNC_CONFIG.minSyncIntervalMs);
-  frjScheduleOneShot_("frjDeferredSyncTrigger", runAt, "FRJ_SYNC_TRIGGER_AT");
+  var parsedChangedAt = Date.parse(String(changedAt || ""));
+  var sourceChangedAt = isFinite(parsedChangedAt) ? parsedChangedAt : now;
+  var runAt = frjComputeSyncRunAt_(sourceChangedAt, now);
+  frjScheduleOneShot_("frjDeferredSyncTrigger", runAt, "FRJ_SYNC_TRIGGER_AT", true);
   frjReportAudit_("_system", "sync-requested", "", "", { reason: reason, dataset: dataset, scheduledAt: new Date(runAt).toISOString() });
   return { ok: true, scheduledAt: new Date(runAt).toISOString() };
 }
@@ -194,9 +239,21 @@ function frjScheduleIntegrityAudit_(lastRunAt) {
   frjScheduleOneShot_("frjDeferredAuditTrigger", lastRunAt + FRJ_SYNC_CONFIG.auditDelayMs, "FRJ_AUDIT_TRIGGER_AT");
 }
 
-function frjScheduleOneShot_(handler, runAt, propertyName) {
+function frjComputeSyncRunAt_(changedAt, now) {
+  return Math.max(now + 1000, changedAt + FRJ_SYNC_CONFIG.syncDelayMs);
+}
+
+function frjEnsureSchedulerVersion_() {
+  var installedVersion = PropertiesService.getScriptProperties().getProperty("FRJ_SYNC_SCHEDULER_VERSION") || "";
+  if (installedVersion === FRJ_SYNC_CONFIG.schedulerVersion) return false;
+  installFrjBidirectionalSync();
+  return true;
+}
+
+function frjScheduleOneShot_(handler, runAt, propertyName, keepEarlier) {
   var properties = PropertiesService.getScriptProperties();
   var existingAt = Number(properties.getProperty(propertyName) || 0);
+  if (keepEarlier && existingAt && existingAt <= runAt + 30000) return;
   if (existingAt && Math.abs(existingAt - runAt) < 30000) return;
   ScriptApp.getProjectTriggers().forEach(function(trigger) {
     if (trigger.getHandlerFunction() === handler) ScriptApp.deleteTrigger(trigger);
@@ -214,7 +271,7 @@ function runFrjSyncNow() {
 }
 
 function runFrjSyncAuditNow() {
-  return frjRunSync_(true);
+  return frjRunIntegrityAudit_("audit-manuel");
 }
 
 function getFrjSyncStatus() {
@@ -234,6 +291,7 @@ function getFrjSyncStatus() {
     dirtyAt: properties.getProperty("FRJ_SYNC_DIRTY_AT") || "",
     dirtyReason: properties.getProperty("FRJ_SYNC_DIRTY_REASON") || "",
     lastRunAt: properties.getProperty("FRJ_SYNC_LAST_RUN_AT") || "",
+    schedulerVersion: properties.getProperty("FRJ_SYNC_SCHEDULER_VERSION") || "",
     triggers: triggers
   };
 }
