@@ -86,11 +86,16 @@
       timeStyle: "medium",
       timeZone: "Europe/Paris"
     });
+    const AUTO_REFRESH_DELAY = 5 * 60 * 1000;
+    let autoRefreshTimer = null;
+    let lastReportLoadAt = 0;
 
-    document.getElementById("refreshReport").addEventListener("click", loadSyncReport);
+    document.getElementById("refreshReport").addEventListener("click", () => {
+      loadSyncReport().finally(scheduleAutoRefresh);
+    });
     document.getElementById("clearReportToken").addEventListener("click", () => {
       FRJ_API.clearAdminToken();
-      loadSyncReport();
+      loadSyncReport().finally(scheduleAutoRefresh);
     });
 
     function formatDate(value) {
@@ -206,6 +211,7 @@
     }
 
     async function loadSyncReport() {
+      lastReportLoadAt = Date.now();
       const loading = document.getElementById("reportLoading");
       const error = document.getElementById("reportError");
       const content = document.getElementById("reportContent");
@@ -227,7 +233,27 @@
       }
     }
 
-    loadSyncReport();
+    function scheduleAutoRefresh() {
+      if (autoRefreshTimer) window.clearTimeout(autoRefreshTimer);
+      autoRefreshTimer = null;
+      if (document.hidden) return;
+      const elapsed = Date.now() - lastReportLoadAt;
+      const delay = Math.max(0, AUTO_REFRESH_DELAY - elapsed);
+      autoRefreshTimer = window.setTimeout(async () => {
+        if (!document.hidden) await loadSyncReport();
+        scheduleAutoRefresh();
+      }, delay);
+    }
+
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden && Date.now() - lastReportLoadAt >= AUTO_REFRESH_DELAY) {
+        loadSyncReport().finally(scheduleAutoRefresh);
+      } else {
+        scheduleAutoRefresh();
+      }
+    });
+
+    loadSyncReport().finally(scheduleAutoRefresh);
   </script>
 </body>
 </html>
