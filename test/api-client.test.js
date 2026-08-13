@@ -80,3 +80,18 @@ test("une écriture D1 envoie le jeton sans repli automatique", async () => {
   assert.equal(requests[0].options.headers.get("Authorization"), "Bearer jeton-test");
   assert.equal(values.size, 0);
 });
+
+test("le rapport administrateur lit uniquement D1 avec le jeton", async () => {
+  const requests = [];
+  const { api } = loadClient("?admin=1", async (url, options) => {
+    requests.push({ url, options });
+    return new Response(JSON.stringify({ status: "ok", datasets: [], events: [] }), { status: 200 });
+  }, () => "jeton-rapport");
+
+  const response = await api.fetchD1Admin("/admin/sync-report");
+  assert.equal(response.status, 200);
+  assert.equal(requests.length, 1);
+  assert.match(requests[0].url, /workers\.dev\/admin\/sync-report$/);
+  assert.equal(requests[0].options.headers.get("Authorization"), "Bearer jeton-rapport");
+  assert.equal(api.activeBackend, "d1");
+});

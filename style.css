@@ -488,6 +488,40 @@ h1 {
 /* =========================
    NAV ADMIN
 ========================= */
+.admin-menu {
+  position: sticky;
+  top: 0;
+  z-index: 10000;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: 0 90px 20px;
+  padding: 10px;
+  background: rgba(245, 245, 245, 0.96);
+  border-bottom: 1px solid #ccc;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.admin-menu a {
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #ddd;
+  color: #000;
+  font-size: 0.9rem;
+  font-weight: bold;
+  text-decoration: none;
+}
+
+.admin-menu a:hover {
+  background: #bbb;
+}
+
+.admin-menu a.active {
+  background: #333;
+  color: #fff;
+}
+
 .nav-admin {
   position: fixed;
   top: 10px;
@@ -513,4 +547,16 @@ h1 {
 .nav-admin a.active {
   background: #333;
   color: #fff;
+}
+
+@media (max-width: 800px) {
+  .admin-menu {
+    position: static;
+    margin: 0 0 20px;
+  }
+
+  .admin-menu a {
+    flex: 1 1 170px;
+    text-align: center;
+  }
 }

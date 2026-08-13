@@ -67,6 +67,27 @@
     return response;
   }
 
+  async function requestD1Admin(query, options = {}) {
+    const headers = new Headers(options.headers || {});
+    headers.set("Authorization", `Bearer ${getAdminToken()}`);
+    const response = await global.fetch(buildUrl("d1", query), {
+      ...options,
+      headers
+    });
+
+    if (response.status === 401) {
+      clearAdminToken();
+      throw new Error("Jeton administrateur refusé. Recharge la page et saisis le nouveau jeton.");
+    }
+    if (!response.ok) {
+      const details = await response.text();
+      throw new Error(details || `D1 répond ${response.status}`);
+    }
+
+    setActiveBackend("d1");
+    return response;
+  }
+
   function setActiveBackend(backend) {
     activeBackend = backend;
     global.dispatchEvent(new CustomEvent("frj:backendchange", {
@@ -122,6 +143,7 @@
 
   global.FRJ_API = Object.freeze({
     fetch: request,
+    fetchD1Admin: requestD1Admin,
     backend: preferredBackend,
     get activeBackend() { return activeBackend; },
     label: preferredBackend === "d1" ? "Cloudflare D1" : "Google Sheets / GAS",

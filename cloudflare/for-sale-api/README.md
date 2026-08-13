@@ -92,3 +92,14 @@ provisoirement sa source maîtresse : les colonnes prix/image/wiki dépendent en
 Installation : activer l’API Google Apps Script dans les paramètres du compte, créer un projet Apps Script
 autonome, y pousser `SyncD1.gs`, configurer le même secret `SYNC_TOKEN` dans Cloudflare et les propriétés du
 script, puis exécuter `installFrjBidirectionalSync()` et un audit initial.
+
+## Administration et rapport
+
+Avec `?admin=1`, le frontend affiche un menu commun permettant d’ouvrir explicitement les catalogues et les
+pages d’import GAS ou D1. La page `rapport-sync.html?admin=1` affiche l’état des six datasets et les 100
+derniers événements du journal croisé GAS ↔ D1.
+
+Le paramètre `admin=1` contrôle seulement l’affichage du menu. Le rapport appelle
+`GET /admin/sync-report`, protégé par `ADMIN_TOKEN`; aucune donnée de synchronisation n’est exposée sans ce
+jeton. GAS remonte dans `sync_audit` le résultat global de chaque exécution, tandis que D1 conserve les 500
+derniers événements par dataset.

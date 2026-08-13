@@ -133,10 +133,19 @@ function frjRunSync_(forceAudit) {
         FRJ_SYNC_LAST_ERROR: "",
         FRJ_SYNC_LAST_SUMMARY: JSON.stringify(summary)
       });
+      frjReportAudit_("_system", "sync-run-completed", "", "", {
+        audit: Boolean(forceAudit),
+        completedAt: completedAt,
+        datasets: summary
+      });
       console.log(JSON.stringify({ message: "Synchronisation FRJ terminée", audit: forceAudit, summary: summary }));
       return summary;
     } catch (error) {
       properties.setProperty("FRJ_SYNC_LAST_ERROR", new Date().toISOString() + " — " + error.message);
+      frjReportAudit_("_system", "sync-run-failed", "", "", {
+        audit: Boolean(forceAudit),
+        error: error.message
+      });
       console.error(JSON.stringify({ message: "Synchronisation FRJ échouée", error: error.message }));
       throw error;
     }

@@ -54,13 +54,19 @@ export default {
     try {
       const url = new URL(request.url);
       const isSyncRequest = url.pathname.startsWith("/sync/");
+      const isAdminRequest = url.pathname.startsWith("/admin/");
 
       if (isSyncRequest && !(await isAuthorized(request, env.SYNC_TOKEN || env.ADMIN_TOKEN))) {
         return withCors(json({ error: "Unauthorized" }, 401), origin);
       }
 
+      if (isAdminRequest && !(await isAuthorized(request, env.ADMIN_TOKEN))) {
+        return withCors(json({ error: "Unauthorized" }, 401), origin);
+      }
+
       if (request.method === "GET") {
         if (isSyncRequest) return withCors(await handleSyncGet(url, env), origin);
+        if (isAdminRequest) return withCors(await handleAdminGet(url, env), origin);
         return withCors(await handleGet(url, env), origin);
       }
 
@@ -189,6 +195,65 @@ async function handleGet(url, env) {
     TOTAL: Number(row.QUANTITE || 0) * Number(row.PRIX_UNITAIRE || 0)
   }));
   return publicJson(rows);
+}
+
+async function handleAdminGet(url, env) {
+  if (url.pathname !== "/admin/sync-report") {
+    return json({ error: "Endpoint administrateur inconnu" }, 404);
+  }
+
+  const requestedLimit = Number(url.searchParams.get("limit") || 100);
+  const limit = Math.min(Math.max(Number.isFinite(requestedLimit) ? Math.trunc(requestedLimit) : 100, 20), 200);
+  const [statesResult, latestResult, eventsResult] = await env.DB.batch([
+    env.DB.prepare(`
+      SELECT
+        dataset_key, content_checksum, source_updated_at, source_origin,
+        import_id, row_count, synchronized_at
+      FROM sync_state
+      ORDER BY dataset_key
+    `),
+    env.DB.prepare(`
+      WITH ranked AS (
+        SELECT
+          id, dataset_key, direction, action, source_checksum, target_checksum,
+          details, created_at,
+          ROW_NUMBER() OVER (PARTITION BY dataset_key ORDER BY id DESC) AS rank
+        FROM sync_audit
+      )
+      SELECT
+        id, dataset_key, direction, action, source_checksum, target_checksum,
+        details, created_at
+      FROM ranked
+      WHERE rank = 1
+      ORDER BY dataset_key
+    `),
+    env.DB.prepare(`
+      SELECT
+        id, dataset_key, direction, action, source_checksum, target_checksum,
+        details, created_at
+      FROM sync_audit
+      ORDER BY id DESC
+      LIMIT ?
+    `).bind(limit)
+  ]);
+
+  const latestByDataset = Object.fromEntries(
+    latestResult.results.map((row) => [row.dataset_key, mapSyncAuditRow(row)])
+  );
+  const datasets = statesResult.results.map((row) => ({
+    ...mapSyncState(row),
+    synchronizedAt: normalizeSyncTimestamp(row.synchronized_at),
+    lastAudit: latestByDataset[row.dataset_key] || null
+  }));
+  const system = latestByDataset._system || null;
+
+  return json({
+    generatedAt: new Date().toISOString(),
+    status: system?.action === "sync-run-failed" ? "error" : "ok",
+    system,
+    datasets,
+    events: eventsResult.results.map(mapSyncAuditRow)
+  });
 }
 
 async function handlePost(request, url, env) {
@@ -1039,6 +1104,27 @@ function mapSyncState(row) {
     origin: row.source_origin,
     importId: row.import_id,
     rowCount: Number(row.row_count || 0)
+  };
+}
+
+function mapSyncAuditRow(row) {
+  let details = null;
+  if (row.details) {
+    try {
+      details = JSON.parse(row.details);
+    } catch {
+      details = { raw: String(row.details) };
+    }
+  }
+  return {
+    id: Number(row.id),
+    dataset: row.dataset_key,
+    direction: row.direction,
+    action: row.action,
+    sourceHash: row.source_checksum,
+    targetHash: row.target_checksum,
+    details,
+    createdAt: normalizeSyncTimestamp(row.created_at)
   };
 }
 
