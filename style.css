@@ -55,6 +55,13 @@ h1 {
   font-weight: bold;
 }
 
+.backend-indicator {
+  font-size: 0.72em;
+  font-style: normal;
+  font-weight: normal;
+  opacity: 0.75;
+}
+
 .filter select {
   padding: 5px;
   font-size: 1em;

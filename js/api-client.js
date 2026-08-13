@@ -6,6 +6,7 @@
   const ADMIN_TOKEN_KEY = "FRJ_D1_ADMIN_TOKEN";
   const requestedBackend = new URLSearchParams(global.location.search).get("backend");
   const preferredBackend = requestedBackend === "d1" ? "d1" : "gas";
+  let activeBackend = preferredBackend;
 
   const backends = {
     gas: GAS_URL,
@@ -29,6 +30,7 @@
         if (!response.ok) {
           throw new Error(`${backend.toUpperCase()} répond ${response.status}`);
         }
+        setActiveBackend(backend);
         return response;
       } catch (error) {
         lastError = error;
@@ -61,7 +63,15 @@
       throw new Error(details || `${preferredBackend.toUpperCase()} répond ${response.status}`);
     }
 
+    setActiveBackend(preferredBackend);
     return response;
+  }
+
+  function setActiveBackend(backend) {
+    activeBackend = backend;
+    global.dispatchEvent(new CustomEvent("frj:backendchange", {
+      detail: { backend }
+    }));
   }
 
   function buildUrl(backend, query) {
@@ -113,6 +123,7 @@
   global.FRJ_API = Object.freeze({
     fetch: request,
     backend: preferredBackend,
+    get activeBackend() { return activeBackend; },
     label: preferredBackend === "d1" ? "Cloudflare D1" : "Google Sheets / GAS",
     clearAdminToken,
     preserveBackendInAdminLinks
