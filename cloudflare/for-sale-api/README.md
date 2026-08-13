@@ -6,7 +6,8 @@ Ce projet est volontairement séparé de `../worker.js`, qui gère Discord pour 
 
 - Worker déployé : <https://frj-for-sale-api.merlin-merzhin-lesage.workers.dev>
 - D1 distant : `frj-for-sale` (`6afa102c-94a4-4b40-a61b-0fdc2e0a2b86`), région WEUR.
-- Données chargées : 1 113 articles, 1 113 classements, 3 097 lignes d’inventaire et 802 observations MU.
+- Données source : 1 113 lignes catalogue, 3 097 lignes d’inventaire brut consolidées en 2 148 triplets
+  `avatar + item + container`, et 802 observations MU.
 - Le front GitHub Pages peut utiliser GAS ou D1 sans changer son adresse publique.
 - Les lectures D1 sont publiques ; `ADMIN_TOKEN` est configuré dans les secrets Cloudflare.
 - Le frontend local possède une bascule progressive, mais ces modifications ne sont pas encore publiées sur GitHub Pages.
@@ -59,18 +60,18 @@ contiennent les inventaires complets. Ne pas les forcer dans le dépôt public.
 
 Ne pas remplacer l’URL GAS dans le front avant validation des réponses locales et distantes.
 
-## Retour arrière
+## Stockage différentiel et retour arrière
 
-Chaque import crée une version immuable, puis change uniquement le pointeur `active_inventory` ou
-`active_market_import`. Pour chaque avatar, les cinq instantanés d’inventaire les plus récents sont conservés ;
-les plus anciens et leurs lignes sont supprimés automatiquement après un import réussi. L’import actif est
-toujours explicitement protégé de la purge. Une des quatre versions précédentes peut donc être réactivée sans
-réimporter les données.
+Les imports ne créent plus de versions complètes. Un import identique ne modifie aucune ligne métier ; sinon,
+seules les lignes ajoutées, modifiées ou supprimées sont écrites. Les inventaires sont consolidés sur le triplet
+`avatar + item + container` : quantité et valeur PED sont additionnées. Les MU sont identifiées par item et le
+catalogue conserve toutes les lignes BDD_APP, y compris ses doublons, tout en gardant ses tables publiques
+normalisées.
 
-Les cinq instantanés les plus récents sont conservés pour chacun des quatre inventaires, le catalogue et les
-MU. L’import actif est toujours protégé. Le journal de synchronisation conserve les 500 dernières opérations
-par dataset. D1 Time Travel fournit en plus une restauration à la minute, automatiquement active côté
-Cloudflare.
+Une seule base commune par dataset remplace les anciens snapshots pour la fusion GAS ↔ D1. Le journal de
+synchronisation conserve les 500 dernières opérations par dataset et indique le nombre réel de lignes D1
+écrites. Les anciennes tables versionnées restent temporairement en lecture seule pour permettre un retour
+arrière du code ; D1 Time Travel reste disponible pour une restauration de la base.
 
 ## Synchronisation GAS ↔ D1
 
@@ -80,7 +81,7 @@ ayant corrigé des données programme un audit d’intégrité 30 minutes plus t
 exécuté vers 02 h 00, et le signal D1 est contrôlé toutes les cinq minutes.
 
 Les inventaires et les MU sont bidirectionnels. Une modification indépendante de chaque côté est fusionnée
-ligne par ligne à partir du dernier snapshot commun ; une suppression fait partie du snapshot et est donc
+à partir de la dernière base commune ; une suppression fait partie de l’état courant et est donc
 propagée. En cas de modification concurrente pendant le transfert, l’écriture est refusée puis retentée après
 relecture.
 

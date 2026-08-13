@@ -4,6 +4,7 @@ import {
   canonicalCatalogPayload,
   canonicalInventoryPayload,
   canonicalMarketPayload,
+  aggregateInventoryRows,
   inventoryContentHash,
   mergeMarketRows
 } from "../src/sync.js";
@@ -20,6 +21,32 @@ test("l'empreinte inventaire ignore l'ordre et les numéros de ligne", async () 
     await inventoryContentHash([{ ...second, lineNo: 3 }, { ...first, lineNo: 8 }])
   );
   assert.match(canonicalInventoryPayload([first]), /Item A/);
+});
+
+test("l'inventaire fusionne avatar/item/container et additionne quantité et valeur PED", async () => {
+  const rows = [
+    {
+      sourceId: "id-1", itemName: "Item A", quantity: 2, valuePed: 1.25,
+      container: "Storage (Calypso)", containerRefId: "ref-1"
+    },
+    {
+      sourceId: "id-2", itemName: "item a", quantity: 3, valuePed: 2.75,
+      container: "storage (calypso)", containerRefId: "ref-2"
+    },
+    { sourceId: "id-3", itemName: "Item A", quantity: 4, valuePed: null, container: "Carried" }
+  ];
+
+  const aggregated = aggregateInventoryRows(rows);
+  assert.equal(aggregated.length, 2);
+  const storage = aggregated.find((row) => row.container.toLowerCase() === "storage (calypso)");
+  assert.equal(storage.quantity, 5);
+  assert.equal(storage.valuePed, 4);
+  assert.equal(storage.sourceId, null);
+  assert.equal(storage.containerRefId, null);
+  assert.equal(
+    await inventoryContentHash(rows),
+    await inventoryContentHash(aggregated)
+  );
 });
 
 test("la fusion MU remplace l'article reçu et conserve les autres", () => {

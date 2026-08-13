@@ -15,15 +15,16 @@
 
 - GitHub Pages reste l’hébergement public du front.
 - Un nouveau Worker `frj-for-sale-api` fournit l’API HTTP.
-- Une base D1 `frj-for-sale` conserve le catalogue, les inventaires versionnés, les MU et les promotions.
+- Une base D1 `frj-for-sale` conserve le catalogue, l’état courant consolidé des inventaires, les MU et les promotions.
 - Les lectures sont publiques et acceptent l’origine `https://mrln033.github.io`.
 - Les imports exigent un secret Worker `ADMIN_TOKEN`, envoyé en Bearer token.
-- Chaque import est immuable. Un pointeur désigne la version active, ce qui permet un retour arrière rapide.
-- Les cinq derniers instantanés sont conservés pour chaque inventaire, les MU et le catalogue ; les plus
-  anciens sont purgés après chaque import réussi.
-- Deux triggers GAS assurent une synchronisation toutes les 15 minutes et un audit complet toutes les
-  30 minutes. Les empreintes évitent de transférer les datasets inchangés.
-- Inventaires et MU sont fusionnés dans les deux sens à partir du dernier snapshot commun. `BDD_APP` reste
+- Les imports utilisent des écritures différentielles et un garde-fou sans écriture lorsque l’empreinte est identique.
+- Les inventaires fusionnent les lignes de même triplet `avatar + item + container`, en additionnant quantité
+  et valeur PED.
+- Une base commune unique par dataset permet le merge à trois voies sans conserver chaque import.
+- Une modification programme la synchronisation sous cinq minutes et chaque correction est contrôlée par un
+  audit 30 minutes plus tard ; un audit quotidien s’exécute vers 02 h 00.
+- Inventaires et MU sont fusionnés dans les deux sens à partir de la dernière base commune. `BDD_APP` reste
   provisoirement maître du catalogue tant que ses colonnes de référentiel utilisent `IMPORTRANGE`.
 
 Un domaine Cloudflare n’est pas nécessaire : le front GitHub Pages peut appeler l’URL `workers.dev` du

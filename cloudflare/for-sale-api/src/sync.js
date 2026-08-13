@@ -20,13 +20,11 @@ export async function catalogContentHash(rows) {
 }
 
 export function canonicalInventoryPayload(rows) {
-  return rows.map((row) => JSON.stringify([
-    cleanText(row.sourceId),
+  return aggregateInventoryRows(rows).map((row) => JSON.stringify([
     cleanText(row.itemName),
     cleanNumber(row.quantity),
     cleanNullableNumber(row.valuePed),
-    cleanText(row.container),
-    cleanText(row.containerRefId)
+    cleanText(row.container)
   ])).sort().join("\n");
 }
 
@@ -67,6 +65,64 @@ export function mergeMarketRows(currentRows, incomingRows) {
       sensitivity: "base"
     }))
     .map((row, index) => ({ ...row, lineNo: index + 2 }));
+}
+
+export function aggregateInventoryRows(rows) {
+  const grouped = new Map();
+  for (const row of rows) {
+    const key = inventoryRowKey(row);
+    const existing = grouped.get(key);
+    const quantity = Number(row.quantity);
+    const valuePed = cleanOptionalNumber(row.valuePed);
+    if (!existing) {
+      grouped.set(key, {
+        lineNo: Number(row.lineNo || 0),
+        sourceId: null,
+        itemName: cleanText(row.itemName),
+        quantity: Number.isFinite(quantity) ? quantity : 0,
+        valuePed,
+        container: cleanText(row.container) || null,
+        containerRefId: null,
+        rowKey: key
+      });
+      continue;
+    }
+    existing.quantity += Number.isFinite(quantity) ? quantity : 0;
+    if (valuePed !== null) existing.valuePed = (existing.valuePed || 0) + valuePed;
+    existing.lineNo = Math.min(existing.lineNo || Number.MAX_SAFE_INTEGER, Number(row.lineNo || 0));
+  }
+  return [...grouped.values()]
+    .sort((left, right) => left.rowKey.localeCompare(right.rowKey, "en"))
+    .map((row, index) => ({ ...row, lineNo: index + 2 }));
+}
+
+export function inventoryRowsWithKeys(rows) {
+  return aggregateInventoryRows(rows);
+}
+
+export function inventoryRowKey(row) {
+  return `inventory:${[
+    cleanText(row.itemName).toLocaleLowerCase("en-US"),
+    cleanText(row.container).toLocaleLowerCase("en-US")
+  ].join("\u001f")}`;
+}
+
+export function marketRowKey(row) {
+  return `item:${cleanText(row.itemName).toLocaleLowerCase("en-US")}`;
+}
+
+export function catalogRowsWithKeys(rows) {
+  const occurrences = new Map();
+  return rows.map((row) => {
+    const baseKey = `listing:${[
+      cleanText(row.itemName).toLocaleLowerCase("en-US"),
+      cleanText(row.storage).toLocaleLowerCase("en-US"),
+      cleanText(row.aisle).toLocaleLowerCase("en-US")
+    ].join("|")}`;
+    const occurrence = (occurrences.get(baseKey) || 0) + 1;
+    occurrences.set(baseKey, occurrence);
+    return { ...row, rowKey: `${baseKey}#${occurrence}` };
+  });
 }
 
 export function normalizeSyncTimestamp(value, fallback = new Date().toISOString()) {
@@ -143,6 +199,12 @@ function cleanNullableNumber(value) {
   if (value === null || value === undefined || String(value).trim() === "") return "";
   const number = Number(value);
   return Number.isFinite(number) ? String(number) : "";
+}
+
+function cleanOptionalNumber(value) {
+  if (value === null || value === undefined || String(value).trim() === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
 }
 
 function cleanTimestamp(value) {

@@ -706,11 +706,40 @@ function frjThreeWayMerge_(dataset, baseRows, localRows, remoteRows, conflictWin
     var localSignature = frjRowSignature_(dataset, localRow);
     var remoteSignature = frjRowSignature_(dataset, remoteRow);
 
-    if (localSignature === remoteSignature) return localRow;
+    if (localSignature === remoteSignature) {
+      if (dataset.indexOf("inventory:") === 0 && !baseRow && localRow && remoteRow) {
+        return frjMergeInventoryQuantities_(baseRow, localRow, remoteRow, conflictWinner);
+      }
+      return localRow;
+    }
     if (localSignature === baseSignature) return remoteRow;
     if (remoteSignature === baseSignature) return localRow;
+    if (dataset.indexOf("inventory:") === 0 && localRow && remoteRow) {
+      return frjMergeInventoryQuantities_(baseRow, localRow, remoteRow, conflictWinner);
+    }
     return conflictWinner === "local" ? localRow : remoteRow;
   }).filter(function(row) { return row !== undefined; });
+}
+
+function frjMergeInventoryQuantities_(baseRow, localRow, remoteRow, conflictWinner) {
+  var winner = conflictWinner === "local" ? localRow : remoteRow;
+  var baseQuantity = baseRow ? Number(baseRow.quantity) || 0 : 0;
+  var baseValue = baseRow && baseRow.valuePed !== null && baseRow.valuePed !== undefined
+    ? Number(baseRow.valuePed) || 0
+    : 0;
+  var localHasValue = localRow.valuePed !== null && localRow.valuePed !== undefined;
+  var remoteHasValue = remoteRow.valuePed !== null && remoteRow.valuePed !== undefined;
+  var baseHasValue = Boolean(baseRow && baseRow.valuePed !== null && baseRow.valuePed !== undefined);
+  return {
+    sourceId: null,
+    itemName: winner.itemName,
+    quantity: (Number(localRow.quantity) || 0) + (Number(remoteRow.quantity) || 0) - baseQuantity,
+    valuePed: localHasValue || remoteHasValue || baseHasValue
+      ? (Number(localRow.valuePed) || 0) + (Number(remoteRow.valuePed) || 0) - baseValue
+      : null,
+    container: winner.container || null,
+    containerRefId: null
+  };
 }
 
 function frjRowsByStableKey_(dataset, rows) {
@@ -726,14 +755,11 @@ function frjRowsByStableKey_(dataset, rows) {
         frjText_(row.storage).toLowerCase(),
         frjText_(row.aisle).toLowerCase()
       ].join("|");
-    } else if (frjText_(row.sourceId)) {
-      baseKey = "id:" + frjText_(row.sourceId);
     } else {
-      baseKey = "fallback:" + [
+      baseKey = "inventory:" + [
         frjText_(row.itemName).toLowerCase(),
-        frjText_(row.container).toLowerCase(),
-        frjText_(row.containerRefId)
-      ].join("|");
+        frjText_(row.container).toLowerCase()
+      ].join("\u001f");
     }
     occurrences[baseKey] = (occurrences[baseKey] || 0) + 1;
     result[baseKey + "#" + occurrences[baseKey]] = row;
@@ -762,8 +788,8 @@ function frjRowSignature_(dataset, row) {
     ]);
   }
   return JSON.stringify([
-    frjText_(row.sourceId), frjText_(row.itemName), frjNumber_(row.quantity),
-    frjNullableNumberText_(row.valuePed), frjText_(row.container), frjText_(row.containerRefId)
+    frjText_(row.itemName), frjNumber_(row.quantity),
+    frjNullableNumberText_(row.valuePed), frjText_(row.container)
   ]);
 }
 
@@ -791,6 +817,7 @@ function frjReadLocalInventory_(avatar) {
   }
 
   if (!rows.length) throw new Error("Inventaire local vide : " + sheetName);
+  rows = frjAggregateInventoryRows_(rows);
   var updatedAt = frjToIso_(values[0][1], "1970-01-01T00:00:00.000Z");
   return { rows: rows, hash: frjHashInventory_(rows), updatedAt: updatedAt };
 }
@@ -917,13 +944,39 @@ function frjHashDataset_(dataset, rows) {
 }
 
 function frjHashInventory_(rows) {
-  var payload = rows.map(function(row) {
+  var payload = frjAggregateInventoryRows_(rows).map(function(row) {
     return JSON.stringify([
-      frjText_(row.sourceId), frjText_(row.itemName), frjNumber_(row.quantity),
-      frjNullableNumberText_(row.valuePed), frjText_(row.container), frjText_(row.containerRefId)
+      frjText_(row.itemName), frjNumber_(row.quantity),
+      frjNullableNumberText_(row.valuePed), frjText_(row.container)
     ]);
   }).sort().join("\n");
   return frjSha256_(payload);
+}
+
+function frjAggregateInventoryRows_(rows) {
+  var grouped = {};
+  rows.forEach(function(row) {
+    var key = "inventory:" + [
+      frjText_(row.itemName).toLowerCase(),
+      frjText_(row.container).toLowerCase()
+    ].join("\u001f");
+    var quantity = Number(row.quantity);
+    var valuePed = frjNullableNumber_(row.valuePed);
+    if (!grouped[key]) {
+      grouped[key] = {
+        sourceId: null,
+        itemName: frjText_(row.itemName),
+        quantity: isFinite(quantity) ? quantity : 0,
+        valuePed: valuePed,
+        container: frjNullableText_(row.container),
+        containerRefId: null
+      };
+      return;
+    }
+    grouped[key].quantity += isFinite(quantity) ? quantity : 0;
+    if (valuePed !== null) grouped[key].valuePed = (grouped[key].valuePed || 0) + valuePed;
+  });
+  return Object.keys(grouped).sort().map(function(key) { return grouped[key]; });
 }
 
 function frjHashMarket_(rows) {
@@ -1019,6 +1072,10 @@ function frjGetBaseHash_(dataset) {
 }
 
 function frjSetBaseHash_(dataset, hash) {
+  frjD1Request_("/sync/ack", {
+    method: "post",
+    payload: JSON.stringify({ dataset: dataset, hash: hash })
+  });
   PropertiesService.getScriptProperties().setProperty(FRJ_SYNC_CONFIG.basePropertyPrefix + dataset, hash);
 }
 

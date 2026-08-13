@@ -1,10 +1,13 @@
 import { computeWeightedMarkup, normalizeInventoryRows, normalizeMarketRows } from "./domain.js";
 import {
   catalogContentHash,
+  catalogRowsWithKeys,
   inventoryContentHash,
+  inventoryRowsWithKeys,
   mapCatalogDbRow,
   mapInventoryDbRow,
   mapMarketDbRow,
+  marketRowKey,
   marketContentHash,
   mergeMarketRows,
   normalizeSyncTimestamp
@@ -12,7 +15,6 @@ import {
 
 const MAX_IMPORT_BYTES = 1_800_000;
 const MAX_OBSERVATION_BYTES = 2_200_000;
-const INVENTORY_RETENTION_COUNT = 5;
 const SYNC_AUDIT_RETENTION_COUNT = 500;
 
 const PUBLIC_ORIGINS = new Set([
@@ -115,9 +117,8 @@ async function handleGet(url, env) {
       SELECT l.storage
       FROM catalog_listings l
       JOIN catalog_items c ON c.name = l.item_name COLLATE NOCASE
-      JOIN active_inventory ai ON ai.avatar_id = 'enzo'
-      JOIN inventory_items ii
-        ON ii.import_id = ai.import_id
+      JOIN inventory_current ii
+        ON ii.avatar_id = 'enzo'
        AND ii.item_name = c.name COLLATE NOCASE
       WHERE l.enabled = 1
         AND l.storage <> ''
@@ -132,10 +133,9 @@ async function handleGet(url, env) {
 
   if (action === "inventoryDate") {
     const row = await env.DB.prepare(`
-      SELECT i.imported_at
-      FROM active_inventory a
-      JOIN inventory_imports i ON i.id = a.import_id
-      WHERE a.avatar_id = 'enzo'
+      SELECT source_updated_at AS imported_at
+      FROM sync_state
+      WHERE dataset_key = 'inventory:enzo'
     `).first();
     return publicJson({ inventoryDate: row ? formatInventoryDate(row.imported_at) : "" });
   }
@@ -151,9 +151,8 @@ async function handleGet(url, env) {
   const result = await env.DB.prepare(`
     WITH inventory AS (
       SELECT ii.item_name, SUM(ii.quantity) AS quantity
-      FROM inventory_items ii
-      JOIN active_inventory ai ON ai.import_id = ii.import_id
-      WHERE ai.avatar_id = 'enzo'
+      FROM inventory_current ii
+      WHERE ii.avatar_id = 'enzo'
         AND ${SALEABLE_CONTAINER_SQL}
       GROUP BY ii.item_name COLLATE NOCASE
     ),
@@ -162,8 +161,7 @@ async function handleGet(url, env) {
         mo.item_name,
         mo.weighted_display,
         mo.observed_at
-      FROM market_observations mo
-      JOIN active_market_import ami ON ami.import_id = mo.import_id
+      FROM market_current mo
       WHERE datetime(mo.observed_at) >= datetime('now', '-7 days')
     )
     SELECT
@@ -343,18 +341,37 @@ async function handlePost(request, url, env) {
 
     const rows = parseImport(() => normalizeInventoryRows(body));
     if (rows.length === 0) return json({ error: "Inventaire vide" }, 400);
+    const datasetKey = inventoryDatasetKey(avatar);
+    const rawChecksum = await sha256(body);
+    if (await isRepeatedRawImport(env, datasetKey, rawChecksum)) {
+      const currentState = await readSyncState(env, datasetKey);
+      return legacyText(
+        `✅ Import inventaire déjà traité dans ${AVATAR_SHEETS[avatar]} (${rows.length + 1} lignes, 0 écriture D1)`,
+        currentState?.importId || "unchanged"
+      );
+    }
+    const contentHash = await inventoryContentHash(rows);
+    const currentState = await readSyncState(env, datasetKey);
+    if (currentState?.hash === contentHash) {
+      return legacyText(
+        `✅ Import inventaire identique dans ${AVATAR_SHEETS[avatar]} (${rows.length + 1} lignes, 0 écriture D1)`,
+        currentState.importId
+      );
+    }
     const result = await storeInventorySnapshot(env, {
       avatar,
       rows,
-      rawChecksum: await sha256(body),
+      rawChecksum,
       sourceOrigin: "d1",
-      sourceUpdatedAt: new Date().toISOString()
+      sourceUpdatedAt: new Date().toISOString(),
+      contentHash
     });
     await notifyGasDataChanged(env, `inventory:${avatar}`, "import-d1-inventory");
 
     return legacyText(
       `✅ Import inventaire OK dans ${AVATAR_SHEETS[avatar]} (${rows.length + 1} lignes)`,
-      result.importId
+      result.importId,
+      result.rowsWritten
     );
   }
 
@@ -362,21 +379,32 @@ async function handlePost(request, url, env) {
     const observedAt = new Date().toISOString();
     const incomingRows = parseImport(() => normalizeMarketRows(body, observedAt));
     if (incomingRows.length === 0) return json({ error: "Import MU vide" }, 400);
+    const rawChecksum = await sha256(body);
+    if (await isRepeatedRawImport(env, "mu", rawChecksum)) {
+      const currentState = await readSyncState(env, "mu");
+      return legacyText(`Import MU déjà traité (0 écriture D1)`, currentState?.importId || "unchanged");
+    }
 
     const currentRows = (await readMarketSnapshot(env)).rows;
     const existingItems = new Set(currentRows.map((row) => row.itemName.toLocaleLowerCase("en-US")));
     const rows = mergeMarketRows(currentRows, incomingRows);
     const updates = incomingRows.filter((row) => existingItems.has(row.itemName.toLocaleLowerCase("en-US"))).length;
     const inserts = incomingRows.length - updates;
+    const contentHash = await marketContentHash(rows);
+    const currentState = await readSyncState(env, "mu");
+    if (currentState?.hash === contentHash) {
+      return legacyText(`${updates} MAJ / ${inserts} AJOUTS (données identiques, 0 écriture D1)`, currentState.importId);
+    }
     const result = await storeMarketSnapshot(env, {
       rows,
-      rawChecksum: await sha256(body),
+      rawChecksum,
       sourceOrigin: "d1",
-      sourceUpdatedAt: observedAt
+      sourceUpdatedAt: observedAt,
+      contentHash
     });
     await notifyGasDataChanged(env, "mu", "import-d1-mu");
 
-    return legacyText(`${updates} MAJ / ${inserts} AJOUTS`, result.importId);
+    return legacyText(`${updates} MAJ / ${inserts} AJOUTS`, result.importId, result.rowsWritten);
   }
 
   return json({ error: `Type inconnu : ${type || "absent"}` }, 400);
@@ -476,7 +504,7 @@ async function handleSyncPost(request, url, env) {
       sourceUpdatedAt,
       contentHash
     });
-    return json({ ok: true, noChange: false, state: result.state });
+    return json({ ok: true, noChange: false, state: result.state, rowsWritten: result.rowsWritten });
   }
 
   if (url.pathname === "/sync/mu") {
@@ -499,7 +527,7 @@ async function handleSyncPost(request, url, env) {
       sourceUpdatedAt,
       contentHash
     });
-    return json({ ok: true, noChange: false, state: result.state });
+    return json({ ok: true, noChange: false, state: result.state, rowsWritten: result.rowsWritten });
   }
 
   if (url.pathname === "/sync/catalog") {
@@ -521,7 +549,20 @@ async function handleSyncPost(request, url, env) {
       sourceUpdatedAt,
       contentHash
     });
-    return json({ ok: true, noChange: false, state: result.state });
+    return json({ ok: true, noChange: false, state: result.state, rowsWritten: result.rowsWritten });
+  }
+
+  if (url.pathname === "/sync/ack") {
+    const datasetKey = String(payload.dataset || "").trim();
+    const acknowledgedHash = String(payload.hash || "").trim().toLowerCase();
+    if (!SYNC_DATASETS.has(datasetKey)) throw new ApiError(400, `Dataset inconnu : ${datasetKey || "absent"}`);
+    if (!acknowledgedHash) throw new ApiError(400, "Empreinte reconnue absente");
+    const current = await readCurrentDatasetSnapshot(env, datasetKey);
+    if (!current.state || current.state.hash !== acknowledgedHash) {
+      throw new ApiError(409, `Le dataset ${datasetKey} a changé avant reconnaissance`);
+    }
+    const result = await baselineStatement(env, current.state, current.rows).run();
+    return json({ ok: true, noChange: Number(result.meta?.rows_written || 0) === 0, rowsWritten: Number(result.meta?.rows_written || 0) });
   }
 
   if (url.pathname === "/sync/audit") {
@@ -554,30 +595,25 @@ async function storeInventorySnapshot(env, options) {
   const contentHash = options.contentHash || await inventoryContentHash(options.rows);
   const sourceUpdatedAt = normalizeSyncTimestamp(options.sourceUpdatedAt, importedAt);
   const datasetKey = inventoryDatasetKey(options.avatar);
-  const payload = JSON.stringify(options.rows);
+  const consolidatedRows = inventoryRowsWithKeys(options.rows);
+  const payload = JSON.stringify(consolidatedRows);
 
-  await env.DB.batch([
+  const dataResults = await env.DB.batch([
     env.DB.prepare(`
-      INSERT INTO inventory_imports (
-        id, avatar_id, imported_at, source_row_count, checksum,
-        content_checksum, source_updated_at, source_origin
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      importId,
-      options.avatar,
-      importedAt,
-      options.rows.length,
-      options.rawChecksum,
-      contentHash,
-      sourceUpdatedAt,
-      options.sourceOrigin
-    ),
+      DELETE FROM inventory_current
+      WHERE avatar_id = ?
+        AND row_key NOT IN (
+          SELECT json_extract(value, '$.rowKey') FROM json_each(?)
+        )
+    `).bind(options.avatar, payload),
     env.DB.prepare(`
-      INSERT INTO inventory_items (
-        import_id, line_no, source_id, item_name, quantity, value_ped, container, container_ref_id
+      INSERT INTO inventory_current (
+        avatar_id, row_key, line_no, source_id, item_name, quantity,
+        value_ped, container, container_ref_id
       )
       SELECT
         ?,
+        json_extract(value, '$.rowKey'),
         CAST(json_extract(value, '$.lineNo') AS INTEGER),
         json_extract(value, '$.sourceId'),
         json_extract(value, '$.itemName'),
@@ -586,46 +622,44 @@ async function storeInventorySnapshot(env, options) {
         json_extract(value, '$.container'),
         json_extract(value, '$.containerRefId')
       FROM json_each(?)
-    `).bind(importId, payload),
-    env.DB.prepare(`
-      INSERT INTO active_inventory (avatar_id, import_id) VALUES (?, ?)
-      ON CONFLICT (avatar_id) DO UPDATE SET import_id = excluded.import_id
-    `).bind(options.avatar, importId),
+      WHERE true
+      ON CONFLICT (avatar_id, row_key) DO UPDATE SET
+        source_id = excluded.source_id,
+        item_name = excluded.item_name,
+        quantity = excluded.quantity,
+        value_ped = excluded.value_ped,
+        container = excluded.container,
+        container_ref_id = excluded.container_ref_id
+      WHERE inventory_current.source_id IS NOT excluded.source_id
+         OR inventory_current.item_name IS NOT excluded.item_name
+         OR inventory_current.quantity IS NOT excluded.quantity
+         OR inventory_current.value_ped IS NOT excluded.value_ped
+         OR inventory_current.container IS NOT excluded.container
+         OR inventory_current.container_ref_id IS NOT excluded.container_ref_id
+    `).bind(options.avatar, payload),
     syncStateStatement(env, {
       datasetKey,
       hash: contentHash,
       updatedAt: sourceUpdatedAt,
       origin: options.sourceOrigin,
       importId,
-      rowCount: options.rows.length
+      rowCount: consolidatedRows.length
     }),
+    importGuardStatement(env, datasetKey, options.rawChecksum)
+  ]);
+  const dataRowsWritten = sumRowsWritten(dataResults);
+  const auditResults = await env.DB.batch([
     env.DB.prepare(`
       INSERT INTO sync_audit (
         dataset_key, direction, action, source_checksum, target_checksum, details
-      ) VALUES (?, ?, 'snapshot-imported', ?, ?, ?)
+      ) VALUES (?, ?, 'current-updated', ?, ?, ?)
     `).bind(
       datasetKey,
       options.sourceOrigin === "gas" ? "gas-to-d1" : "d1-local",
       contentHash,
       contentHash,
-      JSON.stringify({ importId, rows: options.rows.length })
+      JSON.stringify({ importId, rows: consolidatedRows.length, rowsWritten: dataRowsWritten })
     ),
-    env.DB.prepare(`
-      DELETE FROM inventory_imports
-      WHERE avatar_id = ?
-        AND id NOT IN (
-          SELECT id
-          FROM inventory_imports
-          WHERE avatar_id = ?
-          ORDER BY datetime(imported_at) DESC, created_at DESC, id DESC
-          LIMIT ?
-        )
-        AND id NOT IN (
-          SELECT import_id
-          FROM active_inventory
-          WHERE avatar_id = ?
-        )
-    `).bind(options.avatar, options.avatar, INVENTORY_RETENTION_COUNT, options.avatar),
     syncAuditRetentionStatement(env, datasetKey)
   ]);
 
@@ -637,8 +671,9 @@ async function storeInventorySnapshot(env, options) {
       updatedAt: sourceUpdatedAt,
       origin: options.sourceOrigin,
       importId,
-      rowCount: options.rows.length
-    }
+      rowCount: consolidatedRows.length
+    },
+    rowsWritten: dataRowsWritten + sumRowsWritten(auditResults)
   };
 }
 
@@ -647,33 +682,26 @@ async function storeMarketSnapshot(env, options) {
   const importId = crypto.randomUUID();
   const contentHash = options.contentHash || await marketContentHash(options.rows);
   const sourceUpdatedAt = normalizeSyncTimestamp(options.sourceUpdatedAt, importedAt);
-  const payload = JSON.stringify(options.rows);
+  const keyedRows = options.rows.map((row) => ({ ...row, itemKey: marketRowKey(row) }));
+  const payload = JSON.stringify(keyedRows);
 
-  await env.DB.batch([
+  const dataResults = await env.DB.batch([
     env.DB.prepare(`
-      INSERT INTO market_imports (
-        id, imported_at, source_row_count, checksum,
-        content_checksum, source_updated_at, source_origin
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      importId,
-      importedAt,
-      options.rows.length,
-      options.rawChecksum,
-      contentHash,
-      sourceUpdatedAt,
-      options.sourceOrigin
-    ),
+      DELETE FROM market_current
+      WHERE item_key NOT IN (
+        SELECT json_extract(value, '$.itemKey') FROM json_each(?)
+      )
+    `).bind(payload),
     env.DB.prepare(`
-      INSERT INTO market_observations (
-        import_id, line_no, item_name, tier,
+      INSERT INTO market_current (
+        item_key, line_no, item_name, tier,
         day_markup, day_sales, week_markup, week_sales,
         month_markup, month_sales, year_markup, year_sales,
         decade_markup, decade_sales,
         weighted_kind, weighted_value, weighted_display, observed_at
       )
       SELECT
-        ?,
+        json_extract(value, '$.itemKey'),
         CAST(json_extract(value, '$.lineNo') AS INTEGER),
         json_extract(value, '$.itemName'),
         json_extract(value, '$.tier'),
@@ -692,11 +720,38 @@ async function storeMarketSnapshot(env, options) {
         json_extract(value, '$.weightedDisplay'),
         json_extract(value, '$.observedAt')
       FROM json_each(?)
-    `).bind(importId, payload),
-    env.DB.prepare(`
-      INSERT INTO active_market_import (singleton, import_id) VALUES (1, ?)
-      ON CONFLICT (singleton) DO UPDATE SET import_id = excluded.import_id
-    `).bind(importId),
+      WHERE true
+      ON CONFLICT (item_key) DO UPDATE SET
+        item_name = excluded.item_name,
+        tier = excluded.tier,
+        day_markup = excluded.day_markup,
+        day_sales = excluded.day_sales,
+        week_markup = excluded.week_markup,
+        week_sales = excluded.week_sales,
+        month_markup = excluded.month_markup,
+        month_sales = excluded.month_sales,
+        year_markup = excluded.year_markup,
+        year_sales = excluded.year_sales,
+        decade_markup = excluded.decade_markup,
+        decade_sales = excluded.decade_sales,
+        weighted_kind = excluded.weighted_kind,
+        weighted_value = excluded.weighted_value,
+        weighted_display = excluded.weighted_display,
+        observed_at = excluded.observed_at
+      WHERE market_current.item_name IS NOT excluded.item_name
+         OR market_current.tier IS NOT excluded.tier
+         OR market_current.day_markup IS NOT excluded.day_markup
+         OR market_current.day_sales IS NOT excluded.day_sales
+         OR market_current.week_markup IS NOT excluded.week_markup
+         OR market_current.week_sales IS NOT excluded.week_sales
+         OR market_current.month_markup IS NOT excluded.month_markup
+         OR market_current.month_sales IS NOT excluded.month_sales
+         OR market_current.year_markup IS NOT excluded.year_markup
+         OR market_current.year_sales IS NOT excluded.year_sales
+         OR market_current.decade_markup IS NOT excluded.decade_markup
+         OR market_current.decade_sales IS NOT excluded.decade_sales
+         OR market_current.observed_at IS NOT excluded.observed_at
+    `).bind(payload),
     syncStateStatement(env, {
       datasetKey: "mu",
       hash: contentHash,
@@ -705,25 +760,20 @@ async function storeMarketSnapshot(env, options) {
       importId,
       rowCount: options.rows.length
     }),
+    importGuardStatement(env, "mu", options.rawChecksum)
+  ]);
+  const dataRowsWritten = sumRowsWritten(dataResults);
+  const auditResults = await env.DB.batch([
     env.DB.prepare(`
       INSERT INTO sync_audit (
         dataset_key, direction, action, source_checksum, target_checksum, details
-      ) VALUES ('mu', ?, 'snapshot-imported', ?, ?, ?)
+      ) VALUES ('mu', ?, 'current-updated', ?, ?, ?)
     `).bind(
       options.sourceOrigin === "gas" ? "gas-to-d1" : "d1-local",
       contentHash,
       contentHash,
-      JSON.stringify({ importId, rows: options.rows.length })
+      JSON.stringify({ importId, rows: options.rows.length, rowsWritten: dataRowsWritten })
     ),
-    env.DB.prepare(`
-      DELETE FROM market_imports
-      WHERE id NOT IN (
-        SELECT id FROM market_imports
-        ORDER BY datetime(imported_at) DESC, created_at DESC, id DESC
-        LIMIT ?
-      )
-        AND id NOT IN (SELECT import_id FROM active_market_import WHERE singleton = 1)
-    `).bind(INVENTORY_RETENTION_COUNT),
     syncAuditRetentionStatement(env, "mu")
   ]);
 
@@ -736,7 +786,8 @@ async function storeMarketSnapshot(env, options) {
       origin: options.sourceOrigin,
       importId,
       rowCount: options.rows.length
-    }
+    },
+    rowsWritten: dataRowsWritten + sumRowsWritten(auditResults)
   };
 }
 
@@ -745,33 +796,48 @@ async function storeCatalogSnapshot(env, options) {
   const importId = crypto.randomUUID();
   const contentHash = options.contentHash || await catalogContentHash(options.rows);
   const sourceUpdatedAt = normalizeSyncTimestamp(options.sourceUpdatedAt, importedAt);
-  const payload = JSON.stringify(options.rows);
+  const payload = JSON.stringify(catalogRowsWithKeys(options.rows));
 
-  await env.DB.batch([
+  const dataResults = await env.DB.batch([
     env.DB.prepare(`
-      INSERT INTO catalog_imports (
-        id, imported_at, source_row_count, content_checksum, source_updated_at, source_origin
-      ) VALUES (?, ?, ?, ?, ?, ?)
-    `).bind(importId, importedAt, options.rows.length, contentHash, sourceUpdatedAt, options.sourceOrigin),
+      DELETE FROM catalog_current
+      WHERE row_key NOT IN (
+        SELECT json_extract(value, '$.rowKey') FROM json_each(?)
+      )
+    `).bind(payload),
     env.DB.prepare(`
-      INSERT INTO catalog_snapshot_rows (
-        import_id, line_no, item_name, storage, aisle,
+      INSERT INTO catalog_current (
+        row_key, line_no, item_name, storage, aisle,
         unit_price_ped, image, wiki_url, enabled
       )
       SELECT
-        ?, CAST(json_extract(value, '$.lineNo') AS INTEGER),
-        json_extract(value, '$.itemName'), json_extract(value, '$.storage'),
-        json_extract(value, '$.aisle'), CAST(json_extract(value, '$.unitPricePed') AS REAL),
-        json_extract(value, '$.image'), json_extract(value, '$.wikiUrl'),
+        json_extract(value, '$.rowKey'),
+        CAST(json_extract(value, '$.lineNo') AS INTEGER),
+        json_extract(value, '$.itemName'),
+        upper(trim(json_extract(value, '$.storage'))),
+        upper(trim(json_extract(value, '$.aisle'))),
+        CAST(json_extract(value, '$.unitPricePed') AS REAL),
+        json_extract(value, '$.image'),
+        json_extract(value, '$.wikiUrl'),
         CAST(json_extract(value, '$.enabled') AS INTEGER)
       FROM json_each(?)
-    `).bind(importId, payload),
-    env.DB.prepare(`
-      INSERT INTO active_catalog_import (singleton, import_id) VALUES (1, ?)
-      ON CONFLICT (singleton) DO UPDATE SET import_id = excluded.import_id
-    `).bind(importId),
-    env.DB.prepare("DELETE FROM catalog_listings"),
-    env.DB.prepare("DELETE FROM catalog_items"),
+      WHERE true
+      ON CONFLICT (row_key) DO UPDATE SET
+        item_name = excluded.item_name,
+        storage = excluded.storage,
+        aisle = excluded.aisle,
+        unit_price_ped = excluded.unit_price_ped,
+        image = excluded.image,
+        wiki_url = excluded.wiki_url,
+        enabled = excluded.enabled
+      WHERE catalog_current.item_name IS NOT excluded.item_name
+         OR catalog_current.storage IS NOT excluded.storage
+         OR catalog_current.aisle IS NOT excluded.aisle
+         OR catalog_current.unit_price_ped IS NOT excluded.unit_price_ped
+         OR catalog_current.image IS NOT excluded.image
+         OR catalog_current.wiki_url IS NOT excluded.wiki_url
+         OR catalog_current.enabled IS NOT excluded.enabled
+    `).bind(payload),
     env.DB.prepare(`
       INSERT INTO catalog_items (name, unit_price_ped, image, wiki_url, created_at, updated_at)
       SELECT
@@ -784,6 +850,14 @@ async function storeCatalogSnapshot(env, options) {
       FROM json_each(?)
       WHERE trim(json_extract(value, '$.itemName')) <> ''
       GROUP BY json_extract(value, '$.itemName') COLLATE NOCASE
+      ON CONFLICT (name) DO UPDATE SET
+        unit_price_ped = excluded.unit_price_ped,
+        image = excluded.image,
+        wiki_url = excluded.wiki_url,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE catalog_items.unit_price_ped IS NOT excluded.unit_price_ped
+         OR catalog_items.image IS NOT excluded.image
+         OR catalog_items.wiki_url IS NOT excluded.wiki_url
     `).bind(payload),
     env.DB.prepare(`
       INSERT INTO catalog_listings (item_name, storage, aisle, enabled)
@@ -796,7 +870,26 @@ async function storeCatalogSnapshot(env, options) {
       WHERE trim(json_extract(value, '$.itemName')) <> ''
         AND trim(json_extract(value, '$.storage')) <> ''
         AND trim(json_extract(value, '$.aisle')) <> ''
+      ON CONFLICT (item_name, storage, aisle) DO UPDATE SET
+        enabled = excluded.enabled
+      WHERE catalog_listings.enabled IS NOT excluded.enabled
     `).bind(payload),
+    env.DB.prepare(`
+      DELETE FROM catalog_listings AS listing
+      WHERE NOT EXISTS (
+        SELECT 1 FROM json_each(?) incoming
+        WHERE lower(trim(json_extract(incoming.value, '$.itemName'))) = lower(listing.item_name)
+          AND upper(trim(json_extract(incoming.value, '$.storage'))) = listing.storage
+          AND upper(trim(json_extract(incoming.value, '$.aisle'))) = listing.aisle
+      )
+    `).bind(payload),
+    env.DB.prepare(`
+      DELETE FROM catalog_items
+      WHERE NOT EXISTS (
+        SELECT 1 FROM catalog_listings l
+        WHERE l.item_name = catalog_items.name COLLATE NOCASE
+      )
+    `),
     syncStateStatement(env, {
       datasetKey: "catalog",
       hash: contentHash,
@@ -804,26 +897,20 @@ async function storeCatalogSnapshot(env, options) {
       origin: options.sourceOrigin,
       importId,
       rowCount: options.rows.length
-    }),
+    })
+  ]);
+  const dataRowsWritten = sumRowsWritten(dataResults);
+  const auditResults = await env.DB.batch([
     env.DB.prepare(`
       INSERT INTO sync_audit (
         dataset_key, direction, action, source_checksum, target_checksum, details
-      ) VALUES ('catalog', ?, 'snapshot-imported', ?, ?, ?)
+      ) VALUES ('catalog', ?, 'current-updated', ?, ?, ?)
     `).bind(
       options.sourceOrigin === "gas" ? "gas-to-d1" : "d1-bootstrap",
       contentHash,
       contentHash,
-      JSON.stringify({ importId, rows: options.rows.length })
+      JSON.stringify({ importId, rows: options.rows.length, rowsWritten: dataRowsWritten })
     ),
-    env.DB.prepare(`
-      DELETE FROM catalog_imports
-      WHERE id NOT IN (
-        SELECT id FROM catalog_imports
-        ORDER BY datetime(imported_at) DESC, created_at DESC, id DESC
-        LIMIT ?
-      )
-        AND id NOT IN (SELECT import_id FROM active_catalog_import WHERE singleton = 1)
-    `).bind(INVENTORY_RETENTION_COUNT),
     syncAuditRetentionStatement(env, "catalog")
   ]);
 
@@ -836,93 +923,52 @@ async function storeCatalogSnapshot(env, options) {
       origin: options.sourceOrigin,
       importId,
       rowCount: options.rows.length
-    }
+    },
+    rowsWritten: dataRowsWritten + sumRowsWritten(auditResults)
   };
 }
 
 async function readInventorySnapshot(env, avatar, requestedHash = null) {
   const datasetKey = inventoryDatasetKey(avatar);
-  const metaStatement = requestedHash
-    ? env.DB.prepare(`
-        SELECT
-          i.id AS import_id, i.imported_at, i.content_checksum,
-          i.source_updated_at, i.source_origin, i.source_row_count,
-          NULL AS state_checksum, NULL AS state_updated_at, NULL AS state_origin
-        FROM inventory_imports i
-        WHERE i.avatar_id = ? AND i.content_checksum = ?
-        ORDER BY datetime(i.imported_at) DESC, i.id DESC
-        LIMIT 1
-      `).bind(avatar, requestedHash)
-    : env.DB.prepare(`
-        SELECT
-          i.id AS import_id, i.imported_at, i.content_checksum,
-          i.source_updated_at, i.source_origin, i.source_row_count,
-          s.content_checksum AS state_checksum,
-          s.source_updated_at AS state_updated_at,
-          s.source_origin AS state_origin
-        FROM active_inventory ai
-        JOIN inventory_imports i ON i.id = ai.import_id
-        LEFT JOIN sync_state s ON s.dataset_key = ?
-        WHERE ai.avatar_id = ?
-      `).bind(datasetKey, avatar);
-
-  const meta = await metaStatement.first();
-  if (!meta) return { state: null, rows: [] };
+  if (requestedHash) return readBaselineSnapshot(env, datasetKey, requestedHash);
+  let state = await readStoredSyncState(env, datasetKey);
   const rowsResult = await env.DB.prepare(`
     SELECT
       line_no, source_id, item_name, quantity,
       value_ped, container, container_ref_id
-    FROM inventory_items
-    WHERE import_id = ?
+    FROM inventory_current
+    WHERE avatar_id = ?
     ORDER BY line_no
-  `).bind(meta.import_id).all();
+  `).bind(avatar).all();
   const rows = rowsResult.results.map(mapInventoryDbRow);
-  const hash = meta.state_checksum || meta.content_checksum || await inventoryContentHash(rows);
-  const updatedAt = normalizeSyncTimestamp(meta.state_updated_at || meta.source_updated_at || meta.imported_at);
-  const origin = meta.state_origin || meta.source_origin || "d1";
-  const state = {
-    dataset: datasetKey,
-    hash,
-    updatedAt,
-    origin,
-    importId: meta.import_id,
-    rowCount: rows.length
-  };
-
-  if (!requestedHash && (!meta.state_checksum || !meta.content_checksum)) {
-    await persistDerivedSyncState(env, state, "inventory_imports");
+  if (!rows.length) return { state: null, rows: [] };
+  const actualHash = await inventoryContentHash(rows);
+  if (!state) state = await bootstrapCurrentState(env, datasetKey, rows, actualHash, "d1-seed");
+  if (state.hash !== actualHash || state.rowCount !== rows.length) {
+    state.hash = actualHash;
+    state.rowCount = rows.length;
+    await env.DB.batch([
+      syncStateStatement(env, {
+        datasetKey,
+        hash: actualHash,
+        updatedAt: state.updatedAt,
+        origin: state.origin,
+        importId: state.importId,
+        rowCount: rows.length
+      }),
+      env.DB.prepare(`
+        UPDATE sync_baseline
+        SET content_checksum = ?, row_count = ?, rows_json = ?, acknowledged_at = CURRENT_TIMESTAMP
+        WHERE dataset_key = ?
+      `).bind(actualHash, rows.length, JSON.stringify(rows), datasetKey)
+    ]);
   }
-
   return { state, rows };
 }
 
 async function readMarketSnapshot(env, requestedHash = null) {
-  const metaStatement = requestedHash
-    ? env.DB.prepare(`
-        SELECT
-          i.id AS import_id, i.imported_at, i.content_checksum,
-          i.source_updated_at, i.source_origin, i.source_row_count,
-          NULL AS state_checksum, NULL AS state_updated_at, NULL AS state_origin
-        FROM market_imports i
-        WHERE i.content_checksum = ?
-        ORDER BY datetime(i.imported_at) DESC, i.id DESC
-        LIMIT 1
-      `).bind(requestedHash)
-    : env.DB.prepare(`
-        SELECT
-          i.id AS import_id, i.imported_at, i.content_checksum,
-          i.source_updated_at, i.source_origin, i.source_row_count,
-          s.content_checksum AS state_checksum,
-          s.source_updated_at AS state_updated_at,
-          s.source_origin AS state_origin
-        FROM active_market_import ai
-        JOIN market_imports i ON i.id = ai.import_id
-        LEFT JOIN sync_state s ON s.dataset_key = 'mu'
-        WHERE ai.singleton = 1
-      `);
-
-  const meta = await metaStatement.first();
-  if (!meta) return { state: null, rows: [] };
+  if (requestedHash) return readBaselineSnapshot(env, "mu", requestedHash);
+  let state = await readStoredSyncState(env, "mu");
   const rowsResult = await env.DB.prepare(`
     SELECT
       line_no, item_name, tier,
@@ -930,88 +976,100 @@ async function readMarketSnapshot(env, requestedHash = null) {
       month_markup, month_sales, year_markup, year_sales,
       decade_markup, decade_sales,
       weighted_kind, weighted_value, weighted_display, observed_at
-    FROM market_observations
-    WHERE import_id = ?
+    FROM market_current
     ORDER BY line_no
-  `).bind(meta.import_id).all();
+  `).all();
   const rows = rowsResult.results.map(mapMarketDbRow);
-  const hash = meta.state_checksum || meta.content_checksum || await marketContentHash(rows);
-  const updatedAt = normalizeSyncTimestamp(meta.state_updated_at || meta.source_updated_at || meta.imported_at);
-  const origin = meta.state_origin || meta.source_origin || "d1";
-  const state = {
-    dataset: "mu",
-    hash,
-    updatedAt,
-    origin,
-    importId: meta.import_id,
-    rowCount: rows.length
-  };
-
-  if (!requestedHash && (!meta.state_checksum || !meta.content_checksum)) {
-    await persistDerivedSyncState(env, state, "market_imports");
+  if (!rows.length) return { state: null, rows: [] };
+  if (!state) {
+    const updatedAt = rows.reduce((latest, row) => frjLaterTimestamp(latest, row.observedAt), "");
+    state = await bootstrapCurrentState(env, "mu", rows, await marketContentHash(rows), "d1-seed", updatedAt);
   }
-
   return { state, rows };
 }
 
 async function readCatalogSnapshot(env, requestedHash = null) {
-  const metaStatement = requestedHash
-    ? env.DB.prepare(`
-        SELECT id AS import_id, content_checksum, source_updated_at, source_origin, source_row_count
-        FROM catalog_imports
-        WHERE content_checksum = ?
-        ORDER BY datetime(imported_at) DESC, id DESC
-        LIMIT 1
-      `).bind(requestedHash)
-    : env.DB.prepare(`
-        SELECT i.id AS import_id, i.content_checksum, i.source_updated_at, i.source_origin, i.source_row_count
-        FROM active_catalog_import ai
-        JOIN catalog_imports i ON i.id = ai.import_id
-        WHERE ai.singleton = 1
-      `);
-  const meta = await metaStatement.first();
-
-  if (!meta && !requestedHash) {
-    const current = await env.DB.prepare(`
-      SELECT
-        ROW_NUMBER() OVER (ORDER BY c.name COLLATE NOCASE, l.storage, l.aisle) + 1 AS line_no,
-        c.name AS item_name, l.storage, l.aisle,
-        c.unit_price_ped, c.image, c.wiki_url, l.enabled
-      FROM catalog_items c
-      JOIN catalog_listings l ON l.item_name = c.name COLLATE NOCASE
-      ORDER BY c.name COLLATE NOCASE, l.storage, l.aisle
-    `).all();
-    const rows = current.results.map(mapCatalogDbRow);
-    if (!rows.length) return { state: null, rows: [] };
-    const stored = await storeCatalogSnapshot(env, {
-      rows,
-      sourceOrigin: "d1",
-      sourceUpdatedAt: new Date().toISOString()
-    });
-    return { state: stored.state, rows };
-  }
-
-  if (!meta) return { state: null, rows: [] };
+  if (requestedHash) return readBaselineSnapshot(env, "catalog", requestedHash);
+  let state = await readStoredSyncState(env, "catalog");
   const rowsResult = await env.DB.prepare(`
     SELECT
       line_no, item_name, storage, aisle,
       unit_price_ped, image, wiki_url, enabled
-    FROM catalog_snapshot_rows
-    WHERE import_id = ?
+    FROM catalog_current
     ORDER BY line_no
-  `).bind(meta.import_id).all();
+  `).all();
   const rows = rowsResult.results.map(mapCatalogDbRow);
+  if (!rows.length) return { state: null, rows: [] };
+  if (!state) state = await bootstrapCurrentState(env, "catalog", rows, await catalogContentHash(rows), "d1-seed");
+  return { state, rows };
+}
+
+async function bootstrapCurrentState(env, datasetKey, rows, hash, origin, updatedAt = new Date().toISOString()) {
+  const state = {
+    dataset: datasetKey,
+    hash,
+    updatedAt: normalizeSyncTimestamp(updatedAt),
+    origin,
+    importId: `current:${crypto.randomUUID()}`,
+    rowCount: rows.length
+  };
+  await env.DB.batch([
+    syncStateStatement(env, {
+      datasetKey,
+      hash,
+      updatedAt: state.updatedAt,
+      origin,
+      importId: state.importId,
+      rowCount: rows.length
+    }),
+    baselineStatement(env, state, rows)
+  ]);
+  return state;
+}
+
+function frjLaterTimestamp(left, right) {
+  return !left || new Date(right).getTime() > new Date(left).getTime() ? right : left;
+}
+
+async function readBaselineSnapshot(env, datasetKey, requestedHash) {
+  const row = await env.DB.prepare(`
+    SELECT dataset_key, content_checksum, source_updated_at, row_count, rows_json
+    FROM sync_baseline
+    WHERE dataset_key = ? AND content_checksum = ?
+  `).bind(datasetKey, requestedHash).first();
+  if (!row) return { state: null, rows: [] };
+  let rows;
+  try {
+    rows = JSON.parse(row.rows_json);
+  } catch {
+    throw new ApiError(500, `Base commune invalide pour ${datasetKey}`);
+  }
   return {
     state: {
-      dataset: "catalog",
-      hash: meta.content_checksum,
-      updatedAt: normalizeSyncTimestamp(meta.source_updated_at),
-      origin: meta.source_origin,
-      importId: meta.import_id,
-      rowCount: rows.length
+      dataset: datasetKey,
+      hash: row.content_checksum,
+      updatedAt: normalizeSyncTimestamp(row.source_updated_at),
+      origin: "common-baseline",
+      importId: `baseline:${datasetKey}`,
+      rowCount: Number(row.row_count || rows.length)
     },
     rows
   };
+}
+
+async function readCurrentDatasetSnapshot(env, datasetKey) {
+  if (datasetKey === "catalog") return readCatalogSnapshot(env);
+  if (datasetKey === "mu") return readMarketSnapshot(env);
+  return readInventorySnapshot(env, datasetKey.slice("inventory:".length));
+}
+
+async function readStoredSyncState(env, datasetKey) {
+  const row = await env.DB.prepare(`
+    SELECT dataset_key, content_checksum, source_updated_at, source_origin, import_id, row_count
+    FROM sync_state
+    WHERE dataset_key = ?
+  `).bind(datasetKey).first();
+  return row ? mapSyncState(row) : null;
 }
 
 async function readAllSyncStates(env) {
@@ -1046,12 +1104,8 @@ async function readAllSyncStates(env) {
 }
 
 async function readSyncState(env, datasetKey) {
-  const row = await env.DB.prepare(`
-    SELECT dataset_key, content_checksum, source_updated_at, source_origin, import_id, row_count
-    FROM sync_state
-    WHERE dataset_key = ?
-  `).bind(datasetKey).first();
-  if (row) return mapSyncState(row);
+  const state = await readStoredSyncState(env, datasetKey);
+  if (state) return state;
 
   if (datasetKey === "mu") return (await readMarketSnapshot(env)).state;
   if (datasetKey === "catalog") return (await readCatalogSnapshot(env)).state;
@@ -1067,30 +1121,6 @@ async function assertExpectedHash(env, datasetKey, expectedHash) {
   if (!state || state.hash !== expectedHash) {
     throw new ApiError(409, `Le dataset ${datasetKey} a changé pendant la synchronisation`);
   }
-}
-
-async function persistDerivedSyncState(env, state, tableName) {
-  const updateSql = tableName === "inventory_imports"
-    ? `UPDATE inventory_imports
-       SET content_checksum = ?, source_updated_at = COALESCE(source_updated_at, ?),
-           source_origin = COALESCE(source_origin, ?)
-       WHERE id = ?`
-    : `UPDATE market_imports
-       SET content_checksum = ?, source_updated_at = COALESCE(source_updated_at, ?),
-           source_origin = COALESCE(source_origin, ?)
-       WHERE id = ?`;
-
-  await env.DB.batch([
-    env.DB.prepare(updateSql).bind(state.hash, state.updatedAt, state.origin, state.importId),
-    syncStateStatement(env, {
-      datasetKey: state.dataset,
-      hash: state.hash,
-      updatedAt: state.updatedAt,
-      origin: state.origin,
-      importId: state.importId,
-      rowCount: state.rowCount
-    })
-  ]);
 }
 
 function syncStateStatement(env, state) {
@@ -1126,6 +1156,48 @@ function syncAuditRetentionStatement(env, datasetKey) {
         LIMIT ?
       )
   `).bind(datasetKey, datasetKey, SYNC_AUDIT_RETENTION_COUNT);
+}
+
+function baselineStatement(env, state, rows) {
+  return env.DB.prepare(`
+    INSERT INTO sync_baseline (
+      dataset_key, content_checksum, source_updated_at, row_count, rows_json, acknowledged_at
+    ) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT (dataset_key) DO UPDATE SET
+      content_checksum = excluded.content_checksum,
+      source_updated_at = excluded.source_updated_at,
+      row_count = excluded.row_count,
+      rows_json = excluded.rows_json,
+      acknowledged_at = CURRENT_TIMESTAMP
+    WHERE sync_baseline.content_checksum IS NOT excluded.content_checksum
+       OR sync_baseline.row_count IS NOT excluded.row_count
+       OR sync_baseline.rows_json IS NOT excluded.rows_json
+  `).bind(state.dataset, state.hash, state.updatedAt, rows.length, JSON.stringify(rows));
+}
+
+async function isRepeatedRawImport(env, datasetKey, rawChecksum) {
+  const row = await env.DB.prepare(`
+    SELECT raw_checksum FROM import_guard WHERE dataset_key = ?
+  `).bind(datasetKey).first();
+  return Boolean(row?.raw_checksum && row.raw_checksum === rawChecksum);
+}
+
+function importGuardStatement(env, datasetKey, rawChecksum) {
+  return env.DB.prepare(`
+    INSERT INTO import_guard (dataset_key, raw_checksum, received_at)
+    VALUES (?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT (dataset_key) DO UPDATE SET
+      raw_checksum = excluded.raw_checksum,
+      received_at = CURRENT_TIMESTAMP
+    WHERE import_guard.raw_checksum IS NOT excluded.raw_checksum
+  `).bind(datasetKey, String(rawChecksum || ""));
+}
+
+function sumRowsWritten(results) {
+  return (Array.isArray(results) ? results : [results]).reduce(
+    (total, result) => total + Number(result?.meta?.rows_written || 0),
+    0
+  );
 }
 
 function normalizeSyncedInventoryRows(rows) {
@@ -1239,7 +1311,7 @@ async function handleAdminPost(request, url, env) {
     if (dataset.startsWith("inventory:")) {
       const avatar = dataset.slice("inventory:".length);
       if (!AVATAR_SHEETS[avatar]) throw new ApiError(400, `Dataset inconnu : ${dataset}`);
-      rows = parseImport(() => normalizeInventoryRows(raw));
+      rows = inventoryRowsWithKeys(parseImport(() => normalizeInventoryRows(raw)));
       hash = await inventoryContentHash(rows);
     } else if (dataset === "mu") {
       const incomingRows = parseImport(() => normalizeMarketRows(raw, observedAt));
@@ -1463,11 +1535,12 @@ function json(data, status = 200) {
   });
 }
 
-function legacyText(message, importId) {
+function legacyText(message, importId, rowsWritten = 0) {
   return new Response(message, {
     headers: {
       "Content-Type": "text/plain; charset=UTF-8",
-      "X-Import-Id": importId
+      "X-Import-Id": importId,
+      "X-D1-Rows-Written": String(rowsWritten)
     }
   });
 }
@@ -1489,6 +1562,7 @@ function corsPreflight(origin) {
 function withCors(response, origin) {
   if (PUBLIC_ORIGINS.has(origin)) {
     response.headers.set("Access-Control-Allow-Origin", origin);
+    response.headers.set("Access-Control-Expose-Headers", "X-Import-Id, X-D1-Rows-Written");
     response.headers.set("Vary", "Origin");
   }
   return response;

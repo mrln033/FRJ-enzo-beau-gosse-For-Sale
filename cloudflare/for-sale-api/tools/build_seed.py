@@ -100,7 +100,7 @@ def sql(value):
     return "'" + str(value).replace("'", "''") + "'"
 
 
-def insert_statements(table, columns, records, prefix="INSERT OR REPLACE", max_chars=80_000):
+def insert_statements(table, columns, records, prefix="INSERT OR REPLACE", max_chars=10_000):
     header = f"{prefix} INTO {table} ({', '.join(columns)}) VALUES\n"
     statements = []
     current = []
@@ -123,7 +123,9 @@ inventories = read_xlsx(INVENTORY_XLSX)
 
 catalog_by_name = {}
 listings = {}
-for row in app["BDD_APP"][1:]:
+catalog_current = []
+catalog_occurrences = {}
+for line_no, row in enumerate(app["BDD_APP"][1:], start=2):
     name = text(row.get(3))
     if not name:
         continue
@@ -136,6 +138,12 @@ for row in app["BDD_APP"][1:]:
     storage = text(row.get(1)).upper()
     aisle = text(row.get(2)).upper()
     listings[(name.casefold(), storage, aisle)] = (name, storage, aisle, 1)
+    base_key = "listing:" + "|".join((name.lower(), storage.lower(), aisle.lower()))
+    catalog_occurrences[base_key] = catalog_occurrences.get(base_key, 0) + 1
+    catalog_current.append((
+        f"{base_key}#{catalog_occurrences[base_key]}", line_no, name, storage, aisle,
+        number(row.get(5)), text(row.get(6)) or None, text(row.get(7)) or None, 1,
+    ))
 
 avatar_sheets = {
     "enzo": "Inventaire Enzo",
@@ -146,6 +154,7 @@ avatar_sheets = {
 
 inventory_imports = []
 inventory_items = []
+inventory_current = []
 active_inventories = []
 inventory_counts = {}
 for avatar, sheet_name in avatar_sheets.items():
@@ -173,6 +182,17 @@ for avatar, sheet_name in avatar_sheets.items():
     inventory_items.extend(parsed)
     active_inventories.append((avatar, import_id))
     inventory_counts[avatar] = len(parsed)
+    grouped = {}
+    for parsed_row in parsed:
+        _, line_no, _, item_name, quantity, value_ped, container, _ = parsed_row
+        row_key = "inventory:" + "\x1f".join((item_name.lower(), text(container).lower()))
+        if row_key not in grouped:
+            grouped[row_key] = [avatar, row_key, line_no, None, item_name, quantity, value_ped, container, None]
+        else:
+            grouped[row_key][5] += quantity
+            if value_ped is not None:
+                grouped[row_key][6] = (grouped[row_key][6] or 0) + value_ped
+    inventory_current.extend(tuple(row) for row in grouped.values())
 
 market_rows = []
 for line_no, row in enumerate(app["MU_Pondérés"][1:], start=2):
@@ -214,6 +234,7 @@ for line_no, row in enumerate(app["MU_Pondérés"][1:], start=2):
 
 latest_market_date = max((row[-1] for row in market_rows), default=datetime.now(tz=ZoneInfo("UTC")).isoformat())
 market_checksum = hashlib.sha256(repr(market_rows).encode("utf-8")).hexdigest()
+market_current = [("item:" + row[2].lower(),) + row[1:] for row in market_rows]
 
 statements = [
     "PRAGMA foreign_keys = ON;",
@@ -228,33 +249,26 @@ statements = [
         list(listings.values()),
     ),
     *insert_statements(
-        "inventory_imports",
-        ["id", "avatar_id", "imported_at", "source_row_count", "checksum"],
-        inventory_imports,
+        "inventory_current",
+        ["avatar_id", "row_key", "line_no", "source_id", "item_name", "quantity", "value_ped", "container", "container_ref_id"],
+        inventory_current,
     ),
     *insert_statements(
-        "inventory_items",
-        ["import_id", "line_no", "source_id", "item_name", "quantity", "value_ped", "container", "container_ref_id"],
-        inventory_items,
-    ),
-    *insert_statements("active_inventory", ["avatar_id", "import_id"], active_inventories),
-    *insert_statements(
-        "market_imports",
-        ["id", "imported_at", "source_row_count", "checksum"],
-        [("snapshot-market", latest_market_date, len(market_rows), market_checksum)],
-    ),
-    *insert_statements(
-        "market_observations",
+        "market_current",
         [
-            "import_id", "line_no", "item_name", "tier",
+            "item_key", "line_no", "item_name", "tier",
             "day_markup", "day_sales", "week_markup", "week_sales",
             "month_markup", "month_sales", "year_markup", "year_sales",
             "decade_markup", "decade_sales", "weighted_kind", "weighted_value",
             "weighted_display", "observed_at",
         ],
-        market_rows,
+        market_current,
     ),
-    *insert_statements("active_market_import", ["singleton", "import_id"], [(1, "snapshot-market")]),
+    *insert_statements(
+        "catalog_current",
+        ["row_key", "line_no", "item_name", "storage", "aisle", "unit_price_ped", "image", "wiki_url", "enabled"],
+        catalog_current,
+    ),
 ]
 
 OUTPUT.parent.mkdir(parents=True, exist_ok=True)
