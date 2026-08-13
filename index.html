@@ -3,13 +3,14 @@
   <head>
     <base target="_self">
 	<link rel="icon" href="./favicon.ico">
-	<link rel="stylesheet" href="./style.css?v=20260813-3">
+	<link rel="stylesheet" href="./style.css?v=20260813-4">
 	<script src="./js/langues.js"></script>
 	<script src="./js/api-client.js?v=20260813-6"></script>
 	<script defer src="./js/admin-menu.js?v=20260813-2"></script>
 	<title>[FRJ] - enzo beau gosse : Item List</title>
   </head>
   <body>
+	<span id="backendStatusDot" class="backend-status-dot" role="status"></span>
 	<div id="langSwitcher">
 		<button id="btnEN" onclick="setLanguage('EN')">
 			<svg width="20" height="14" viewBox="0 0 60 30">
@@ -70,7 +71,7 @@
     <script>
 	
 document.addEventListener("DOMContentLoaded", () => {
-  window.addEventListener("frj:backendchange", renderFilterLabel);
+  window.addEventListener("frj:backendchange", renderBackendStatusDot);
   updateLanguageButtons();
   applyTranslations();
   loadInventoryDate();
@@ -284,6 +285,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		document.getElementById("loadingState").innerText = t("loadingState");
 
 		renderFilterLabel();
+		renderBackendStatusDot();
 
 		// Select
 		const select = document.getElementById("rayonFilter");
@@ -298,11 +300,19 @@ document.addEventListener("DOMContentLoaded", () => {
 	}
 
 	function renderFilterLabel() {
-		const backend = currentLang === "FR"
-			? ` <small class="backend-indicator">(${FRJ_API.activeBackend.toUpperCase()})</small>`
-			: "";
 		document.getElementById("filterLabel").innerHTML =
-			`<span class="label-italic">${t("filterLabel")}</span>${backend}:`;
+			`<span class="label-italic">${t("filterLabel")}</span>:`;
+	}
+
+	function renderBackendStatusDot() {
+		const dot = document.getElementById("backendStatusDot");
+		if (!dot) return;
+		const backend = FRJ_API.activeBackend === "d1" ? "d1" : "gas";
+		dot.className = `backend-status-dot backend-${backend}`;
+		dot.title = backend.toUpperCase();
+		dot.setAttribute("aria-label", currentLang === "FR"
+			? `Base interrogée : ${backend.toUpperCase()}`
+			: `Active database: ${backend.toUpperCase()}`);
 	}
 
 	function isFRJMember() {

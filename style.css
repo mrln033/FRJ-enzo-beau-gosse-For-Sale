@@ -55,11 +55,24 @@ h1 {
   font-weight: bold;
 }
 
-.backend-indicator {
-  font-size: 0.72em;
-  font-style: normal;
-  font-weight: normal;
-  opacity: 0.75;
+.backend-status-dot {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 11000;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  border-radius: 50%;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.45);
+}
+
+.backend-status-dot.backend-gas {
+  background: #d71920;
+}
+
+.backend-status-dot.backend-d1 {
+  background: #1b9e3e;
 }
 
 .filter select {
