@@ -414,6 +414,41 @@ function runFrjSyncAuditNow() {
   return frjRunIntegrityAudit_("audit-manuel");
 }
 
+/**
+ * Point d'entrée privé utilisé par le Worker pour lancer un audit sans attendre
+ * le poll D1 ni les contraintes temporelles des triggers ordinaires.
+ */
+function frjHandleImmediateAuditPost_(e) {
+  try {
+    var payload = JSON.parse(String(e && e.postData ? e.postData.contents : "{}"));
+    var suppliedToken = String(payload.token || "");
+    if (!frjTimingSafeEqual_(suppliedToken, frjRequireSyncToken_())) {
+      throw new Error("Accès refusé");
+    }
+
+    var reason = String(payload.reason || "audit-force-rapport").trim() || "audit-force-rapport";
+    var summary = frjRunIntegrityAudit_(reason);
+    return frjJsonOutput_({ ok: true, reason: reason, summary: summary });
+  } catch (error) {
+    console.error(JSON.stringify({ message: "Audit forcé refusé ou échoué", error: error.message }));
+    return frjJsonOutput_({ ok: false, error: error.message });
+  }
+}
+
+function frjTimingSafeEqual_(left, right) {
+  var leftHash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(left), Utilities.Charset.UTF_8);
+  var rightHash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(right), Utilities.Charset.UTF_8);
+  var different = 0;
+  for (var i = 0; i < leftHash.length; i++) different |= leftHash[i] ^ rightHash[i];
+  return different === 0;
+}
+
+function frjJsonOutput_(data) {
+  return ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
 function getFrjSyncStatus() {
   var properties = PropertiesService.getScriptProperties();
   var triggers = ScriptApp.getProjectTriggers().filter(function(trigger) {

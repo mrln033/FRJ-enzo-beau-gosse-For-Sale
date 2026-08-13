@@ -1219,6 +1219,12 @@ function mapSyncState(row) {
 }
 
 async function handleAdminPost(request, url, env) {
+  if (url.pathname === "/admin/sync-audit-now") {
+    const body = await readTextBody(request, 20_000);
+    const payload = parseJsonBody(body);
+    return json(await runImmediateGasAudit(env, payload));
+  }
+
   if (url.pathname === "/admin/sync-observation") {
     const body = await readTextBody(request, MAX_OBSERVATION_BYTES);
     const payload = parseJsonBody(body);
@@ -1265,6 +1271,43 @@ async function handleAdminPost(request, url, env) {
   const dataset = String(payload.dataset || "").trim();
   const reason = String(payload.reason || "modification-gas").trim();
   return json(await notifyGasDataChanged(env, dataset, reason));
+}
+
+async function runImmediateGasAudit(env, payload) {
+  const gasSyncUrl = String(env.GAS_SYNC_URL || "").trim();
+  const syncToken = String(env.SYNC_TOKEN || env.ADMIN_TOKEN || "").trim();
+  if (!gasSyncUrl || !syncToken) throw new ApiError(503, "Relais d'audit GAS non configuré");
+
+  const reason = String(payload.reason || "audit-force-rapport").trim() || "audit-force-rapport";
+  const requestId = await recordSystemAudit(env, "manual-audit-requested", { reason });
+
+  try {
+    const response = await fetch(gasSyncUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: syncToken, reason })
+    });
+    const raw = await readTextBody(response, 100_000);
+    let result;
+    try {
+      result = raw ? JSON.parse(raw) : {};
+    } catch {
+      throw new Error("Réponse GAS non JSON");
+    }
+    if (!response.ok || result.ok !== true) {
+      throw new Error(result.error || `GAS répond ${response.status}`);
+    }
+
+    await recordSystemAudit(env, "manual-audit-completed", { reason, requestId });
+    return { ok: true, requestId, reason, summary: result.summary || [] };
+  } catch (error) {
+    await recordSystemAudit(env, "manual-audit-failed", {
+      reason,
+      requestId,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    throw new ApiError(502, `Audit GAS impossible : ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 async function storeGasObservation(env, payload) {

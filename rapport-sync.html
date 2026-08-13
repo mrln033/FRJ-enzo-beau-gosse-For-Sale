@@ -7,8 +7,8 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <link rel="icon" href="./favicon.ico">
   <link rel="stylesheet" href="./style.css?v=20260813-3">
-  <link rel="stylesheet" href="./maj_css.css?v=20260813-3">
-  <script src="./js/api-client.js?v=20260813-6"></script>
+  <link rel="stylesheet" href="./maj_css.css?v=20260813-4">
+  <script src="./js/api-client.js?v=20260813-7"></script>
   <script defer src="./js/admin-menu.js?v=20260813-2"></script>
   <title>Rapport de synchronisation GAS ↔ D1</title>
 </head>
@@ -32,7 +32,13 @@
       <div class="sync-summary" id="syncSummary"></div>
 
       <section class="report-panel">
-        <h2>État des bases</h2>
+        <div class="report-panel-heading">
+          <h2>État des bases</h2>
+          <div class="audit-now-actions">
+            <span id="auditNowStatus" role="status" aria-live="polite"></span>
+            <button type="button" id="auditNow">Auditer maintenant</button>
+          </div>
+        </div>
         <div class="report-table-wrap">
           <table>
             <thead>
@@ -97,6 +103,7 @@
       FRJ_API.clearAdminToken();
       loadSyncReport().finally(scheduleAutoRefresh);
     });
+    document.getElementById("auditNow").addEventListener("click", runAuditNow);
 
     function formatDate(value) {
       if (!value) return "—";
@@ -111,7 +118,11 @@
         "snapshot-imported": "Snapshot enregistré",
         "sync-run-completed": "Synchronisation terminée",
         "sync-run-failed": "Échec de synchronisation",
-        "gas-state-observed": "État GAS observé"
+        "gas-state-observed": "État GAS observé",
+        "manual-audit-requested": "Audit immédiat demandé",
+        "manual-audit-completed": "Audit immédiat terminé",
+        "manual-audit-failed": "Échec de l’audit immédiat",
+        "integrity-audit-completed": "Audit d’intégrité terminé"
       };
       return labels[action] || action || "—";
     }
@@ -232,6 +243,33 @@
         error.hidden = false;
       } finally {
         loading.hidden = true;
+      }
+    }
+
+    async function runAuditNow() {
+      const button = document.getElementById("auditNow");
+      const status = document.getElementById("auditNowStatus");
+      button.disabled = true;
+      button.textContent = "Audit en cours…";
+      status.textContent = "Comparaison complète de GAS et D1…";
+      try {
+        const response = await FRJ_API.fetchD1Admin("/admin/sync-audit-now", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason: "audit-force-rapport" })
+        });
+        const result = await response.json();
+        const changed = (result.summary || []).some((item) => item.action !== "identique");
+        status.textContent = changed
+          ? "Audit terminé : écarts corrigés, nouvel audit programmé à +30 min."
+          : "Audit terminé : bases identiques et vérifiées.";
+        await loadSyncReport();
+      } catch (auditError) {
+        status.textContent = `Échec : ${auditError.message}`;
+      } finally {
+        button.disabled = false;
+        button.textContent = "Auditer maintenant";
+        scheduleAutoRefresh();
       }
     }
 

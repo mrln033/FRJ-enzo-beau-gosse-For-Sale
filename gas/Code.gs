@@ -326,10 +326,11 @@ function processInventory(csv, avatar) {
   return `✅ Import inventaire OK dans ${SHEET_NAME} (${numRows} lignes)`;
 }
 
-function doPost(e) {
-  return withFrjDataLock_(function() {
-    const type = e.parameter.type;
+function frjMainDoPost_(e) {
+  const type = e.parameter.type;
+  if (type === "syncAudit") return frjHandleImmediateAuditPost_(e);
 
+  return withFrjDataLock_(function() {
     if (type === "mu") {
       return ContentService.createTextOutput(processMU(e.postData.contents));
     }

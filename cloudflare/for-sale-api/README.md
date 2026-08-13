@@ -74,11 +74,10 @@ Cloudflare.
 
 ## Synchronisation GAS ↔ D1
 
-Le script `../../gas/SyncD1.gs` synchronise six datasets : catalogue, MU et les quatre inventaires. Deux
-déclencheurs temporels sont installés :
-
-- toutes les 15 minutes : comparaison des empreintes et transfert uniquement des datasets modifiés ;
-- toutes les 30 minutes : audit complet, recalcul des empreintes de toutes les lignes et réconciliation.
+Le script `../../gas/SyncD1.gs` synchronise six datasets : catalogue, MU et les quatre inventaires.
+Une modification demande une synchronisation dans un délai maximal de cinq minutes. Toute synchronisation
+ayant corrigé des données programme un audit d’intégrité 30 minutes plus tard. Un audit quotidien est aussi
+exécuté vers 02 h 00, et le signal D1 est contrôlé toutes les cinq minutes.
 
 Les inventaires et les MU sont bidirectionnels. Une modification indépendante de chaque côté est fusionnée
 ligne par ligne à partir du dernier snapshot commun ; une suppression fait partie du snapshot et est donc
@@ -98,6 +97,11 @@ script, puis exécuter `installFrjBidirectionalSync()` et un audit initial.
 Avec `?admin=1`, le frontend affiche un menu commun permettant d’ouvrir explicitement les catalogues et les
 pages d’import GAS ou D1. La page `rapport-sync.html?admin=1` affiche l’état des six datasets et les 100
 derniers événements du journal croisé GAS ↔ D1.
+
+Le bouton « Auditer maintenant » appelle `POST /admin/sync-audit-now`. Le Worker authentifie le jeton
+administrateur, puis appelle la web app privée de synchronisation GAS avec `SYNC_TOKEN`. Ce premier audit
+ignore les délais ordinaires ; une correction déclenche immédiatement la synchronisation puis conserve le
+cycle normal de vérification à +30 minutes.
 
 Le paramètre `admin=1` contrôle seulement l’affichage du menu. Le rapport appelle
 `GET /admin/sync-report`, protégé par `ADMIN_TOKEN`; aucune donnée de synchronisation n’est exposée sans ce

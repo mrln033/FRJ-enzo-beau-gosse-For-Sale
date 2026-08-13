@@ -129,6 +129,34 @@
 		margin-top: 0;
 	}
 
+	.report-panel-heading {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 16px;
+		margin-bottom: 12px;
+	}
+
+	.report-panel-heading h2 {
+		margin: 0;
+	}
+
+	.audit-now-actions {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+
+	#auditNowStatus {
+		color: #555;
+		font-size: 0.85rem;
+	}
+
+	#auditNow:disabled {
+		cursor: wait;
+		opacity: 0.65;
+	}
+
 	.report-table-wrap {
 		overflow-x: auto;
 	}
@@ -217,5 +245,11 @@
 
 		.sync-report-actions button {
 			flex: 1;
+		}
+
+		.report-panel-heading,
+		.audit-now-actions {
+			align-items: stretch;
+			flex-direction: column;
 		}
 	}
