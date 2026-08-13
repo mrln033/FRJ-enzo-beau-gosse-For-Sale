@@ -7,7 +7,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <link rel="icon" href="./favicon.ico">
   <link rel="stylesheet" href="./style.css?v=20260813-3">
-  <link rel="stylesheet" href="./maj_css.css?v=20260813-2">
+  <link rel="stylesheet" href="./maj_css.css?v=20260813-3">
   <script src="./js/api-client.js?v=20260813-5"></script>
   <script defer src="./js/admin-menu.js?v=20260813-2"></script>
   <title>Rapport de synchronisation GAS ↔ D1</title>
@@ -37,12 +37,19 @@
           <table>
             <thead>
               <tr>
-                <th>Dataset</th>
+                <th rowspan="2">Dataset</th>
+                <th colspan="3" class="backend-heading gas-heading">Google Sheets / GAS</th>
+                <th colspan="3" class="backend-heading d1-heading">Cloudflare D1</th>
+                <th rowspan="2">Concordance</th>
+                <th rowspan="2">Dernier audit</th>
+              </tr>
+              <tr>
                 <th>Lignes</th>
-                <th>Origine active</th>
                 <th>Date source</th>
-                <th>Dernier contrôle</th>
-                <th>Résultat</th>
+                <th>Empreinte</th>
+                <th>Lignes</th>
+                <th>Date source</th>
+                <th>Empreinte</th>
               </tr>
             </thead>
             <tbody id="datasetRows"></tbody>
@@ -103,10 +110,41 @@
       return labels[action] || action || "—";
     }
 
+    function datasetLabel(dataset) {
+      const labels = {
+        catalog: "Catalogue",
+        mu: "MU",
+        "inventory:enzo": "Inventaire Enzo",
+        "inventory:arkaman": "Inventaire ArkaMan",
+        "inventory:kenza": "Inventaire Kenza",
+        "inventory:nocturnal": "Inventaire Nocturnal"
+      };
+      return labels[dataset] || dataset;
+    }
+
+    function concordanceLabel(status) {
+      const labels = {
+        verified: "Identique — vérifié",
+        "pending-audit": "Identique — audit attendu",
+        different: "Différent — synchronisation requise",
+        unknown: "État GAS non encore observé"
+      };
+      return labels[status] || status || "—";
+    }
+
     function appendCell(row, value, className = "") {
       const cell = document.createElement("td");
       cell.textContent = value;
       if (className) cell.className = className;
+      row.appendChild(cell);
+    }
+
+    function appendHashCell(row, value, className = "") {
+      const hash = String(value || "");
+      const cell = document.createElement("td");
+      cell.textContent = hash ? hash.slice(0, 12) : "—";
+      cell.title = hash;
+      cell.className = `hash-cell${className ? ` ${className}` : ""}`;
       row.appendChild(cell);
     }
 
@@ -119,8 +157,8 @@
           report.status === "error" ? "Erreur" : (report.status === "pending" ? "En attente du prochain trigger" : "Opérationnel"),
           report.status
         ],
-        ["Datasets suivis", String(report.datasets.length), ""],
-        ["Dernière exécution GAS", formatDate(report.system?.createdAt), ""],
+        ["Paires suivies", `${report.datasets.length} paires / ${report.datasets.length * 2} états`, ""],
+        ["Dernière observation GAS", formatDate(report.lastGasRunAt), ""],
         ["Rapport généré", formatDate(report.generatedAt), ""]
       ];
       cards.forEach(([label, value, status]) => {
@@ -140,12 +178,15 @@
       body.replaceChildren();
       datasets.forEach((dataset) => {
         const row = document.createElement("tr");
-        appendCell(row, dataset.dataset);
-        appendCell(row, String(dataset.rowCount));
-        appendCell(row, String(dataset.origin || "—").toUpperCase());
-        appendCell(row, formatDate(dataset.updatedAt));
+        appendCell(row, datasetLabel(dataset.dataset), "dataset-name");
+        appendCell(row, dataset.gas ? String(dataset.gas.rowCount) : "—", "gas-cell");
+        appendCell(row, formatDate(dataset.gas?.updatedAt), "gas-cell");
+        appendHashCell(row, dataset.gas?.hash, "gas-cell");
+        appendCell(row, dataset.d1 ? String(dataset.d1.rowCount) : "—", "d1-cell");
+        appendCell(row, formatDate(dataset.d1?.updatedAt), "d1-cell");
+        appendHashCell(row, dataset.d1?.hash, "d1-cell");
+        appendCell(row, concordanceLabel(dataset.concordance), `status-${dataset.concordance}`);
         appendCell(row, formatDate(dataset.lastAudit?.createdAt));
-        appendCell(row, actionLabel(dataset.lastAudit?.action), dataset.lastAudit?.action === "sync-run-failed" ? "status-error" : "");
         body.appendChild(row);
       });
     }

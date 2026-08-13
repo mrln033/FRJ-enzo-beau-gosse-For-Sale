@@ -205,7 +205,7 @@ async function handleAdminGet(url, env) {
 
   const requestedLimit = Number(url.searchParams.get("limit") || 100);
   const limit = Math.min(Math.max(Number.isFinite(requestedLimit) ? Math.trunc(requestedLimit) : 100, 20), 200);
-  const [statesResult, latestResult, eventsResult] = await env.DB.batch([
+  const [statesResult, latestResult, eventsResult, latestRunResult] = await env.DB.batch([
     env.DB.prepare(`
       SELECT
         dataset_key, content_checksum, source_updated_at, source_origin,
@@ -220,6 +220,8 @@ async function handleAdminGet(url, env) {
           details, created_at,
           ROW_NUMBER() OVER (PARTITION BY dataset_key ORDER BY id DESC) AS rank
         FROM sync_audit
+        WHERE dataset_key = '_system'
+           OR action IN ('verified', 'reconciled')
       )
       SELECT
         id, dataset_key, direction, action, source_checksum, target_checksum,
@@ -235,23 +237,67 @@ async function handleAdminGet(url, env) {
       FROM sync_audit
       ORDER BY id DESC
       LIMIT ?
-    `).bind(limit)
+    `).bind(limit),
+    env.DB.prepare(`
+      SELECT id, details, created_at
+      FROM sync_audit
+      WHERE dataset_key = '_system'
+        AND action = 'sync-run-completed'
+      ORDER BY id DESC
+      LIMIT 1
+    `)
   ]);
 
   const latestByDataset = Object.fromEntries(
     latestResult.results.map((row) => [row.dataset_key, mapSyncAuditRow(row)])
   );
-  const datasets = statesResult.results.map((row) => ({
-    ...mapSyncState(row),
-    synchronizedAt: normalizeSyncTimestamp(row.synchronized_at),
-    lastAudit: latestByDataset[row.dataset_key] || null
-  }));
+  const latestRun = latestRunResult.results[0] || null;
+  let latestRunDetails = {};
+  try { latestRunDetails = latestRun?.details ? JSON.parse(latestRun.details) : {}; } catch {}
+  const gasByDataset = Object.fromEntries(
+    (Array.isArray(latestRunDetails.datasets) ? latestRunDetails.datasets : [])
+      .filter((item) => item?.dataset)
+      .map((item) => [item.dataset, {
+        hash: String(item.hash || ""),
+        rowCount: Number(item.rows || 0),
+        updatedAt: normalizeSyncTimestamp(item.updatedAt || latestRunDetails.completedAt || latestRun?.created_at),
+        observedAt: normalizeSyncTimestamp(latestRunDetails.completedAt || latestRun?.created_at)
+      }])
+  );
+  const datasets = statesResult.results.map((row) => {
+    const d1 = {
+      ...mapSyncState(row),
+      synchronizedAt: normalizeSyncTimestamp(row.synchronized_at)
+    };
+    const lastAudit = latestByDataset[row.dataset_key] || null;
+    const gas = gasByDataset[row.dataset_key] || (lastAudit?.sourceHash ? {
+      hash: lastAudit.sourceHash,
+      rowCount: Number(lastAudit.details?.rows || 0),
+      updatedAt: lastAudit.createdAt,
+      observedAt: lastAudit.createdAt
+    } : null);
+    const hashesMatch = Boolean(gas?.hash && d1.hash && gas.hash === d1.hash);
+    const auditMatchesCurrent = Boolean(
+      hashesMatch
+      && lastAudit?.action === "verified"
+      && lastAudit.sourceHash === gas.hash
+      && lastAudit.targetHash === d1.hash
+    );
+    return {
+      dataset: row.dataset_key,
+      gas,
+      d1,
+      concordance: !gas ? "unknown" : (auditMatchesCurrent ? "verified" : (hashesMatch ? "pending-audit" : "different")),
+      lastAudit
+    };
+  });
   const system = latestByDataset._system || null;
 
   return json({
     generatedAt: new Date().toISOString(),
     status: !system ? "pending" : (system.action === "sync-run-failed" ? "error" : "ok"),
     system,
+    lastGasRunAt: normalizeSyncTimestamp(latestRunDetails.completedAt || latestRun?.created_at),
     datasets,
     events: eventsResult.results.map(mapSyncAuditRow)
   });

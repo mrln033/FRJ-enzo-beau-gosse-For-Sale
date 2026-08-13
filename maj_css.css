@@ -150,6 +150,51 @@
 		background: #f0f0f0;
 	}
 
+	.report-panel th[rowspan] {
+		vertical-align: middle;
+	}
+
+	.backend-heading {
+		text-align: center !important;
+	}
+
+	.gas-heading,
+	.gas-cell {
+		background: #f2f8ff;
+	}
+
+	.d1-heading,
+	.d1-cell {
+		background: #fff7ed;
+	}
+
+	.dataset-name {
+		font-weight: bold;
+		white-space: nowrap;
+	}
+
+	.hash-cell {
+		font-family: monospace;
+		font-size: 0.78rem;
+		cursor: help;
+	}
+
+	.status-verified {
+		color: #146c2e;
+		font-weight: bold;
+	}
+
+	.status-pending-audit,
+	.status-unknown {
+		color: #9a5b00;
+		font-weight: bold;
+	}
+
+	.status-different {
+		color: #b00020;
+		font-weight: bold;
+	}
+
 	.event-details {
 		max-width: 500px;
 		font-family: monospace;

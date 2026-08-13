@@ -359,7 +359,13 @@ function frjSynchronizeDataset_(dataset, remoteState, forceAudit, retryCount) {
   if (local.hash === remoteState.hash) {
     frjSetBaseHash_(dataset, local.hash);
     if (forceAudit) frjReportAudit_(dataset, "verified", local.hash, remoteState.hash, { rows: local.rows.length });
-    return { dataset: dataset, action: "identique", rows: local.rows.length, hash: local.hash };
+    return {
+      dataset: dataset,
+      action: "identique",
+      rows: local.rows.length,
+      hash: local.hash,
+      updatedAt: local.updatedAt
+    };
   }
 
   var baseHash = frjGetBaseHash_(dataset);
@@ -454,7 +460,8 @@ function frjSynchronizeDataset_(dataset, remoteState, forceAudit, retryCount) {
     action: direction,
     conflict: localChanged && remoteChanged,
     rows: finalLocal.rows.length,
-    hash: finalLocal.hash
+    hash: finalLocal.hash,
+    updatedAt: finalLocal.updatedAt
   };
 }
 
