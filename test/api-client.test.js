@@ -124,3 +124,19 @@ test("un jeton enregistré sur cette machine est réutilisé sans nouvelle saisi
   api.clearAdminToken();
   assert.equal(localValues.size, 0);
 });
+
+test("un import GAS enregistre une demande de synchronisation côté D1", async () => {
+  const requests = [];
+  const { api } = loadClient("?admin=1", async (url, options) => {
+    requests.push({ url, options });
+    return new Response(JSON.stringify({ ok: true, requestId: 42 }), { status: 200 });
+  }, () => "jeton-sync");
+
+  await api.requestSynchronization("inventory:enzo", "import-gas-inventory");
+  assert.match(requests[0].url, /workers\.dev\/admin\/sync-request$/);
+  assert.equal(requests[0].options.headers.get("Authorization"), "Bearer jeton-sync");
+  assert.deepEqual(JSON.parse(requests[0].options.body), {
+    dataset: "inventory:enzo",
+    reason: "import-gas-inventory"
+  });
+});

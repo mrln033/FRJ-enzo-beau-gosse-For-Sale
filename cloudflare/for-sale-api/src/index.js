@@ -75,6 +75,7 @@ export default {
         if (!(await isAuthorized(request, env.ADMIN_TOKEN))) {
           return withCors(json({ error: "Unauthorized" }, 401), origin);
         }
+        if (isAdminRequest) return withCors(await handleAdminPost(request, url, env), origin);
         return withCors(await handlePost(request, url, env), origin);
       }
 
@@ -276,6 +277,7 @@ async function handlePost(request, url, env) {
       sourceOrigin: "d1",
       sourceUpdatedAt: new Date().toISOString()
     });
+    await notifyGasDataChanged(env, `inventory:${avatar}`, "import-d1-inventory");
 
     return legacyText(
       `✅ Import inventaire OK dans ${AVATAR_SHEETS[avatar]} (${rows.length + 1} lignes)`,
@@ -299,6 +301,7 @@ async function handlePost(request, url, env) {
       sourceOrigin: "d1",
       sourceUpdatedAt: observedAt
     });
+    await notifyGasDataChanged(env, "mu", "import-d1-mu");
 
     return legacyText(`${updates} MAJ / ${inserts} AJOUTS`, result.importId);
   }
@@ -307,6 +310,28 @@ async function handlePost(request, url, env) {
 }
 
 async function handleSyncGet(url, env) {
+  if (url.pathname === "/sync/pending") {
+    const row = await env.DB.prepare(`
+      SELECT id, details, created_at
+      FROM sync_audit
+      WHERE dataset_key = '_system'
+        AND direction = 'signal'
+        AND action = 'sync-requested'
+      ORDER BY id DESC
+      LIMIT 1
+    `).first();
+    let details = {};
+    try { details = row?.details ? JSON.parse(row.details) : {}; } catch {}
+    return json({
+      request: row ? {
+        id: Number(row.id),
+        createdAt: normalizeSyncTimestamp(row.created_at),
+        dataset: String(details.dataset || ""),
+        reason: String(details.reason || "")
+      } : null
+    });
+  }
+
   if (url.pathname === "/sync/state") {
     return json({ datasets: await readAllSyncStates(env) });
   }
@@ -1105,6 +1130,34 @@ function mapSyncState(row) {
     importId: row.import_id,
     rowCount: Number(row.row_count || 0)
   };
+}
+
+async function handleAdminPost(request, url, env) {
+  if (url.pathname !== "/admin/sync-request") {
+    return json({ error: "Endpoint administrateur inconnu" }, 404);
+  }
+  const body = await readTextBody(request, 20_000);
+  const payload = parseJsonBody(body);
+  const dataset = String(payload.dataset || "").trim();
+  const reason = String(payload.reason || "modification-gas").trim();
+  return json(await notifyGasDataChanged(env, dataset, reason));
+}
+
+async function notifyGasDataChanged(env, dataset, reason) {
+  const requestId = await recordSystemAudit(env, "sync-requested", { dataset, reason });
+  return { ok: true, dataset, reason, requestId };
+}
+
+async function recordSystemAudit(env, action, details) {
+  const [result] = await env.DB.batch([
+    env.DB.prepare(`
+      INSERT INTO sync_audit (
+        dataset_key, direction, action, source_checksum, target_checksum, details
+      ) VALUES ('_system', 'signal', ?, NULL, NULL, ?)
+    `).bind(action, JSON.stringify(details || {})),
+    syncAuditRetentionStatement(env, "_system")
+  ]);
+  return Number(result.meta?.last_row_id || 0);
 }
 
 function mapSyncAuditRow(row) {

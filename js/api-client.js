@@ -88,6 +88,14 @@
     return response;
   }
 
+  async function requestSynchronization(dataset, reason) {
+    return requestD1Admin("/admin/sync-request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dataset, reason })
+    });
+  }
+
   function setActiveBackend(backend) {
     activeBackend = backend;
     global.dispatchEvent(new CustomEvent("frj:backendchange", {
@@ -206,6 +214,7 @@
   global.FRJ_API = Object.freeze({
     fetch: request,
     fetchD1Admin: requestD1Admin,
+    requestSynchronization,
     backend: preferredBackend,
     get activeBackend() { return activeBackend; },
     label: preferredBackend === "d1" ? "Cloudflare D1" : "Google Sheets / GAS",
