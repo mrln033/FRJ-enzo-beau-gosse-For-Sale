@@ -25,8 +25,8 @@ export function normalizeOrderSubmission(payload) {
   if (!buyerAvatar) throw new Error("L'avatar en jeu est obligatoire");
 
   const sourceItems = Array.isArray(payload.items) ? payload.items : [];
-  if (sourceItems.length < 1 || sourceItems.length > 30) {
-    throw new Error("Le panier doit contenir entre 1 et 30 articles");
+  if (sourceItems.length < 1 || sourceItems.length > 10) {
+    throw new Error("Le panier doit contenir entre 1 et 10 articles");
   }
 
   const items = sourceItems.map((item) => {

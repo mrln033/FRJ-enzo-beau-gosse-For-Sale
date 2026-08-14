@@ -384,7 +384,7 @@ function processPurchaseOrderRequest(rawBody) {
       order.id, order.publicReference, order.buyerAvatar, order.buyerContact || "",
       order.buyerComment || "", order.language, order.frjMember ? "TRUE" : "FALSE",
       order.status, order.totalTtPed, order.totalSalePed, order.pricingStatus,
-      order.clientCreatedAt || "", new Date(), "", "", "", "", ""
+      order.clientCreatedAt || "", new Date(), "", "", "", "", "", "FALSE", 0
     ]);
     var orderRow = sheet.getLastRow();
     var discordResult = purchasePublishDiscord_(order, priced.lines);
@@ -422,7 +422,7 @@ function normalizePurchaseOrderPayload_(payload) {
   if (!/^FRJ-\d{8}-[A-F0-9]{6}$/.test(publicReference)) throw new Error("Référence de demande invalide");
   if (!/^[a-f0-9-]{70,80}$/i.test(accessToken)) throw new Error("Jeton de suivi invalide");
   if (!buyerAvatar) throw new Error("L'avatar en jeu est obligatoire");
-  if (!items.length || items.length > 30) throw new Error("Le panier doit contenir entre 1 et 30 articles");
+  if (!items.length || items.length > 10) throw new Error("Le panier doit contenir entre 1 et 10 articles");
   return {
     id: id,
     publicReference: publicReference,
@@ -536,7 +536,7 @@ function getOrCreatePurchaseOrderSheet_(ss) {
     "ORDER_ID", "REFERENCE", "AVATAR_ACHETEUR", "CONTACT", "COMMENTAIRE", "LANGUE",
     "MEMBRE_FRJ", "STATUT", "TOTAL_TT_PED", "TOTAL_VENTE_PED", "PRIX_STATUT",
     "DATE_CLIENT", "DATE_RECEPTION", "SYNC_PAYLOAD_JSON", "SYNCED_D1_AT", "SYNC_ERROR",
-    "DISCORD_MESSAGE_ID", "DISCORD_ERROR"
+    "DISCORD_MESSAGE_ID", "DISCORD_ERROR", "APPROVAL_REQUIRED", "PROPOSAL_VERSION"
   ];
   if (sheet.getMaxColumns() < headers.length) {
     sheet.insertColumnsAfter(sheet.getMaxColumns(), headers.length - sheet.getMaxColumns());
@@ -548,6 +548,70 @@ function getOrCreatePurchaseOrderSheet_(ss) {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   }
   return sheet;
+}
+
+function upsertPurchaseOrderMirror_(snapshot) {
+  var order = snapshot && snapshot.order ? snapshot.order : snapshot;
+  var items = snapshot && Array.isArray(snapshot.items) ? snapshot.items : (Array.isArray(order && order.items) ? order.items : []);
+  var orderId = String(order && order.id || "").trim().toLowerCase();
+  if (!/^[a-f0-9-]{36}$/.test(orderId)) throw new Error("Commande D1 invalide");
+
+  var ss = SpreadsheetApp.openById("13r_PzIZE8dJiPFU8w7UXxtEednHhS-yijNgTiYLqYP0");
+  var sheet = getOrCreatePurchaseOrderSheet_(ss);
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+  var indexes = {};
+  headers.forEach(function(header, index) { indexes[String(header || "").trim()] = index; });
+  var values = sheet.getLastRow() > 1
+    ? sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).getValues()
+    : [];
+  var existingIndex = values.findIndex(function(row) { return String(row[indexes.ORDER_ID] || "").trim().toLowerCase() === orderId; });
+  var row = existingIndex >= 0 ? values[existingIndex].slice() : new Array(headers.length).fill("");
+  var set = function(name, value) { if (indexes[name] !== undefined) row[indexes[name]] = value; };
+
+  set("ORDER_ID", orderId);
+  set("REFERENCE", order.publicReference || "");
+  set("AVATAR_ACHETEUR", order.buyerAvatar || "");
+  set("CONTACT", order.buyerContact || "");
+  set("COMMENTAIRE", order.buyerComment || "");
+  set("LANGUE", order.language === "FR" ? "FR" : "EN");
+  set("MEMBRE_FRJ", order.frjMember === true ? "TRUE" : "FALSE");
+  set("STATUT", order.status || "submitted");
+  set("TOTAL_TT_PED", Number(order.totalTtPed || 0));
+  set("TOTAL_VENTE_PED", Number(order.totalSalePed || 0));
+  set("PRIX_STATUT", order.pricingStatus || "estimated");
+  set("DATE_CLIENT", order.clientCreatedAt || "");
+  if (!row[indexes.DATE_RECEPTION]) set("DATE_RECEPTION", order.createdAt ? new Date(order.createdAt) : new Date());
+  set("SYNC_PAYLOAD_JSON", JSON.stringify({
+    order: {
+      id: orderId,
+      publicReference: order.publicReference,
+      accessTokenHash: order.accessTokenHash,
+      status: order.status,
+      buyerAvatar: order.buyerAvatar,
+      buyerContact: order.buyerContact,
+      buyerComment: order.buyerComment,
+      language: order.language,
+      frjMember: order.frjMember === true,
+      sourceBackend: order.sourceBackend || "d1",
+      totalTtPed: Number(order.totalTtPed || 0),
+      totalSalePed: Number(order.totalSalePed || 0),
+      pricingStatus: order.pricingStatus || "estimated",
+      clientCreatedAt: order.clientCreatedAt || null,
+      discordMessageId: order.discordMessageId || null,
+      approvalRequired: order.approvalRequired === true,
+      proposalVersion: Number(order.proposalVersion || 0)
+    },
+    items: items
+  }));
+  set("SYNCED_D1_AT", new Date());
+  set("SYNC_ERROR", "");
+  set("DISCORD_MESSAGE_ID", order.discordMessageId || "");
+  set("APPROVAL_REQUIRED", order.approvalRequired === true ? "TRUE" : "FALSE");
+  set("PROPOSAL_VERSION", Number(order.proposalVersion || 0));
+
+  var targetRow = existingIndex >= 0 ? existingIndex + 2 : sheet.getLastRow() + 1;
+  sheet.getRange(targetRow, 1, 1, headers.length).setValues([row]);
+  return targetRow;
 }
 
 function purchasePublishDiscord_(order, items) {

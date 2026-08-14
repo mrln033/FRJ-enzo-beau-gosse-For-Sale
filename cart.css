@@ -14,6 +14,13 @@
 }
 
 .cart-launcher.pulse { animation: cart-pulse 0.35s ease; }
+.cart-launcher.action-required {
+  border-color: #ffcb54;
+  color: #fff7db;
+  background: #6c3517;
+  box-shadow: 0 0 0 3px rgba(255, 203, 84, 0.35), 0 3px 12px rgba(0, 0, 0, 0.28);
+  animation: cart-attention 1.8s ease-in-out infinite;
+}
 
 .cart-back-icon {
   position: absolute;
@@ -115,7 +122,10 @@
 .cart-status { white-space: pre-line; min-height: 1.2em; margin: 2px 0; font-size: 0.86rem; }
 .cart-status.success { color: #176a34; }
 .cart-status.error { color: #a02323; }
-.cart-tracking { display: grid; gap: 8px; margin: 2px 16px 24px; padding: 13px; border: 1px solid #c8b98f; border-radius: 7px; background: #faf3df; }
+.cart-tracking-list { display: grid; gap: 8px; margin: 10px 16px 20px; }
+.cart-tracking { display: grid; gap: 8px; padding: 13px; border: 1px solid #c8b98f; border-radius: 7px; background: #faf3df; }
+.cart-tracking.approval-required { border-color: #8b5cf6; background: #f3efff; }
+.cart-tracking-alert { color: #563a87; }
 .cart-tracking > span { color: #5e5547; font-size: 0.88rem; }
 .cart-tracking > a { color: #674713; font-weight: 800; }
 .cart-tracking > button { justify-self: start; }
@@ -124,6 +134,10 @@
 
 @keyframes cart-pulse {
   50% { transform: scale(1.08); }
+}
+
+@keyframes cart-attention {
+  50% { box-shadow: 0 0 0 6px rgba(255, 203, 84, 0.08), 0 3px 12px rgba(0, 0, 0, 0.28); }
 }
 
 @media (max-width: 600px) {

@@ -24,7 +24,18 @@ test("normalise une demande et ne conserve membre FRJ qu'en français", () => {
 
 test("refuse le honeypot et les paniers vides", () => {
   assert.throws(() => normalizeOrderSubmission({ ...validPayload, website: "spam" }), /refusée/);
-  assert.throws(() => normalizeOrderSubmission({ ...validPayload, items: [] }), /entre 1 et 30/);
+  assert.throws(() => normalizeOrderSubmission({ ...validPayload, items: [] }), /entre 1 et 10/);
+});
+
+test("limite les nouvelles demandes à 10 lignes", () => {
+  const items = Array.from({ length: 10 }, (_, index) => ({
+    ...validPayload.items[0], itemName: `Item ${index + 1}`
+  }));
+  assert.equal(normalizeOrderSubmission({ ...validPayload, items }).items.length, 10);
+  assert.throws(
+    () => normalizeOrderSubmission({ ...validPayload, items: [...items, { ...items[0], itemName: "Item 11" }] }),
+    /entre 1 et 10/
+  );
 });
 
 test("calcule les prix pour MU pourcentage et remise membre", () => {

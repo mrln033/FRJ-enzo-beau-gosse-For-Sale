@@ -6,7 +6,7 @@
   <base target="_self">
   <link rel="icon" href="./favicon.ico">
   <link rel="stylesheet" href="./style.css?v=20260814-6">
-  <script src="./js/api-client.js?v=20260814-5"></script>
+  <script src="./js/api-client.js?v=20260814-6"></script>
   <script defer src="./js/admin-menu.js?v=20260814-5"></script>
   <title>[FRJ] — Demandes d'achat</title>
   <style>
@@ -23,6 +23,7 @@
     .order-card table { width: 100%; border-collapse: collapse; margin-top: 12px; }
     .order-card th, .order-card td { padding: 6px; border-bottom: 1px solid #e2dbcf; text-align: left; }
     .order-card th:not(:first-child), .order-card td:not(:first-child) { text-align: right; }
+    .order-card tr.is-dirty td { background: #faf7ff; }
     .order-total { margin: 10px 0 0; text-align: right; font-size: 1.05rem; }
     .order-comment { margin: 10px 0 0; padding: 8px; background: #f1ece3; white-space: pre-wrap; }
     .order-status { padding: 6px; border-radius: 5px; }
@@ -32,6 +33,10 @@
     .line-editor select, .line-editor button { padding: 5px; }
     .line-editor .markup-amount { width: 72px; }
     .approval-hint { margin: 10px 0 0; padding: 8px 10px; border-radius: 6px; color: #563a87; background: #eee7ff; font-weight: 700; }
+    .order-save-row { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 12px; }
+    .order-save-row button { padding: 8px 13px; border: 1px solid #735117; border-radius: 6px; background: #d5aa54; cursor: pointer; font-weight: 800; }
+    .order-save-row button:disabled { opacity: .5; cursor: default; }
+    .order-dirty { color: #7045b2; font-size: .85rem; font-weight: 700; }
     .orders-error { color: #a02323; white-space: pre-line; }
     @media (max-width: 650px) {
       body { padding-top: 125px; }
@@ -64,6 +69,11 @@
 
     function formatPed(value) {
       return Number(value || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function roundPed(value, decimals = 2) {
+      const factor = 10 ** decimals;
+      return Math.round((Number(value) + Number.EPSILON) * factor) / factor;
     }
 
     async function loadOrders() {
@@ -134,8 +144,9 @@
       }
 
       const table = document.createElement("table");
-      table.innerHTML = "<thead><tr><th>Article</th><th>Qté proposée</th><th>Prix affiché</th><th>MU ponctuel</th><th>Estimation vente</th><th>Action</th></tr></thead>";
+      table.innerHTML = "<thead><tr><th>Article</th><th>Qté proposée</th><th>Prix affiché</th><th>MU ponctuel</th><th>Estimation vente</th></tr></thead>";
       const body = document.createElement("tbody");
+      const editors = [];
       (order.items || []).forEach((item) => {
         const row = document.createElement("tr");
         [`${item.itemName} (${item.storage} · ${item.aisle})`].forEach((value) => {
@@ -182,14 +193,9 @@
         markupCell.append(kind, amount);
         const estimateCell = document.createElement("td");
         estimateCell.textContent = `${formatPed(item.lineSalePed)} PED`;
-        const actionCell = document.createElement("td");
-        const save = document.createElement("button");
-        save.type = "button";
-        save.textContent = "Enregistrer";
-        save.addEventListener("click", () => updateLine(order.id, item.lineNo, { quantity, kind, amount, save }));
-        actionCell.appendChild(save);
-        row.append(quantityCell, priceCell, markupCell, estimateCell, actionCell);
+        row.append(quantityCell, priceCell, markupCell, estimateCell);
         body.appendChild(row);
+        editors.push({ item, quantity, kind, amount, estimateCell, row });
       });
       table.appendChild(body);
       article.appendChild(table);
@@ -197,6 +203,59 @@
       total.className = "order-total";
       total.textContent = `Estimation totale : ${formatPed(order.totalSalePed)} PED`;
       article.appendChild(total);
+      const saveRow = document.createElement("div");
+      saveRow.className = "order-save-row";
+      const dirtyLabel = document.createElement("span");
+      dirtyLabel.className = "order-dirty";
+      const save = document.createElement("button");
+      save.type = "button";
+      save.textContent = "Enregistrer les modifications";
+      save.disabled = true;
+      saveRow.append(dirtyLabel, save);
+      article.appendChild(saveRow);
+
+      const readEditor = (editor) => {
+        const quantity = Number(editor.quantity.value);
+        const markupKind = editor.kind.value;
+        const markupAmount = markupKind === "none" ? null : Number(editor.amount.value);
+        const unitTt = Number(editor.item.unitTtPed || 0);
+        const valid = Number.isFinite(quantity) && quantity > 0
+          && (markupKind === "none" || (Number.isFinite(markupAmount) && markupAmount >= 0));
+        let unitSale = unitTt;
+        if (valid && markupKind === "percent") unitSale = unitTt * (markupAmount / 100);
+        if (valid && markupKind === "ped") unitSale = unitTt + markupAmount;
+        const lineSale = valid ? roundPed(unitSale * quantity) : null;
+        const originalAmount = editor.item.markupKind === "percent"
+          ? Number(editor.item.markupValue || 0) * 100
+          : (editor.item.markupKind === "ped" ? Number(editor.item.markupValue || 0) : null);
+        const dirty = valid && (
+          Math.abs(quantity - Number(editor.item.quantity)) > 0.0001
+          || markupKind !== editor.item.markupKind
+          || (markupKind !== "none" && Math.abs(markupAmount - originalAmount) > 0.0001)
+        );
+        return { lineNo: editor.item.lineNo, quantity, markupKind, markupAmount, lineSale, valid, dirty };
+      };
+      const recalculate = () => {
+        const values = editors.map(readEditor);
+        editors.forEach((editor, index) => {
+          editor.estimateCell.textContent = values[index].valid ? `${formatPed(values[index].lineSale)} PED` : "—";
+          editor.row.classList.toggle("is-dirty", values[index].dirty);
+        });
+        const valid = values.every((value) => value.valid);
+        const dirtyCount = values.filter((value) => value.dirty).length;
+        const totalValue = valid ? roundPed(values.reduce((sum, value) => sum + value.lineSale, 0)) : null;
+        total.textContent = valid ? `Estimation totale : ${formatPed(totalValue)} PED` : "Estimation totale : —";
+        dirtyLabel.textContent = dirtyCount ? `${dirtyCount} ligne(s) modifiée(s)` : "";
+        save.disabled = !valid || dirtyCount === 0;
+        return values;
+      };
+      editors.forEach((editor) => {
+        editor.quantity.addEventListener("input", recalculate);
+        editor.amount.addEventListener("input", recalculate);
+        editor.kind.addEventListener("change", recalculate);
+      });
+      save.addEventListener("click", () => updateProposal(order.id, recalculate(), save));
+      recalculate();
       if (order.buyerComment) {
         const comment = document.createElement("p");
         comment.className = "order-comment";
@@ -223,24 +282,22 @@
       }
     }
 
-    async function updateLine(orderId, lineNo, controls) {
-      controls.save.disabled = true;
-      controls.save.textContent = "Enregistrement…";
+    async function updateProposal(orderId, items, save) {
+      save.disabled = true;
+      save.textContent = "Enregistrement…";
       try {
-        await FRJ_API.fetchD1Admin(`/admin/orders/${encodeURIComponent(orderId)}/items/${lineNo}`, {
+        await FRJ_API.fetchD1Admin(`/admin/orders/${encodeURIComponent(orderId)}/proposal`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            quantity: Number(controls.quantity.value),
-            markupKind: controls.kind.value,
-            markupAmount: controls.kind.value === "none" ? null : Number(controls.amount.value)
-          })
+          body: JSON.stringify({ items: items.map(({ lineNo, quantity, markupKind, markupAmount }) => ({
+            lineNo, quantity, markupKind, markupAmount
+          })) })
         });
         await loadOrders();
       } catch (error) {
         alert(error.message);
-        controls.save.disabled = false;
-        controls.save.textContent = "Enregistrer";
+        save.disabled = false;
+        save.textContent = "Enregistrer les modifications";
       }
     }
 

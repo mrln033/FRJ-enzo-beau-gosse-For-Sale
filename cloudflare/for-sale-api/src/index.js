@@ -446,6 +446,10 @@ async function handlePost(request, url, env) {
 }
 
 async function handleSyncGet(url, env) {
+  if (url.pathname === "/sync/orders") {
+    return json(await readOrdersForGasMirror(env, url));
+  }
+
   if (url.pathname === "/sync/pending") {
     const row = await env.DB.prepare(`
       SELECT id, details, created_at
@@ -1330,7 +1334,125 @@ function mapSyncState(row) {
   };
 }
 
+async function updateOrderProposal(env, orderId, requestedItems) {
+  const [orderResult, itemsResult] = await env.DB.batch([
+    env.DB.prepare(`
+      SELECT id, status, approval_required, proposal_version
+      FROM purchase_orders WHERE id = ?
+    `).bind(orderId),
+    env.DB.prepare(`
+      SELECT order_id, line_no, item_name, storage, aisle, unit_tt_ped,
+             quantity, markup_kind, markup_value
+      FROM purchase_order_items WHERE order_id = ? ORDER BY line_no
+    `).bind(orderId)
+  ]);
+  const order = orderResult.results[0];
+  if (!order) throw new ApiError(404, "Demande introuvable");
+  const existingByLine = new Map(itemsResult.results.map((item) => [Number(item.line_no), item]));
+  const requestedLineNumbers = new Set();
+  requestedItems.forEach((item) => {
+    const lineNo = Number(item?.lineNo);
+    if (!Number.isInteger(lineNo) || !existingByLine.has(lineNo) || requestedLineNumbers.has(lineNo)) {
+      throw new ApiError(400, "Ligne de proposition invalide ou dupliquée");
+    }
+    requestedLineNumbers.add(lineNo);
+  });
+
+  const itemNames = [...new Set(itemsResult.results.map((item) => String(item.item_name)))];
+  const stocksResult = await env.DB.prepare(`
+    WITH requested AS (
+      SELECT CAST(value AS TEXT) AS item_name FROM json_each(?)
+    )
+    SELECT r.item_name, COALESCE(SUM(ii.quantity), 0) AS stock
+    FROM requested r
+    LEFT JOIN inventory_current ii
+      ON ii.avatar_id = 'enzo'
+     AND ii.item_name = r.item_name COLLATE NOCASE
+     AND ${SALEABLE_CONTAINER_SQL}
+    GROUP BY r.item_name COLLATE NOCASE
+  `).bind(JSON.stringify(itemNames)).all();
+  const stocks = new Map(stocksResult.results.map((row) => [String(row.item_name).toLocaleLowerCase("en-US"), Number(row.stock || 0)]));
+  const changed = [];
+
+  requestedItems.forEach((requested) => {
+    const existing = existingByLine.get(Number(requested.lineNo));
+    const stock = stocks.get(String(existing.item_name).toLocaleLowerCase("en-US")) || 0;
+    const revised = parseOrderValue(() => reviseOrderLine(existing, requested, stock));
+    const sameMarkupValue = revised.markupValue === null
+      ? existing.markup_value === null || existing.markup_value === undefined
+      : Math.abs(Number(existing.markup_value) - revised.markupValue) <= 0.0001;
+    const noChange = Math.abs(Number(existing.quantity) - revised.quantity) <= 0.0001
+      && String(existing.markup_kind || "none") === revised.markupKind
+      && sameMarkupValue;
+    if (!noChange) changed.push({ existing, revised });
+  });
+
+  if (!changed.length) {
+    return {
+      ok: true,
+      noChange: true,
+      status: Number(order.approval_required || 0) === 1 ? "awaiting_approval" : order.status,
+      proposalVersion: Number(order.proposal_version || 0)
+    };
+  }
+
+  const nextVersion = Number(order.proposal_version || 0) + 1;
+  const statements = changed.map(({ existing, revised }) => env.DB.prepare(`
+    UPDATE purchase_order_items
+    SET quantity = ?, stock_at_submission = ?, markup_kind = ?, markup_value = ?,
+        markup_display = ?, unit_sale_ped = ?, line_tt_ped = ?, line_sale_ped = ?, price_status = ?
+    WHERE order_id = ? AND line_no = ?
+  `).bind(
+    revised.quantity, revised.stockAtSubmission, revised.markupKind, revised.markupValue,
+    revised.markupDisplay, revised.unitSalePed, revised.lineTtPed, revised.lineSalePed,
+    revised.priceStatus, orderId, Number(existing.line_no)
+  ));
+  statements.push(
+    env.DB.prepare(`
+      UPDATE purchase_orders
+      SET status = 'submitted', approval_required = 1,
+          proposal_version = proposal_version + 1,
+          total_tt_ped = (SELECT COALESCE(SUM(line_tt_ped), 0) FROM purchase_order_items WHERE order_id = ?),
+          total_sale_ped = (SELECT COALESCE(SUM(line_sale_ped), 0) FROM purchase_order_items WHERE order_id = ?),
+          pricing_status = CASE WHEN EXISTS (
+            SELECT 1 FROM purchase_order_items WHERE order_id = ? AND price_status = 'to-confirm'
+          ) THEN 'to-confirm' ELSE 'estimated' END,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(orderId, orderId, orderId, orderId),
+    env.DB.prepare(`
+      INSERT INTO purchase_order_events (order_id, action, details)
+      VALUES (?, 'proposal-changed', ?)
+    `).bind(orderId, JSON.stringify({
+      proposalVersion: nextVersion,
+      lines: changed.map(({ existing, revised }) => ({ lineNo: Number(existing.line_no), itemName: existing.item_name, revised }))
+    }))
+  );
+  await env.DB.batch(statements);
+  const discord = await synchronizeDiscordOrder(env, orderId);
+  return {
+    ok: true,
+    noChange: false,
+    status: "awaiting_approval",
+    proposalVersion: nextVersion,
+    changedLines: changed.length,
+    discord: publicDiscordResult(discord)
+  };
+}
+
 async function handleAdminPost(request, url, env) {
+  const orderProposalMatch = url.pathname.match(/^\/admin\/orders\/([a-f0-9-]{36})\/proposal$/i);
+  if (orderProposalMatch) {
+    const payload = parseJsonBody(await readTextBody(request, 40_000));
+    const requestedItems = Array.isArray(payload.items) ? payload.items : [];
+    // Les nouvelles demandes sont limitées à 10 lignes, mais les demandes
+    // historiques pouvaient en contenir jusqu'à 30 et doivent rester éditables.
+    if (requestedItems.length < 1 || requestedItems.length > 30) {
+      throw new ApiError(400, "La proposition doit contenir entre 1 et 30 articles");
+    }
+    return json(await updateOrderProposal(env, orderProposalMatch[1].toLowerCase(), requestedItems));
+  }
+
   const orderItemMatch = url.pathname.match(/^\/admin\/orders\/([a-f0-9-]{36})\/items\/(\d+)$/i);
   if (orderItemMatch) {
     const body = await readTextBody(request, 20_000);
@@ -1820,6 +1942,58 @@ async function readAdminOrders(env) {
       ...mapAdminOrder(order),
       items: itemsByOrder[order.id] || []
     }))
+  };
+}
+
+async function readOrdersForGasMirror(env, url) {
+  const afterEventId = Number(url.searchParams.get("afterEventId") || 0);
+  if (!Number.isInteger(afterEventId) || afterEventId < 0) {
+    throw new ApiError(400, "Curseur de commandes invalide");
+  }
+  const eventsResult = await env.DB.prepare(`
+    SELECT id, order_id
+    FROM purchase_order_events
+    WHERE id > ?
+    ORDER BY id
+    LIMIT 500
+  `).bind(afterEventId).all();
+  if (!eventsResult.results.length) {
+    return { orders: [], cursor: afterEventId, hasMore: false };
+  }
+
+  const orderIds = [...new Set(eventsResult.results.map((row) => String(row.order_id)))];
+  const idsJson = JSON.stringify(orderIds);
+  const [ordersResult, itemsResult] = await env.DB.batch([
+    env.DB.prepare(`
+      SELECT id, public_reference, access_token_hash, status, approval_required, proposal_version,
+             buyer_avatar, buyer_contact, buyer_comment, language, frj_member, source_backend,
+             total_tt_ped, total_sale_ped, pricing_status, client_created_at, created_at, updated_at,
+             discord_message_id
+      FROM purchase_orders
+      WHERE id IN (SELECT CAST(value AS TEXT) FROM json_each(?))
+    `).bind(idsJson),
+    env.DB.prepare(`
+      SELECT order_id, line_no, item_name, storage, aisle, quantity, stock_at_submission,
+             unit_tt_ped, markup_kind, markup_value, markup_display, unit_sale_ped,
+             line_tt_ped, line_sale_ped, price_status
+      FROM purchase_order_items
+      WHERE order_id IN (SELECT CAST(value AS TEXT) FROM json_each(?))
+      ORDER BY order_id, line_no
+    `).bind(idsJson)
+  ]);
+  const itemsByOrder = {};
+  itemsResult.results.forEach((item) => {
+    (itemsByOrder[item.order_id] ||= []).push(mapOrderItem(item));
+  });
+  const orders = ordersResult.results.map((row) => ({
+    ...mapAdminOrder(row),
+    accessTokenHash: row.access_token_hash,
+    items: itemsByOrder[row.id] || []
+  }));
+  return {
+    orders,
+    cursor: Math.max(...eventsResult.results.map((row) => Number(row.id))),
+    hasMore: eventsResult.results.length === 500
   };
 }
 

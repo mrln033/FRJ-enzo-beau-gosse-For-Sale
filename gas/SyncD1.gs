@@ -218,6 +218,8 @@ function frjD1SignalPollTrigger() {
     }
     var ordersPushed = frjPushPendingPurchaseOrders_();
     if (ordersPushed) scheduled.push("COMMANDES:" + ordersPushed);
+    var ordersPulled = frjPullPurchaseOrdersFromD1_();
+    if (ordersPulled) scheduled.push("COMMANDES-D1:" + ordersPulled);
     properties.deleteProperty("FRJ_D1_POLL_LAST_ERROR");
   } catch (error) {
     properties.setProperty("FRJ_D1_POLL_LAST_ERROR", new Date().toISOString() + " — " + error.message);
@@ -256,6 +258,30 @@ function frjPushPendingPurchaseOrders_() {
     }
   }
   return pushed;
+}
+
+function frjPullPurchaseOrdersFromD1_() {
+  var properties = PropertiesService.getScriptProperties();
+  var cursorKey = "FRJ_D1_ORDERS_EVENT_CURSOR";
+  var cursor = Number(properties.getProperty(cursorKey) || 0);
+  if (!isFinite(cursor) || cursor < 0) cursor = 0;
+  var pulled = 0;
+
+  for (var page = 0; page < 5; page++) {
+    var response = frjD1Request_("/sync/orders?afterEventId=" + encodeURIComponent(String(cursor)));
+    var orders = response && Array.isArray(response.orders) ? response.orders : [];
+    orders.forEach(function(order) {
+      upsertPurchaseOrderMirror_(order);
+      pulled++;
+    });
+    var nextCursor = Number(response && response.cursor || cursor);
+    if (isFinite(nextCursor) && nextCursor >= cursor) {
+      cursor = nextCursor;
+      properties.setProperty(cursorKey, String(cursor));
+    }
+    if (!response || response.hasMore !== true) break;
+  }
+  return pulled;
 }
 
 function frjRunIntegrityAudit_(reason) {

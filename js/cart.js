@@ -3,7 +3,9 @@
 
   const enabled = global.FRJ_FEATURES?.cart === true;
   const STORAGE_KEY = "FRJ_PURCHASE_CART_V1";
-  const MAX_LINES = 30;
+  const REQUESTS_KEY = "FRJ_PURCHASE_REQUESTS_V1";
+  const MAX_LINES = 10;
+  const MAX_SAVED_REQUESTS = 10;
   const copyLabels = {
     FR: {
       cart: "Panier", empty: "Votre panier est vide.", add: "Ajouter au panier",
@@ -17,9 +19,13 @@
       stockChanged: "Le stock, le prix affiché ou le MU a changé. Le panier a été actualisé ; vérifiez-le avant de renvoyer.",
       failure: "Transmission impossible. Le panier reste enregistré sur cette machine.",
       noPrice: "Prix à confirmer", markupPending: "à confirmer",
-      maxLines: "Le panier est limité à 30 articles.", lastRequest: "Dernière demande",
+      maxLines: "Le panier est limité à 10 lignes d’articles. Transmettez cette demande avant d’en préparer une autre.", lastRequest: "Demandes transmises",
       trackRequest: "Suivre ma demande", copyTracking: "Copier le lien de suivi",
-      trackingCopied: "Lien de suivi copié.", gasTrackingPending: "Le suivi apparaîtra dès le transfert du secours GAS vers D1."
+      trackingCopied: "Lien de suivi copié.", gasTrackingPending: "Le suivi apparaîtra dès le transfert du secours GAS vers D1.",
+      approvalRequired: "Action requise : Enzo a proposé des modifications à accepter.",
+      statusAwaiting: "À valider",
+      statusSubmitted: "Transmise", statusViewed: "Consultée", statusPreparing: "En préparation",
+      statusReady: "Prête", statusCompleted: "Terminée", statusCancelled: "Annulée", statusExpired: "Expirée"
     },
     EN: {
       cart: "Cart", empty: "Your cart is empty.", add: "Add to cart",
@@ -33,19 +39,24 @@
       stockChanged: "Stock, displayed price or MU changed. The cart was updated; review it before sending again.",
       failure: "Unable to send. The cart remains saved on this device.",
       noPrice: "Price to confirm", markupPending: "to confirm",
-      maxLines: "The cart is limited to 30 items.", lastRequest: "Latest request",
+      maxLines: "The cart is limited to 10 item lines. Send this request before preparing another one.", lastRequest: "Submitted requests",
       trackRequest: "Track my request", copyTracking: "Copy tracking link",
-      trackingCopied: "Tracking link copied.", gasTrackingPending: "Tracking will appear once the GAS fallback has transferred the request to D1."
+      trackingCopied: "Tracking link copied.", gasTrackingPending: "Tracking will appear once the GAS fallback has transferred the request to D1.",
+      approvalRequired: "Action required: Enzo proposed changes that need your approval.",
+      statusAwaiting: "Approval required",
+      statusSubmitted: "Submitted", statusViewed: "Viewed", statusPreparing: "Being prepared",
+      statusReady: "Ready", statusCompleted: "Completed", statusCancelled: "Cancelled", statusExpired: "Expired"
     }
   };
 
   let cart = readCart();
-  let lastRequest = readLastRequest();
+  let requests = readRequests();
   let drawer;
   let launcher;
   let statusNode;
   let statusMessage = "";
   let statusType = "";
+  let trackingRefreshRunning = false;
 
   function language() {
     return global.currentLang === "FR" || global.localStorage.getItem("lang") === "FR" ? "FR" : "EN";
@@ -175,14 +186,18 @@
     });
     document.body.append(launcher, drawer);
     render();
+    refreshRequestStatuses();
+    global.setInterval(() => { if (!document.hidden) refreshRequestStatuses(); }, 5 * 60 * 1000);
   }
 
   function render() {
     if (!enabled || !launcher || !drawer) return;
     const count = cart.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
     const saleTotal = roundPed(cart.items.reduce((sum, item) => sum + linePrices(item).sale, 0));
-    launcher.textContent = `🛒 ${formatQuantity(count)} · ${formatPed(saleTotal)} PED`;
-    launcher.setAttribute("aria-label", `${label("cart")} — ${formatQuantity(count)}`);
+    const requiresApproval = requests.some((request) => request.status === "awaiting_approval");
+    launcher.classList.toggle("action-required", requiresApproval);
+    launcher.textContent = `${requiresApproval ? "⚠️ " : ""}🛒 ${formatQuantity(count)} · ${formatPed(saleTotal)} PED`;
+    launcher.setAttribute("aria-label", `${label("cart")} — ${formatQuantity(count)}${requiresApproval ? ` — ${label("approvalRequired")}` : ""}`);
 
     const content = document.createElement("div");
     content.className = "cart-panel";
@@ -218,7 +233,7 @@
     statusNode.className = `cart-status${statusType ? ` ${statusType}` : ""}`;
     content.appendChild(statusNode);
 
-    if (!cart.items.length && lastRequest) content.appendChild(renderTracking());
+    if (requests.length) content.appendChild(renderTracking());
 
     if (cart.items.length) content.appendChild(renderActions());
     drawer.replaceChildren(content);
@@ -281,27 +296,38 @@
   }
 
   function renderTracking() {
-    const section = document.createElement("section");
-    section.className = "cart-tracking";
+    const wrapper = document.createElement("section");
+    wrapper.className = "cart-tracking-list";
     const title = document.createElement("strong");
     title.textContent = label("lastRequest");
-    const reference = document.createElement("span");
-    reference.textContent = lastRequest.reference;
-    const link = document.createElement("a");
-    link.href = trackingUrl(lastRequest.accessToken);
-    link.target = "_self";
-    link.textContent = label("trackRequest");
-    const copy = button(label("copyTracking"), "cart-secondary", async () => {
-      await navigator.clipboard.writeText(link.href);
-      setStatus(label("trackingCopied"), "success");
+    wrapper.appendChild(title);
+    requests.forEach((request) => {
+      const section = document.createElement("article");
+      section.className = `cart-tracking${request.status === "awaiting_approval" ? " approval-required" : ""}`;
+      const reference = document.createElement("span");
+      reference.textContent = `${request.reference} — ${requestStatusLabel(request.status)}`;
+      const link = document.createElement("a");
+      link.href = trackingUrl(request.accessToken);
+      link.target = "_self";
+      link.textContent = label("trackRequest");
+      const copy = button(label("copyTracking"), "cart-secondary", async () => {
+        await navigator.clipboard.writeText(link.href);
+        setStatus(label("trackingCopied"), "success");
+      });
+      section.append(reference, link, copy);
+      if (request.status === "awaiting_approval") {
+        const alert = document.createElement("strong");
+        alert.className = "cart-tracking-alert";
+        alert.textContent = label("approvalRequired");
+        section.prepend(alert);
+      } else if (request.backend === "gas") {
+        const pending = document.createElement("small");
+        pending.textContent = label("gasTrackingPending");
+        section.appendChild(pending);
+      }
+      wrapper.appendChild(section);
     });
-    section.append(title, reference, link, copy);
-    if (lastRequest.backend === "gas") {
-      const pending = document.createElement("small");
-      pending.textContent = label("gasTrackingPending");
-      section.appendChild(pending);
-    }
-    return section;
+    return wrapper;
   }
 
   async function submitCart(event) {
@@ -341,13 +367,15 @@
       const result = await global.FRJ_API.submitOrder(payload);
       const reference = result.order?.publicReference || publicReference;
       setStatus(`${label("sent")} — ${reference}${result.backend === "gas" ? `\n${label("fallback")}` : ""}`, "success");
-      lastRequest = {
+      const request = {
         reference,
         accessToken: payload.accessToken,
         backend: result.backend,
-        submittedAt: new Date().toISOString()
+        submittedAt: new Date().toISOString(),
+        status: result.order?.status || "submitted"
       };
-      global.localStorage.setItem("FRJ_LAST_PURCHASE_REQUEST", JSON.stringify(lastRequest));
+      requests = [request, ...requests.filter((entry) => entry.accessToken !== request.accessToken)].slice(0, MAX_SAVED_REQUESTS);
+      saveRequests();
       cart.items = [];
       saveCart();
       form.reset();
@@ -412,6 +440,7 @@
     if (!drawer) return;
     drawer.hidden = false;
     document.body.classList.add("cart-open");
+    refreshRequestStatuses();
   }
 
   function close() {
@@ -443,19 +472,56 @@
     }
   }
 
-  function readLastRequest() {
+  function readRequests() {
     try {
-      const parsed = JSON.parse(global.localStorage.getItem("FRJ_LAST_PURCHASE_REQUEST") || "null");
-      if (!parsed || !/^[a-f0-9-]{70,80}$/i.test(String(parsed.accessToken || ""))) return null;
-      return {
-        reference: String(parsed.reference || "").trim(),
-        accessToken: String(parsed.accessToken),
-        backend: parsed.backend === "gas" ? "gas" : "d1",
-        submittedAt: String(parsed.submittedAt || "")
-      };
+      const stored = JSON.parse(global.localStorage.getItem(REQUESTS_KEY) || "[]");
+      const legacy = JSON.parse(global.localStorage.getItem("FRJ_LAST_PURCHASE_REQUEST") || "null");
+      const source = Array.isArray(stored) && stored.length ? stored : (legacy ? [legacy] : []);
+      return source.filter((request) => /^[a-f0-9-]{70,80}$/i.test(String(request?.accessToken || "")))
+        .slice(0, MAX_SAVED_REQUESTS)
+        .map((request) => ({
+          reference: String(request.reference || "").trim(),
+          accessToken: String(request.accessToken),
+          backend: request.backend === "gas" ? "gas" : "d1",
+          submittedAt: String(request.submittedAt || ""),
+          status: String(request.status || "")
+        }));
     } catch {
-      return null;
+      return [];
     }
+  }
+
+  function saveRequests() {
+    global.localStorage.setItem(REQUESTS_KEY, JSON.stringify(requests));
+    if (requests[0]) global.localStorage.setItem("FRJ_LAST_PURCHASE_REQUEST", JSON.stringify(requests[0]));
+  }
+
+  function requestStatusLabel(status) {
+    const keys = {
+      submitted: "statusSubmitted", viewed: "statusViewed", preparing: "statusPreparing",
+      ready: "statusReady", completed: "statusCompleted", cancelled: "statusCancelled", expired: "statusExpired"
+    };
+    return status === "awaiting_approval" ? label("statusAwaiting") : (keys[status] ? label(keys[status]) : label("statusSubmitted"));
+  }
+
+  async function refreshRequestStatuses() {
+    if (trackingRefreshRunning || !requests.length || !global.FRJ_API?.getOrderStatus) return;
+    trackingRefreshRunning = true;
+    let changed = false;
+    await Promise.all(requests.map(async (request) => {
+      try {
+        const order = await global.FRJ_API.getOrderStatus(request.accessToken);
+        if (request.status !== order.status || request.backend !== "d1") changed = true;
+        request.status = order.status;
+        request.backend = "d1";
+        request.updatedAt = order.updatedAt || request.updatedAt || "";
+      } catch (error) {
+        if (error?.status !== 404) console.warn("Suivi de demande indisponible", error);
+      }
+    }));
+    trackingRefreshRunning = false;
+    if (changed) saveRequests();
+    render();
   }
 
   function trackingUrl(accessToken) {
