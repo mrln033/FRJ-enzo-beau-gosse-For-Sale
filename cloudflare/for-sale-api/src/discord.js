@@ -3,6 +3,7 @@ const ADMIN_ORDERS_URL = "https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale
 
 const STATUS_LABELS = {
   submitted: "Demande transmise",
+  awaiting_approval: "À valider par le client",
   viewed: "Demande consultée",
   preparing: "Préparation en cours",
   ready: "Prête",
@@ -13,6 +14,7 @@ const STATUS_LABELS = {
 
 const STATUS_COLORS = {
   submitted: 0xC89222,
+  awaiting_approval: 0x8B5CF6,
   viewed: 0x3578C4,
   preparing: 0xD87818,
   ready: 0x27834A,

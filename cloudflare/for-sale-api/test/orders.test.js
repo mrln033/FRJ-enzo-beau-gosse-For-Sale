@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalizeOrderSubmission, priceOrderLines, validateOrderStatus } from "../src/orders.js";
+import { normalizeOrderSubmission, priceOrderLines, reviseOrderLine, validateOrderStatus } from "../src/orders.js";
 
 const validPayload = {
   id: "123e4567-e89b-42d3-a456-426614174000",
@@ -86,4 +86,28 @@ test("calcule avec le MU arrondi exactement comme sur la tuile", () => {
 test("valide uniquement les statuts connus", () => {
   assert.equal(validateOrderStatus("READY"), "ready");
   assert.throws(() => validateOrderStatus("deleted"), /invalide/);
+});
+
+test("recalcule une proposition ponctuelle en pourcentage affiché", () => {
+  const revised = reviseOrderLine({ itemName: "Item A", unitTtPed: 10 }, {
+    quantity: 3,
+    markupKind: "percent",
+    markupAmount: 115
+  }, 5);
+  assert.equal(revised.markupValue, 1.15);
+  assert.equal(revised.markupDisplay, "115,00 %");
+  assert.equal(revised.lineSalePed, 34.5);
+});
+
+test("recalcule une proposition ponctuelle en PED et contrôle le stock", () => {
+  const revised = reviseOrderLine({ itemName: "Item A", unitTtPed: 3 }, {
+    quantity: 2,
+    markupKind: "ped",
+    markupAmount: 0.75
+  }, 2);
+  assert.equal(revised.lineSalePed, 7.5);
+  assert.throws(() => reviseOrderLine({ itemName: "Item A", unitTtPed: 3 }, {
+    quantity: 3,
+    markupKind: "none"
+  }, 2), /Stock insuffisant/);
 });

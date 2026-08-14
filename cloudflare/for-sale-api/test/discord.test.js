@@ -24,6 +24,11 @@ test("construit un message Discord sans mention active", () => {
   assert.match(payload.embeds[0].fields.find((field) => field.name.startsWith("Articles")).value, /MU FRJ/);
 });
 
+test("affiche explicitement une proposition à valider", () => {
+  const payload = buildDiscordOrderPayload({ ...order, status: "awaiting_approval" }, items);
+  assert.match(payload.embeds[0].description, /À valider par le client/);
+});
+
 test("publie avec wait=true et récupère l'identifiant Discord", async () => {
   let request;
   const result = await sendOrUpdateDiscordOrder({

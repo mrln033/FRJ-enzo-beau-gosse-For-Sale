@@ -6,7 +6,7 @@
   <base target="_self">
   <link rel="icon" href="./favicon.ico">
   <link rel="stylesheet" href="./style.css?v=20260814-6">
-  <script src="./js/api-client.js?v=20260814-3"></script>
+  <script src="./js/api-client.js?v=20260814-5"></script>
   <script defer src="./js/admin-menu.js?v=20260814-5"></script>
   <title>[FRJ] — Demandes d'achat</title>
   <style>
@@ -16,6 +16,7 @@
     .orders-summary { margin: 8px 0 20px; color: #5e5547; }
     .orders-list { display: grid; gap: 14px; }
     .order-card { padding: 15px; border: 1px solid #c9bfae; border-radius: 9px; background: #fffdf7; box-shadow: 0 2px 7px rgba(0,0,0,.08); }
+    .order-card.awaiting-approval { border-color: #8b5cf6; box-shadow: 0 0 0 2px rgba(139,92,246,.12); }
     .order-card header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
     .order-card h2 { margin: 0 0 4px; font-size: 1.05rem; }
     .order-meta { display: flex; flex-wrap: wrap; gap: 7px 15px; font-size: .88rem; color: #675e51; }
@@ -25,6 +26,12 @@
     .order-total { margin: 10px 0 0; text-align: right; font-size: 1.05rem; }
     .order-comment { margin: 10px 0 0; padding: 8px; background: #f1ece3; white-space: pre-wrap; }
     .order-status { padding: 6px; border-radius: 5px; }
+    .line-editor { white-space: nowrap; }
+    .line-editor > * + * { margin-left: 5px; }
+    .line-editor input { width: 78px; padding: 5px; }
+    .line-editor select, .line-editor button { padding: 5px; }
+    .line-editor .markup-amount { width: 72px; }
+    .approval-hint { margin: 10px 0 0; padding: 8px 10px; border-radius: 6px; color: #563a87; background: #eee7ff; font-weight: 700; }
     .orders-error { color: #a02323; white-space: pre-line; }
     @media (max-width: 650px) {
       body { padding-top: 125px; }
@@ -46,7 +53,7 @@
 
   <script>
     const STATUS_LABELS = {
-      submitted: "Transmise", viewed: "Vue", preparing: "À préparer",
+      awaiting_approval: "À valider", submitted: "Transmise", viewed: "Vue", preparing: "À préparer",
       ready: "Prête", completed: "Terminée", cancelled: "Annulée", expired: "Expirée"
     };
 
@@ -88,7 +95,7 @@
 
     function renderOrder(order) {
       const article = document.createElement("article");
-      article.className = "order-card";
+      article.className = `order-card${order.status === "awaiting_approval" ? " awaiting-approval" : ""}`;
       const header = document.createElement("header");
       const identity = document.createElement("div");
       const title = document.createElement("h2");
@@ -113,29 +120,75 @@
         option.value = value;
         option.textContent = label;
         option.selected = order.status === value;
+        option.disabled = value === "awaiting_approval";
         select.appendChild(option);
       });
       select.addEventListener("change", () => updateStatus(order.id, select));
       header.append(identity, select);
       article.appendChild(header);
+      if (order.status === "awaiting_approval") {
+        const hint = document.createElement("p");
+        hint.className = "approval-hint";
+        hint.textContent = `Proposition n°${order.proposalVersion} en attente d’acceptation par le client.`;
+        article.appendChild(hint);
+      }
 
       const table = document.createElement("table");
-      table.innerHTML = "<thead><tr><th>Article</th><th>Qté</th><th>Prix affiché</th><th>MU appliqué</th><th>Estimation vente</th></tr></thead>";
+      table.innerHTML = "<thead><tr><th>Article</th><th>Qté proposée</th><th>Prix affiché</th><th>MU ponctuel</th><th>Estimation vente</th><th>Action</th></tr></thead>";
       const body = document.createElement("tbody");
       (order.items || []).forEach((item) => {
         const row = document.createElement("tr");
-        const markupLabel = order.frjMember ? "MU FRJ" : "MU";
-        [
-          `${item.itemName} (${item.storage} · ${item.aisle})`,
-          item.quantity,
-          `${formatPed(item.unitTtPed)} PED`,
-          `${markupLabel} : ${item.markupDisplay || "à confirmer"}`,
-          `${formatPed(item.lineSalePed)} PED`
-        ].forEach((value) => {
+        [`${item.itemName} (${item.storage} · ${item.aisle})`].forEach((value) => {
           const cell = document.createElement("td");
           cell.textContent = value;
           row.appendChild(cell);
         });
+        const quantityCell = document.createElement("td");
+        const quantity = document.createElement("input");
+        quantity.type = "number";
+        quantity.min = "0.0001";
+        quantity.max = "1000000";
+        quantity.step = "0.0001";
+        quantity.value = item.quantity;
+        quantity.setAttribute("aria-label", `Quantité ${item.itemName}`);
+        quantityCell.appendChild(quantity);
+        const priceCell = document.createElement("td");
+        priceCell.textContent = `${formatPed(item.unitTtPed)} PED`;
+        const markupCell = document.createElement("td");
+        markupCell.className = "line-editor";
+        const kind = document.createElement("select");
+        kind.setAttribute("aria-label", `Type de MU ${item.itemName}`);
+        [["percent", "%"], ["ped", "PED"], ["none", "Aucun"]].forEach(([value, label]) => {
+          const option = document.createElement("option");
+          option.value = value;
+          option.textContent = label;
+          option.selected = item.markupKind === value;
+          kind.appendChild(option);
+        });
+        const amount = document.createElement("input");
+        amount.className = "markup-amount";
+        amount.type = "number";
+        amount.min = "0";
+        amount.step = "0.01";
+        amount.value = item.markupKind === "percent"
+          ? Number(item.markupValue || 0) * 100
+          : (item.markupKind === "ped" ? Number(item.markupValue || 0) : "");
+        amount.disabled = item.markupKind === "none";
+        amount.setAttribute("aria-label", `Valeur du MU ${item.itemName}`);
+        kind.addEventListener("change", () => {
+          amount.disabled = kind.value === "none";
+          if (kind.value === "none") amount.value = "";
+        });
+        markupCell.append(kind, amount);
+        const estimateCell = document.createElement("td");
+        estimateCell.textContent = `${formatPed(item.lineSalePed)} PED`;
+        const actionCell = document.createElement("td");
+        const save = document.createElement("button");
+        save.type = "button";
+        save.textContent = "Enregistrer";
+        save.addEventListener("click", () => updateLine(order.id, item.lineNo, { quantity, kind, amount, save }));
+        actionCell.appendChild(save);
+        row.append(quantityCell, priceCell, markupCell, estimateCell, actionCell);
         body.appendChild(row);
       });
       table.appendChild(body);
@@ -161,11 +214,33 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status: select.value })
         });
+        await loadOrders();
       } catch (error) {
         alert(error.message);
         await loadOrders();
       } finally {
         select.disabled = false;
+      }
+    }
+
+    async function updateLine(orderId, lineNo, controls) {
+      controls.save.disabled = true;
+      controls.save.textContent = "Enregistrement…";
+      try {
+        await FRJ_API.fetchD1Admin(`/admin/orders/${encodeURIComponent(orderId)}/items/${lineNo}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            quantity: Number(controls.quantity.value),
+            markupKind: controls.kind.value,
+            markupAmount: controls.kind.value === "none" ? null : Number(controls.amount.value)
+          })
+        });
+        await loadOrders();
+      } catch (error) {
+        alert(error.message);
+        controls.save.disabled = false;
+        controls.save.textContent = "Enregistrer";
       }
     }
 

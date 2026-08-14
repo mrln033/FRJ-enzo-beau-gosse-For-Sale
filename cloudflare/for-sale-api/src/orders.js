@@ -149,6 +149,40 @@ export function validateOrderStatus(status) {
   return normalized;
 }
 
+export function reviseOrderLine(existingLine, payload, availableStock) {
+  const itemName = String(existingLine?.itemName || existingLine?.item_name || "Article");
+  const quantity = Number(payload?.quantity);
+  const stock = Math.max(0, Number(availableStock) || 0);
+  if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 1_000_000) {
+    throw new Error(`Quantité invalide pour ${itemName}`);
+  }
+  if (quantity > stock) {
+    throw new Error(`Stock insuffisant pour ${itemName} (${stock} disponible)`);
+  }
+
+  const markupKind = normalizeMarkupKind(payload?.markupKind);
+  const rawAmount = markupKind === "none" ? null : Number(payload?.markupAmount);
+  if (markupKind !== "none" && (!Number.isFinite(rawAmount) || rawAmount < 0 || rawAmount > 1_000_000)) {
+    throw new Error(`MU invalide pour ${itemName}`);
+  }
+  const markupValue = markupKind === "percent" ? roundPed(rawAmount / 100, 4) : rawAmount;
+  const unitTtPed = Math.max(0, Number(existingLine?.unitTtPed ?? existingLine?.unit_tt_ped) || 0);
+  const unitSalePed = roundPed(saleUnitPrice(unitTtPed, markupKind, markupValue));
+  const roundedQuantity = roundPed(quantity, 4);
+
+  return {
+    quantity: roundedQuantity,
+    stockAtSubmission: stock,
+    markupKind,
+    markupValue,
+    markupDisplay: formatMarkup(markupKind, markupValue),
+    unitSalePed,
+    lineTtPed: roundPed(unitTtPed * roundedQuantity),
+    lineSalePed: roundPed(unitSalePed * roundedQuantity),
+    priceStatus: markupKind === "none" ? "to-confirm" : "estimated"
+  };
+}
+
 export function orderItemKey(row) {
   return [row?.itemName, row?.storage, row?.aisle]
     .map((value) => String(value || "").trim().toLocaleLowerCase("en-US"))

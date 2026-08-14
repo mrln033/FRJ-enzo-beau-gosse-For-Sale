@@ -16,6 +16,7 @@ import {
 import {
   normalizeOrderSubmission,
   priceOrderLines,
+  reviseOrderLine,
   validateOrderStatus
 } from "./orders.js";
 import { sendOrUpdateDiscordOrder } from "./discord.js";
@@ -86,6 +87,12 @@ export default {
 
       if (request.method === "POST") {
         if (isSyncRequest) return withCors(await handleSyncPost(request, url, env), origin);
+        if (/^\/orders\/status\/[a-f0-9-]{70,80}\/accept$/i.test(url.pathname)) {
+          if (!PUBLIC_ORIGINS.has(String(origin || ""))) {
+            return withCors(json({ error: "Origine non autorisée" }, 403), origin);
+          }
+          return withCors(await handlePublicOrderAcceptance(request, url, env), origin);
+        }
         if (url.pathname === "/orders") {
           if (!PUBLIC_ORIGINS.has(String(origin || ""))) {
             return withCors(json({ error: "Origine non autorisée" }, 403), origin);
@@ -1324,17 +1331,84 @@ function mapSyncState(row) {
 }
 
 async function handleAdminPost(request, url, env) {
+  const orderItemMatch = url.pathname.match(/^\/admin\/orders\/([a-f0-9-]{36})\/items\/(\d+)$/i);
+  if (orderItemMatch) {
+    const body = await readTextBody(request, 20_000);
+    const payload = parseJsonBody(body);
+    const orderId = orderItemMatch[1].toLowerCase();
+    const lineNo = Number(orderItemMatch[2]);
+    const existing = await env.DB.prepare(`
+      SELECT oi.order_id, oi.line_no, oi.item_name, oi.storage, oi.aisle, oi.unit_tt_ped,
+             oi.quantity, oi.markup_kind, oi.markup_value
+      FROM purchase_order_items oi
+      JOIN purchase_orders po ON po.id = oi.order_id
+      WHERE oi.order_id = ? AND oi.line_no = ?
+    `).bind(orderId, lineNo).first();
+    if (!existing) throw new ApiError(404, "Article de demande introuvable");
+
+    const stockRow = await env.DB.prepare(`
+      SELECT COALESCE(SUM(ii.quantity), 0) AS stock
+      FROM inventory_current ii
+      WHERE ii.avatar_id = 'enzo'
+        AND ii.item_name = ? COLLATE NOCASE
+        AND ${SALEABLE_CONTAINER_SQL}
+    `).bind(existing.item_name).first();
+    const revised = parseOrderValue(() => reviseOrderLine(existing, payload, Number(stockRow?.stock || 0)));
+    const sameMarkupValue = revised.markupValue === null
+      ? existing.markup_value === null || existing.markup_value === undefined
+      : Math.abs(Number(existing.markup_value) - revised.markupValue) <= 0.0001;
+    if (
+      Math.abs(Number(existing.quantity) - revised.quantity) <= 0.0001
+      && String(existing.markup_kind || "none") === revised.markupKind
+      && sameMarkupValue
+    ) {
+      return json({ ok: true, noChange: true });
+    }
+    await env.DB.batch([
+      env.DB.prepare(`
+        UPDATE purchase_order_items
+        SET quantity = ?, stock_at_submission = ?, markup_kind = ?, markup_value = ?,
+            markup_display = ?, unit_sale_ped = ?, line_tt_ped = ?, line_sale_ped = ?, price_status = ?
+        WHERE order_id = ? AND line_no = ?
+      `).bind(
+        revised.quantity, revised.stockAtSubmission, revised.markupKind, revised.markupValue,
+        revised.markupDisplay, revised.unitSalePed, revised.lineTtPed, revised.lineSalePed,
+        revised.priceStatus, orderId, lineNo
+      ),
+      env.DB.prepare(`
+        UPDATE purchase_orders
+        SET status = 'submitted', approval_required = 1,
+            proposal_version = proposal_version + 1,
+            total_tt_ped = (SELECT COALESCE(SUM(line_tt_ped), 0) FROM purchase_order_items WHERE order_id = ?),
+            total_sale_ped = (SELECT COALESCE(SUM(line_sale_ped), 0) FROM purchase_order_items WHERE order_id = ?),
+            pricing_status = CASE WHEN EXISTS (
+              SELECT 1 FROM purchase_order_items WHERE order_id = ? AND price_status = 'to-confirm'
+            ) THEN 'to-confirm' ELSE 'estimated' END,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).bind(orderId, orderId, orderId, orderId),
+      env.DB.prepare(`
+        INSERT INTO purchase_order_events (order_id, action, details)
+        VALUES (?, 'proposal-line-changed', ?)
+      `).bind(orderId, JSON.stringify({ lineNo, itemName: existing.item_name, revised }))
+    ]);
+    const discord = await synchronizeDiscordOrder(env, orderId);
+    return json({ ok: true, status: "awaiting_approval", discord: publicDiscordResult(discord) });
+  }
+
   const orderStatusMatch = url.pathname.match(/^\/admin\/orders\/([a-f0-9-]{36})\/status$/i);
   if (orderStatusMatch) {
     const body = await readTextBody(request, 20_000);
     const payload = parseJsonBody(body);
     const status = parseOrderValue(() => validateOrderStatus(payload.status));
-    const existing = await env.DB.prepare(`SELECT id, status FROM purchase_orders WHERE id = ?`)
+    const existing = await env.DB.prepare(`SELECT id, status, approval_required FROM purchase_orders WHERE id = ?`)
       .bind(orderStatusMatch[1].toLowerCase()).first();
     if (!existing) throw new ApiError(404, "Demande introuvable");
-    if (existing.status === status) return json({ ok: true, noChange: true, status });
+    if (existing.status === status && Number(existing.approval_required || 0) === 0) {
+      return json({ ok: true, noChange: true, status });
+    }
     await env.DB.batch([
-      env.DB.prepare(`UPDATE purchase_orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
+      env.DB.prepare(`UPDATE purchase_orders SET status = ?, approval_required = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
         .bind(status, existing.id),
       env.DB.prepare(`INSERT INTO purchase_order_events (order_id, action, details) VALUES (?, 'status-changed', ?)`)
         .bind(existing.id, JSON.stringify({ from: existing.status, to: status }))
@@ -1406,7 +1480,7 @@ async function handlePublicOrderGet(url, env) {
   if (!match) throw new ApiError(404, "Demande introuvable");
   const tokenHash = await sha256(match[1]);
   const order = await env.DB.prepare(`
-    SELECT id, public_reference, status, buyer_avatar, language, frj_member,
+    SELECT id, public_reference, status, approval_required, proposal_version, buyer_avatar, language, frj_member,
            total_tt_ped, total_sale_ped, pricing_status, created_at, updated_at
     FROM purchase_orders
     WHERE access_token_hash = ?
@@ -1414,10 +1488,48 @@ async function handlePublicOrderGet(url, env) {
   if (!order) throw new ApiError(404, "Demande introuvable");
   const items = await env.DB.prepare(`
     SELECT line_no, item_name, storage, aisle, quantity, stock_at_submission,
-           unit_tt_ped, markup_display, unit_sale_ped, line_tt_ped, line_sale_ped, price_status
+           unit_tt_ped, markup_kind, markup_value, markup_display, unit_sale_ped,
+           line_tt_ped, line_sale_ped, price_status
     FROM purchase_order_items WHERE order_id = ? ORDER BY line_no
   `).bind(order.id).all();
   return json({ order: mapPublicOrder(order, items.results) });
+}
+
+async function handlePublicOrderAcceptance(request, url, env) {
+  if (!isCartEnabled(env)) throw new ApiError(503, "Suivi de panier désactivé");
+  const match = url.pathname.match(/^\/orders\/status\/([a-f0-9-]{70,80})\/accept$/i);
+  if (!match) throw new ApiError(404, "Demande introuvable");
+  const payload = parseJsonBody(await readTextBody(request, 20_000));
+  const proposalVersion = Number(payload.proposalVersion);
+  if (!Number.isInteger(proposalVersion) || proposalVersion < 1) {
+    throw new ApiError(400, "Version de proposition invalide");
+  }
+  const tokenHash = await sha256(match[1]);
+  const order = await env.DB.prepare(`
+    SELECT id, status, approval_required, proposal_version
+    FROM purchase_orders WHERE access_token_hash = ?
+  `).bind(tokenHash).first();
+  if (!order) throw new ApiError(404, "Demande introuvable");
+  if (Number(order.approval_required || 0) !== 1) {
+    return json({ ok: true, noChange: true, status: order.status });
+  }
+  if (Number(order.proposal_version || 0) !== proposalVersion) {
+    throw new ApiError(409, "La proposition a changé. Actualisez la page avant de l’accepter.");
+  }
+  const result = await env.DB.prepare(`
+    UPDATE purchase_orders
+    SET status = 'submitted', approval_required = 0, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ? AND approval_required = 1 AND proposal_version = ?
+  `).bind(order.id, proposalVersion).run();
+  if (Number(result.meta?.changes || 0) !== 1) {
+    throw new ApiError(409, "La proposition a changé. Actualisez la page avant de l’accepter.");
+  }
+  await env.DB.prepare(`
+    INSERT INTO purchase_order_events (order_id, action, details)
+    VALUES (?, 'proposal-accepted', ?)
+  `).bind(order.id, JSON.stringify({ proposalVersion })).run();
+  const discord = await synchronizeDiscordOrder(env, order.id);
+  return json({ ok: true, noChange: false, status: "submitted", discord: publicDiscordResult(discord) });
 }
 
 async function handlePublicOrderPost(request, env) {
@@ -1429,7 +1541,8 @@ async function handlePublicOrderPost(request, env) {
   const submission = parseOrderValue(() => normalizeOrderSubmission(rawPayload));
   const accessTokenHash = await sha256(submission.accessToken);
   const duplicate = await env.DB.prepare(`
-    SELECT id, public_reference, access_token_hash, status, total_tt_ped, total_sale_ped,
+    SELECT id, public_reference, access_token_hash, status, approval_required, proposal_version,
+           total_tt_ped, total_sale_ped,
            pricing_status, created_at, updated_at, buyer_avatar, language, frj_member,
            discord_message_id
     FROM purchase_orders WHERE id = ? OR public_reference = ?
@@ -1619,7 +1732,8 @@ async function synchronizeDiscordOrder(env, orderId) {
 
   const [orderResult, itemsResult] = await env.DB.batch([
     env.DB.prepare(`
-      SELECT id, public_reference, status, buyer_avatar, buyer_contact, buyer_comment,
+      SELECT id, public_reference, status, approval_required, proposal_version,
+             buyer_avatar, buyer_contact, buyer_comment,
              language, frj_member, source_backend, total_tt_ped, total_sale_ped,
              pricing_status, created_at, updated_at, discord_message_id
       FROM purchase_orders WHERE id = ?
@@ -1678,14 +1792,16 @@ async function readAdminOrders(env) {
   if (!isCartEnabled(env)) return { enabled: false, generatedAt: new Date().toISOString(), orders: [] };
   const [ordersResult, itemsResult] = await env.DB.batch([
     env.DB.prepare(`
-      SELECT id, public_reference, status, buyer_avatar, buyer_contact, buyer_comment,
+      SELECT id, public_reference, status, approval_required, proposal_version,
+             buyer_avatar, buyer_contact, buyer_comment,
              language, frj_member, source_backend, total_tt_ped, total_sale_ped,
              pricing_status, client_created_at, created_at, updated_at
       FROM purchase_orders ORDER BY created_at DESC LIMIT 200
     `),
     env.DB.prepare(`
       SELECT oi.order_id, oi.line_no, oi.item_name, oi.storage, oi.aisle, oi.quantity,
-             oi.stock_at_submission, oi.unit_tt_ped, oi.markup_display, oi.unit_sale_ped,
+              oi.stock_at_submission, oi.unit_tt_ped, oi.markup_kind, oi.markup_value,
+              oi.markup_display, oi.unit_sale_ped,
              oi.line_tt_ped, oi.line_sale_ped, oi.price_status
       FROM purchase_order_items oi
       JOIN (SELECT id FROM purchase_orders ORDER BY created_at DESC LIMIT 200) recent
@@ -1708,10 +1824,13 @@ async function readAdminOrders(env) {
 }
 
 function mapPublicOrder(order, items) {
+  const approvalRequired = Number(order.approval_required ?? order.approvalRequired ?? 0) === 1;
   return {
     id: order.id,
     publicReference: order.public_reference || order.publicReference,
-    status: order.status || "submitted",
+    status: approvalRequired ? "awaiting_approval" : (order.status || "submitted"),
+    approvalRequired,
+    proposalVersion: Number(order.proposal_version ?? order.proposalVersion ?? 0),
     buyerAvatar: order.buyer_avatar || order.buyerAvatar,
     language: order.language || "EN",
     frjMember: Number(order.frj_member ?? order.frjMember ?? 0) === 1 || order.frjMember === true,

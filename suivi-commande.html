@@ -7,7 +7,7 @@
   <meta name="robots" content="noindex,nofollow">
   <base target="_self">
   <link rel="icon" href="./favicon.ico">
-  <script src="./js/api-client.js?v=20260814-4"></script>
+  <script src="./js/api-client.js?v=20260814-5"></script>
   <title>[FRJ] — Suivi de demande</title>
   <style>
     :root { color-scheme: light; font-family: Arial, sans-serif; color: #2d261b; background: #eee9df; }
@@ -29,6 +29,8 @@
     .tracking-status.ready::before, .tracking-status.completed::before { background: #27834a; }
     .tracking-status.cancelled, .tracking-status.expired { color: #79231f; background: #f4d9d6; }
     .tracking-status.cancelled::before, .tracking-status.expired::before { background: #b43c34; }
+    .tracking-status.awaiting_approval { color: #563a87; background: #eee7ff; }
+    .tracking-status.awaiting_approval::before { background: #8b5cf6; }
     button { padding: 8px 12px; border: 1px solid #8b795a; border-radius: 6px; background: #fff; cursor: pointer; }
     button:hover { background: #f5eee1; }
     .tracking-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px 20px; margin: 0 0 20px; }
@@ -45,6 +47,11 @@
     .tracking-message { padding: 26px 20px; text-align: center; white-space: pre-line; }
     .tracking-message.error { color: #932d29; }
     .tracking-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .tracking-proposal { margin: 0 0 20px; padding: 14px; border: 1px solid #a78bda; border-radius: 8px; color: #3f2868; background: #f3efff; }
+    .tracking-proposal p { margin: 0 0 12px; }
+    .tracking-proposal button { border-color: #7045b2; color: #fff; background: #7045b2; font-weight: 800; }
+    .tracking-proposal button:hover { background: #5c3499; }
+    .tracking-proposal button:disabled { opacity: .65; cursor: wait; }
     @media (max-width: 600px) {
       .tracking-meta { grid-template-columns: 1fr; }
       .tracking-top img { width: 58px; }
@@ -70,11 +77,11 @@
   <script>
     const STATUS_LABELS = {
       FR: {
-        submitted: "Demande transmise", viewed: "Demande consultée", preparing: "Préparation en cours",
+        awaiting_approval: "À valider", submitted: "Demande transmise", viewed: "Demande consultée", preparing: "Préparation en cours",
         ready: "Prête", completed: "Terminée", cancelled: "Annulée", expired: "Expirée"
       },
       EN: {
-        submitted: "Request submitted", viewed: "Request viewed", preparing: "Being prepared",
+        awaiting_approval: "Approval required", submitted: "Request submitted", viewed: "Request viewed", preparing: "Being prepared",
         ready: "Ready", completed: "Completed", cancelled: "Cancelled", expired: "Expired"
       }
     };
@@ -85,6 +92,9 @@
         reference: "Référence", avatar: "Avatar", created: "Transmise le", updated: "Dernière mise à jour",
         item: "Article", quantity: "Qté", price: "Prix affiché", markup: "MU appliqué", estimate: "Estimation",
         total: "Estimation totale", member: "MU FRJ", public: "MU", pending: "à confirmer",
+        proposal: "Enzo a modifié une ou plusieurs quantités ou MU. Vérifiez les nouvelles conditions affichées ci-dessous, puis acceptez-les pour retransmettre la demande.",
+        accept: "Accepter les modifications", accepting: "Validation…",
+        acceptError: "La validation a échoué. Actualisez la page et réessayez.",
         note: "Prix indicatif, à confirmer avec Enzo. Le stock n’est pas réservé par cette demande.",
         loading: "Actualisation…", missing: "Lien de suivi invalide ou incomplet.",
         gasPending: "Votre demande a été reçue par le secours GAS. Elle apparaîtra ici après son transfert automatique vers D1 (généralement sous cinq minutes).",
@@ -97,6 +107,9 @@
         reference: "Reference", avatar: "Avatar", created: "Submitted", updated: "Last update",
         item: "Item", quantity: "Qty", price: "Displayed price", markup: "Applied MU", estimate: "Estimate",
         total: "Total estimate", member: "FRJ MU", public: "MU", pending: "to confirm",
+        proposal: "Enzo changed one or more quantities or MUs. Review the new terms below, then accept them to resubmit the request.",
+        accept: "Accept changes", accepting: "Accepting…",
+        acceptError: "Acceptance failed. Refresh the page and try again.",
         note: "Indicative price, to be confirmed with Enzo. Stock is not reserved by this request.",
         loading: "Refreshing…", missing: "Invalid or incomplete tracking link.",
         gasPending: "Your request was received by the GAS fallback. It will appear here after its automatic transfer to D1 (usually within five minutes).",
@@ -199,6 +212,19 @@
       statusRow.append(status, actions);
       content.appendChild(statusRow);
 
+      if (order.status === "awaiting_approval") {
+        const proposal = document.createElement("section");
+        proposal.className = "tracking-proposal";
+        const message = document.createElement("p");
+        message.textContent = text("proposal");
+        const accept = document.createElement("button");
+        accept.type = "button";
+        accept.textContent = text("accept");
+        accept.addEventListener("click", () => acceptProposal(order, accept));
+        proposal.append(message, accept);
+        content.appendChild(proposal);
+      }
+
       const meta = document.createElement("dl");
       meta.className = "tracking-meta";
       [
@@ -250,6 +276,19 @@
       note.className = "tracking-note";
       note.textContent = text("note");
       content.appendChild(note);
+    }
+
+    async function acceptProposal(order, button) {
+      button.disabled = true;
+      button.textContent = text("accepting");
+      try {
+        await FRJ_API.acceptOrderProposal(token, order.proposalVersion);
+        await loadOrder();
+      } catch (error) {
+        alert(error.message || text("acceptError"));
+        button.disabled = false;
+        button.textContent = text("accept");
+      }
     }
 
     applyLanguage();

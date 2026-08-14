@@ -87,7 +87,11 @@
     }
     if (!response.ok) {
       const details = await response.text();
-      throw new Error(details || `D1 répond ${response.status}`);
+      let message = details;
+      try { message = JSON.parse(details)?.error || details; } catch {}
+      const error = new Error(message || `D1 répond ${response.status}`);
+      error.status = response.status;
+      throw error;
     }
 
     setActiveBackend("d1");
@@ -169,6 +173,29 @@
       throw error;
     }
     return result.order;
+  }
+
+  async function acceptOrderProposal(accessToken, proposalVersion) {
+    const token = String(accessToken || "").trim();
+    const version = Number(proposalVersion);
+    if (!/^[a-f0-9-]{70,80}$/i.test(token) || !Number.isInteger(version) || version < 1) {
+      const error = new Error("Proposition de demande invalide");
+      error.status = 400;
+      throw error;
+    }
+    const response = await global.fetch(`${D1_URL}/orders/status/${encodeURIComponent(token)}/accept`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ proposalVersion: version })
+    });
+    const result = await readJsonResponse(response);
+    if (!response.ok) {
+      const error = new Error(result.error || `D1 répond ${response.status}`);
+      error.status = response.status;
+      error.details = result;
+      throw error;
+    }
+    return result;
   }
 
   async function readJsonResponse(response) {
@@ -386,6 +413,7 @@
     publishGasObservation,
     submitOrder,
     getOrderStatus,
+    acceptOrderProposal,
     backend: preferredBackend,
     get activeBackend() { return activeBackend; },
     label: preferredBackend === "d1" ? "Cloudflare D1" : "Google Sheets / GAS",
