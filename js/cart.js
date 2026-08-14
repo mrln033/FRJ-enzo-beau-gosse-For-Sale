@@ -360,7 +360,7 @@
   async function copyCart() {
     const lines = cart.items.map((item) => {
       const prices = linePrices(item);
-      return `- ${formatQuantity(item.quantity)} × ${item.itemName} — ${formatPed(item.unitTtPed)} PED/u — ${formatPed(prices.sale)} PED`;
+      return `- ${formatQuantity(item.quantity)} × ${item.itemName} — ${formatPed(item.unitTtPed)} PED/u — ${displayedMarkup(item)} — ${formatPed(prices.sale)} PED`;
     });
     const total = roundPed(cart.items.reduce((sum, item) => sum + linePrices(item).sale, 0));
     const heading = language() === "FR" ? "Bonjour, je suis intéressé par :" : "Hello, I am interested in:";
