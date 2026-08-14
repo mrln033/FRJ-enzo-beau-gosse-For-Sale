@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex,nofollow">
+  <base target="_self">
+  <link rel="icon" href="./favicon.ico">
+  <script src="./js/api-client.js?v=20260814-4"></script>
+  <title>[FRJ] — Suivi de demande</title>
+  <style>
+    :root { color-scheme: light; font-family: Arial, sans-serif; color: #2d261b; background: #eee9df; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 24px 14px 50px; }
+    .tracking-shell { width: min(900px, 100%); margin: 0 auto; }
+    .tracking-top { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-bottom: 18px; }
+    .tracking-top img { width: 76px; height: auto; }
+    .tracking-top a { color: #563a0e; font-weight: 700; }
+    .tracking-card { overflow: hidden; border: 1px solid #c8bfae; border-radius: 11px; background: #fffdf7; box-shadow: 0 4px 18px rgba(0,0,0,.12); }
+    .tracking-header { padding: 20px; color: #fff; background: #2b2113; }
+    .tracking-header h1 { margin: 0 0 7px; font-size: clamp(1.35rem, 4vw, 2rem); }
+    .tracking-header p { margin: 0; color: #ded4c2; }
+    .tracking-body { padding: 20px; }
+    .tracking-status-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+    .tracking-status { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; color: #3a2a0e; background: #ead9a8; font-weight: 800; }
+    .tracking-status::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: #9a6e19; }
+    .tracking-status.ready, .tracking-status.completed { color: #164d2a; background: #d9efdf; }
+    .tracking-status.ready::before, .tracking-status.completed::before { background: #27834a; }
+    .tracking-status.cancelled, .tracking-status.expired { color: #79231f; background: #f4d9d6; }
+    .tracking-status.cancelled::before, .tracking-status.expired::before { background: #b43c34; }
+    button { padding: 8px 12px; border: 1px solid #8b795a; border-radius: 6px; background: #fff; cursor: pointer; }
+    button:hover { background: #f5eee1; }
+    .tracking-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px 20px; margin: 0 0 20px; }
+    .tracking-meta div { display: grid; gap: 2px; }
+    .tracking-meta dt { color: #746a5d; font-size: .8rem; }
+    .tracking-meta dd { margin: 0; font-weight: 700; }
+    .tracking-table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 8px 7px; border-bottom: 1px solid #e3dccf; text-align: left; }
+    th:not(:first-child), td:not(:first-child) { text-align: right; white-space: nowrap; }
+    th { color: #6b6154; font-size: .8rem; }
+    .tracking-total { display: flex; justify-content: space-between; gap: 15px; margin: 18px 0 0; padding: 13px; background: #f1ebdf; font-size: 1.05rem; }
+    .tracking-note { color: #6a6053; font-size: .86rem; }
+    .tracking-message { padding: 26px 20px; text-align: center; white-space: pre-line; }
+    .tracking-message.error { color: #932d29; }
+    .tracking-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    @media (max-width: 600px) {
+      .tracking-meta { grid-template-columns: 1fr; }
+      .tracking-top img { width: 58px; }
+      .tracking-body { padding: 15px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="tracking-shell">
+    <nav class="tracking-top" aria-label="Navigation">
+      <img src="./Logo%20FRJ.png" alt="FRJ">
+      <a href="./">← <span id="catalogLink">Retour au catalogue</span></a>
+    </nav>
+    <article class="tracking-card">
+      <header class="tracking-header">
+        <h1 id="pageTitle">Suivi de votre demande</h1>
+        <p id="pageSubtitle">Ce lien est privé : conservez-le pour consulter l’avancement.</p>
+      </header>
+      <div id="trackingContent" class="tracking-message">Chargement…</div>
+    </article>
+  </main>
+
+  <script>
+    const STATUS_LABELS = {
+      FR: {
+        submitted: "Demande transmise", viewed: "Demande consultée", preparing: "Préparation en cours",
+        ready: "Prête", completed: "Terminée", cancelled: "Annulée", expired: "Expirée"
+      },
+      EN: {
+        submitted: "Request submitted", viewed: "Request viewed", preparing: "Being prepared",
+        ready: "Ready", completed: "Completed", cancelled: "Cancelled", expired: "Expired"
+      }
+    };
+    const COPY = {
+      FR: {
+        title: "Suivi de votre demande", subtitle: "Ce lien est privé : conservez-le pour consulter l’avancement.",
+        back: "Retour au catalogue", refresh: "Actualiser", copy: "Copier le lien", copied: "Lien copié",
+        reference: "Référence", avatar: "Avatar", created: "Transmise le", updated: "Dernière mise à jour",
+        item: "Article", quantity: "Qté", price: "Prix affiché", markup: "MU appliqué", estimate: "Estimation",
+        total: "Estimation totale", member: "MU FRJ", public: "MU", pending: "à confirmer",
+        note: "Prix indicatif, à confirmer avec Enzo. Le stock n’est pas réservé par cette demande.",
+        loading: "Actualisation…", missing: "Lien de suivi invalide ou incomplet.",
+        gasPending: "Votre demande a été reçue par le secours GAS. Elle apparaîtra ici après son transfert automatique vers D1 (généralement sous cinq minutes).",
+        notFound: "Cette demande est introuvable. Vérifiez que le lien est complet.",
+        unavailable: "Le suivi est momentanément indisponible. Réessayez dans quelques minutes."
+      },
+      EN: {
+        title: "Track your request", subtitle: "This link is private: keep it to check progress.",
+        back: "Back to catalogue", refresh: "Refresh", copy: "Copy link", copied: "Link copied",
+        reference: "Reference", avatar: "Avatar", created: "Submitted", updated: "Last update",
+        item: "Item", quantity: "Qty", price: "Displayed price", markup: "Applied MU", estimate: "Estimate",
+        total: "Total estimate", member: "FRJ MU", public: "MU", pending: "to confirm",
+        note: "Indicative price, to be confirmed with Enzo. Stock is not reserved by this request.",
+        loading: "Refreshing…", missing: "Invalid or incomplete tracking link.",
+        gasPending: "Your request was received by the GAS fallback. It will appear here after its automatic transfer to D1 (usually within five minutes).",
+        notFound: "This request could not be found. Check that the link is complete.",
+        unavailable: "Tracking is temporarily unavailable. Try again in a few minutes."
+      }
+    };
+
+    const token = new URLSearchParams(location.search).get("token") || "";
+    let lang = localStorage.getItem("lang") === "FR" ? "FR" : "EN";
+    let refreshing = false;
+
+    function text(key) { return COPY[lang][key] || key; }
+    function formatPed(value) {
+      return Number(value || 0).toLocaleString(lang === "FR" ? "fr-FR" : "en-GB", {
+        minimumFractionDigits: 2, maximumFractionDigits: 2
+      });
+    }
+    function formatQuantity(value) {
+      return Number(value || 0).toLocaleString(lang === "FR" ? "fr-FR" : "en-GB", { maximumFractionDigits: 4 });
+    }
+    function formatDate(value) {
+      if (!value) return "—";
+      return new Date(value).toLocaleString(lang === "FR" ? "fr-FR" : "en-GB", {
+        dateStyle: "short", timeStyle: "short"
+      });
+    }
+    function applyLanguage() {
+      document.documentElement.lang = lang.toLowerCase();
+      document.title = `[FRJ] — ${text("title")}`;
+      document.getElementById("pageTitle").textContent = text("title");
+      document.getElementById("pageSubtitle").textContent = text("subtitle");
+      document.getElementById("catalogLink").textContent = text("back");
+    }
+    function isPendingGasRequest() {
+      try {
+        const last = JSON.parse(localStorage.getItem("FRJ_LAST_PURCHASE_REQUEST") || "null");
+        return last?.backend === "gas" && last?.accessToken === token;
+      } catch { return false; }
+    }
+    function showMessage(message, type = "") {
+      const content = document.getElementById("trackingContent");
+      content.className = `tracking-message${type ? ` ${type}` : ""}`;
+      content.textContent = message;
+    }
+
+    async function loadOrder() {
+      if (refreshing) return;
+      if (!/^[a-f0-9-]{70,80}$/i.test(token)) {
+        applyLanguage();
+        showMessage(text("missing"), "error");
+        return;
+      }
+      refreshing = true;
+      showMessage(text("loading"));
+      try {
+        const order = await FRJ_API.getOrderStatus(token);
+        lang = order.language === "FR" ? "FR" : "EN";
+        localStorage.setItem("lang", lang);
+        applyLanguage();
+        renderOrder(order);
+      } catch (error) {
+        applyLanguage();
+        if (error.status === 404 && isPendingGasRequest()) showMessage(text("gasPending"));
+        else if (error.status === 404) showMessage(text("notFound"), "error");
+        else showMessage(text("unavailable"), "error");
+      } finally {
+        refreshing = false;
+      }
+    }
+
+    function renderOrder(order) {
+      const content = document.getElementById("trackingContent");
+      content.className = "tracking-body";
+      content.replaceChildren();
+
+      const statusRow = document.createElement("div");
+      statusRow.className = "tracking-status-row";
+      const status = document.createElement("span");
+      status.className = `tracking-status ${order.status}`;
+      status.textContent = STATUS_LABELS[lang][order.status] || order.status;
+      const actions = document.createElement("div");
+      actions.className = "tracking-actions";
+      const refresh = document.createElement("button");
+      refresh.type = "button";
+      refresh.textContent = text("refresh");
+      refresh.addEventListener("click", loadOrder);
+      const copy = document.createElement("button");
+      copy.type = "button";
+      copy.textContent = text("copy");
+      copy.addEventListener("click", async () => {
+        await navigator.clipboard.writeText(location.href);
+        copy.textContent = text("copied");
+      });
+      actions.append(refresh, copy);
+      statusRow.append(status, actions);
+      content.appendChild(statusRow);
+
+      const meta = document.createElement("dl");
+      meta.className = "tracking-meta";
+      [
+        [text("reference"), order.publicReference], [text("avatar"), order.buyerAvatar],
+        [text("created"), formatDate(order.createdAt)], [text("updated"), formatDate(order.updatedAt)]
+      ].forEach(([label, value]) => {
+        const wrapper = document.createElement("div");
+        const dt = document.createElement("dt");
+        const dd = document.createElement("dd");
+        dt.textContent = label;
+        dd.textContent = value || "—";
+        wrapper.append(dt, dd);
+        meta.appendChild(wrapper);
+      });
+      content.appendChild(meta);
+
+      const tableWrap = document.createElement("div");
+      tableWrap.className = "tracking-table-wrap";
+      const table = document.createElement("table");
+      table.innerHTML = `<thead><tr><th>${text("item")}</th><th>${text("quantity")}</th><th>${text("price")}</th><th>${text("markup")}</th><th>${text("estimate")}</th></tr></thead>`;
+      const body = document.createElement("tbody");
+      (order.items || []).forEach((item) => {
+        const row = document.createElement("tr");
+        const markupLabel = order.frjMember ? text("member") : text("public");
+        [
+          `${item.itemName} (${item.storage} · ${item.aisle})`, formatQuantity(item.quantity),
+          `${formatPed(item.unitTtPed)} PED`, `${markupLabel} : ${item.markupDisplay || text("pending")}`,
+          `${formatPed(item.lineSalePed)} PED`
+        ].forEach((value) => {
+          const cell = document.createElement("td");
+          cell.textContent = value;
+          row.appendChild(cell);
+        });
+        body.appendChild(row);
+      });
+      table.appendChild(body);
+      tableWrap.appendChild(table);
+      content.appendChild(tableWrap);
+
+      const total = document.createElement("p");
+      total.className = "tracking-total";
+      const totalLabel = document.createElement("span");
+      const totalValue = document.createElement("strong");
+      totalLabel.textContent = text("total");
+      totalValue.textContent = `${formatPed(order.totalSalePed)} PED`;
+      total.append(totalLabel, totalValue);
+      content.appendChild(total);
+      const note = document.createElement("p");
+      note.className = "tracking-note";
+      note.textContent = text("note");
+      content.appendChild(note);
+    }
+
+    applyLanguage();
+    loadOrder();
+    setInterval(() => { if (!document.hidden) loadOrder(); }, 5 * 60 * 1000);
+  </script>
+</body>
+</html>

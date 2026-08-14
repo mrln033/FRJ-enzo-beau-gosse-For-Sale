@@ -8,6 +8,8 @@
 - Une transmission n'enlève et ne réserve aucun stock. Elle crée une demande à traiter dans `commandes.html?admin=1`.
 - Le prix de base est toujours `PRIX_UNITAIRE`, c'est-à-dire le prix TT affiché sur la tuile. Le MU affiché est ajouté à ce prix. En français, si « Je suis membre FRJ » est coché, seul le MU est réduit de 50 %.
 - Avant l'enregistrement, D1 ou GAS relit stock, prix affiché et MU. En cas d'écart, le panier est actualisé et une nouvelle confirmation est requise.
+- Après transmission, un lien privé vers `suivi-commande.html` est affiché et conservé dans le `localStorage`. Le client peut l'ouvrir ou le copier pour consulter le statut mis à jour par l'administration. La page se réactualise automatiquement toutes les cinq minutes.
+- Si D1 était indisponible lors de l'envoi, le lien signale l'attente du transfert GAS → D1, puis devient opérationnel après ce transfert.
 - D1 limite les rafales à 8 nouvelles demandes par heure et par adresse anonymisée. Les doublons techniques ne sont pas réenregistrés.
 
 ## Stockage séparé

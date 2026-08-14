@@ -17,7 +17,9 @@
       stockChanged: "Le stock, le prix affiché ou le MU a changé. Le panier a été actualisé ; vérifiez-le avant de renvoyer.",
       failure: "Transmission impossible. Le panier reste enregistré sur cette machine.",
       noPrice: "Prix à confirmer", markupPending: "à confirmer",
-      maxLines: "Le panier est limité à 30 articles."
+      maxLines: "Le panier est limité à 30 articles.", lastRequest: "Dernière demande",
+      trackRequest: "Suivre ma demande", copyTracking: "Copier le lien de suivi",
+      trackingCopied: "Lien de suivi copié.", gasTrackingPending: "Le suivi apparaîtra dès le transfert du secours GAS vers D1."
     },
     EN: {
       cart: "Cart", empty: "Your cart is empty.", add: "Add to cart",
@@ -31,11 +33,14 @@
       stockChanged: "Stock, displayed price or MU changed. The cart was updated; review it before sending again.",
       failure: "Unable to send. The cart remains saved on this device.",
       noPrice: "Price to confirm", markupPending: "to confirm",
-      maxLines: "The cart is limited to 30 items."
+      maxLines: "The cart is limited to 30 items.", lastRequest: "Latest request",
+      trackRequest: "Track my request", copyTracking: "Copy tracking link",
+      trackingCopied: "Tracking link copied.", gasTrackingPending: "Tracking will appear once the GAS fallback has transferred the request to D1."
     }
   };
 
   let cart = readCart();
+  let lastRequest = readLastRequest();
   let drawer;
   let launcher;
   let statusNode;
@@ -213,6 +218,8 @@
     statusNode.className = `cart-status${statusType ? ` ${statusType}` : ""}`;
     content.appendChild(statusNode);
 
+    if (!cart.items.length && lastRequest) content.appendChild(renderTracking());
+
     if (cart.items.length) content.appendChild(renderActions());
     drawer.replaceChildren(content);
   }
@@ -273,6 +280,30 @@
     return wrapper;
   }
 
+  function renderTracking() {
+    const section = document.createElement("section");
+    section.className = "cart-tracking";
+    const title = document.createElement("strong");
+    title.textContent = label("lastRequest");
+    const reference = document.createElement("span");
+    reference.textContent = lastRequest.reference;
+    const link = document.createElement("a");
+    link.href = trackingUrl(lastRequest.accessToken);
+    link.target = "_self";
+    link.textContent = label("trackRequest");
+    const copy = button(label("copyTracking"), "cart-secondary", async () => {
+      await navigator.clipboard.writeText(link.href);
+      setStatus(label("trackingCopied"), "success");
+    });
+    section.append(title, reference, link, copy);
+    if (lastRequest.backend === "gas") {
+      const pending = document.createElement("small");
+      pending.textContent = label("gasTrackingPending");
+      section.appendChild(pending);
+    }
+    return section;
+  }
+
   async function submitCart(event) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -310,12 +341,13 @@
       const result = await global.FRJ_API.submitOrder(payload);
       const reference = result.order?.publicReference || publicReference;
       setStatus(`${label("sent")} — ${reference}${result.backend === "gas" ? `\n${label("fallback")}` : ""}`, "success");
-      global.localStorage.setItem("FRJ_LAST_PURCHASE_REQUEST", JSON.stringify({
+      lastRequest = {
         reference,
         accessToken: payload.accessToken,
         backend: result.backend,
         submittedAt: new Date().toISOString()
-      }));
+      };
+      global.localStorage.setItem("FRJ_LAST_PURCHASE_REQUEST", JSON.stringify(lastRequest));
       cart.items = [];
       saveCart();
       form.reset();
@@ -409,6 +441,27 @@
     } catch {
       return { version: 1, items: [] };
     }
+  }
+
+  function readLastRequest() {
+    try {
+      const parsed = JSON.parse(global.localStorage.getItem("FRJ_LAST_PURCHASE_REQUEST") || "null");
+      if (!parsed || !/^[a-f0-9-]{70,80}$/i.test(String(parsed.accessToken || ""))) return null;
+      return {
+        reference: String(parsed.reference || "").trim(),
+        accessToken: String(parsed.accessToken),
+        backend: parsed.backend === "gas" ? "gas" : "d1",
+        submittedAt: String(parsed.submittedAt || "")
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function trackingUrl(accessToken) {
+    const url = new URL("./suivi-commande.html", global.location.href);
+    url.searchParams.set("token", accessToken);
+    return url.toString();
   }
 
   function saveCart() {

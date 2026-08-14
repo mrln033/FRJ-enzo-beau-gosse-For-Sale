@@ -150,6 +150,27 @@
     }
   }
 
+  async function getOrderStatus(accessToken) {
+    const token = String(accessToken || "").trim();
+    if (!/^[a-f0-9-]{70,80}$/i.test(token)) {
+      const error = new Error("Lien de suivi invalide");
+      error.status = 400;
+      throw error;
+    }
+    const response = await global.fetch(`${D1_URL}/orders/status/${encodeURIComponent(token)}`, {
+      method: "GET",
+      cache: "no-store"
+    });
+    const result = await readJsonResponse(response);
+    if (!response.ok) {
+      const error = new Error(result.error || `D1 répond ${response.status}`);
+      error.status = response.status;
+      error.details = result;
+      throw error;
+    }
+    return result.order;
+  }
+
   async function readJsonResponse(response) {
     const text = await response.text();
     try {
@@ -364,6 +385,7 @@
     requestSynchronization,
     publishGasObservation,
     submitOrder,
+    getOrderStatus,
     backend: preferredBackend,
     get activeBackend() { return activeBackend; },
     label: preferredBackend === "d1" ? "Cloudflare D1" : "Google Sheets / GAS",

@@ -70,6 +70,26 @@ test("une lecture D1 en échec se replie sur GAS", async () => {
   assert.equal(events.at(-1).detail.backend, "gas");
 });
 
+test("le suivi client interroge D1 sans demander de jeton administrateur", async () => {
+  const requests = [];
+  const accessToken = "123e4567-e89b-42d3-a456-426614174000-123e4567-e89b-42d3-a456-426614174001";
+  const { api } = loadClient("", async (url, options) => {
+    requests.push({ url, options });
+    return new Response(JSON.stringify({ order: { publicReference: "FRJ-20260814-A1B2C3", status: "ready" } }), {
+      status: 200
+    });
+  }, () => {
+    throw new Error("Le suivi public ne doit pas demander de jeton administrateur");
+  });
+
+  const order = await api.getOrderStatus(accessToken);
+  assert.equal(order.status, "ready");
+  assert.match(requests[0].url, new RegExp(`/orders/status/${accessToken}$`));
+  assert.equal(requests[0].options.method, "GET");
+  assert.equal(requests[0].options.cache, "no-store");
+  assert.equal(requests[0].options.headers, undefined);
+});
+
 test("une écriture D1 envoie le jeton sans repli automatique", async () => {
   const requests = [];
   const { api, values } = loadClient("?backend=d1", async (url, options) => {

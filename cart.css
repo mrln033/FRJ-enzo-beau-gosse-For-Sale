@@ -115,6 +115,11 @@
 .cart-status { white-space: pre-line; min-height: 1.2em; margin: 2px 0; font-size: 0.86rem; }
 .cart-status.success { color: #176a34; }
 .cart-status.error { color: #a02323; }
+.cart-tracking { display: grid; gap: 8px; margin: 2px 16px 24px; padding: 13px; border: 1px solid #c8b98f; border-radius: 7px; background: #faf3df; }
+.cart-tracking > span { color: #5e5547; font-size: 0.88rem; }
+.cart-tracking > a { color: #674713; font-weight: 800; }
+.cart-tracking > button { justify-self: start; }
+.cart-tracking > small { color: #665c4e; }
 .cart-open { overflow: hidden; }
 
 @keyframes cart-pulse {
