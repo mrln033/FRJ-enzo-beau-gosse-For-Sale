@@ -13,6 +13,25 @@
   font-weight: 700;
 }
 
+.cart-alert-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  border: 2px solid #fff7db;
+  border-radius: 999px;
+  color: #fff;
+  background: #c62828;
+  font-size: 0.72rem;
+  line-height: 1;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
 .cart-launcher.pulse { animation: cart-pulse 0.35s ease; }
 .cart-launcher.action-required {
   border-color: #ffcb54;

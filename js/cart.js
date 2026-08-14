@@ -5,7 +5,8 @@
   const STORAGE_KEY = "FRJ_PURCHASE_CART_V1";
   const REQUESTS_KEY = "FRJ_PURCHASE_REQUESTS_V1";
   const MAX_LINES = 10;
-  const MAX_SAVED_REQUESTS = 10;
+  const MAX_CLOSED_REQUEST_HISTORY = 20;
+  const CLOSED_REQUEST_STATUSES = new Set(["completed", "cancelled", "expired"]);
   const copyLabels = {
     FR: {
       cart: "Panier", empty: "Votre panier est vide.", add: "Ajouter au panier",
@@ -185,6 +186,12 @@
       if (event.target === drawer) close();
     });
     document.body.append(launcher, drawer);
+    global.addEventListener("storage", (event) => {
+      if (event.key !== REQUESTS_KEY && event.key !== "FRJ_LAST_PURCHASE_REQUEST") return;
+      requests = readRequests();
+      render();
+      refreshRequestStatuses();
+    });
     render();
     refreshRequestStatuses();
     global.setInterval(() => { if (!document.hidden) refreshRequestStatuses(); }, 5 * 60 * 1000);
@@ -194,10 +201,18 @@
     if (!enabled || !launcher || !drawer) return;
     const count = cart.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
     const saleTotal = roundPed(cart.items.reduce((sum, item) => sum + linePrices(item).sale, 0));
-    const requiresApproval = requests.some((request) => request.status === "awaiting_approval");
+    const approvalCount = requests.filter((request) => request.status === "awaiting_approval").length;
+    const requiresApproval = approvalCount > 0;
     launcher.classList.toggle("action-required", requiresApproval);
-    launcher.textContent = `${requiresApproval ? "⚠️ " : ""}🛒 ${formatQuantity(count)} · ${formatPed(saleTotal)} PED`;
-    launcher.setAttribute("aria-label", `${label("cart")} — ${formatQuantity(count)}${requiresApproval ? ` — ${label("approvalRequired")}` : ""}`);
+    launcher.replaceChildren(document.createTextNode(`🛒 ${formatQuantity(count)} · ${formatPed(saleTotal)} PED`));
+    if (requiresApproval) {
+      const badge = document.createElement("span");
+      badge.className = "cart-alert-badge";
+      badge.textContent = String(approvalCount);
+      badge.title = label("approvalRequired");
+      launcher.appendChild(badge);
+    }
+    launcher.setAttribute("aria-label", `${label("cart")} — ${formatQuantity(count)}${requiresApproval ? ` — ${approvalCount} — ${label("approvalRequired")}` : ""}`);
 
     const content = document.createElement("div");
     content.className = "cart-panel";
@@ -374,7 +389,9 @@
         submittedAt: new Date().toISOString(),
         status: result.order?.status || "submitted"
       };
-      requests = [request, ...requests.filter((entry) => entry.accessToken !== request.accessToken)].slice(0, MAX_SAVED_REQUESTS);
+      // Relire le stockage au dernier moment évite qu'une transmission effectuée
+      // depuis un autre onglet soit écrasée par la copie mémoire de cette page.
+      requests = mergeRequests([request], readRequests(), requests);
       saveRequests();
       cart.items = [];
       saveCart();
@@ -476,19 +493,37 @@
     try {
       const stored = JSON.parse(global.localStorage.getItem(REQUESTS_KEY) || "[]");
       const legacy = JSON.parse(global.localStorage.getItem("FRJ_LAST_PURCHASE_REQUEST") || "null");
-      const source = Array.isArray(stored) && stored.length ? stored : (legacy ? [legacy] : []);
-      return source.filter((request) => /^[a-f0-9-]{70,80}$/i.test(String(request?.accessToken || "")))
-        .slice(0, MAX_SAVED_REQUESTS)
-        .map((request) => ({
-          reference: String(request.reference || "").trim(),
-          accessToken: String(request.accessToken),
-          backend: request.backend === "gas" ? "gas" : "d1",
-          submittedAt: String(request.submittedAt || ""),
-          status: String(request.status || "")
-        }));
+      return mergeRequests(Array.isArray(stored) ? stored : [], legacy ? [legacy] : []);
     } catch {
       return [];
     }
+  }
+
+  function mergeRequests(...groups) {
+    const byToken = new Map();
+    groups.flat().forEach((request) => {
+      const accessToken = String(request?.accessToken || "");
+      if (!/^[a-f0-9-]{70,80}$/i.test(accessToken)) return;
+      const normalized = {
+        reference: String(request.reference || "").trim(),
+        accessToken,
+        backend: request.backend === "gas" ? "gas" : "d1",
+        submittedAt: String(request.submittedAt || ""),
+        updatedAt: String(request.updatedAt || ""),
+        status: String(request.status || "")
+      };
+      const existing = byToken.get(accessToken);
+      if (!existing || Date.parse(normalized.updatedAt || normalized.submittedAt || 0) >= Date.parse(existing.updatedAt || existing.submittedAt || 0)) {
+        byToken.set(accessToken, normalized);
+      }
+    });
+    const sorted = [...byToken.values()]
+      .sort((left, right) => Date.parse(right.submittedAt || 0) - Date.parse(left.submittedAt || 0));
+    const active = sorted.filter((request) => !CLOSED_REQUEST_STATUSES.has(request.status));
+    const closed = sorted.filter((request) => CLOSED_REQUEST_STATUSES.has(request.status))
+      .slice(0, MAX_CLOSED_REQUEST_HISTORY);
+    return [...active, ...closed]
+      .sort((left, right) => Date.parse(right.submittedAt || 0) - Date.parse(left.submittedAt || 0));
   }
 
   function saveRequests() {
@@ -520,7 +555,10 @@
       }
     }));
     trackingRefreshRunning = false;
-    if (changed) saveRequests();
+    if (changed) {
+      requests = mergeRequests(requests, readRequests());
+      saveRequests();
+    }
     render();
   }
 

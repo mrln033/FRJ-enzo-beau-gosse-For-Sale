@@ -151,8 +151,28 @@
     function isPendingGasRequest() {
       try {
         const last = JSON.parse(localStorage.getItem("FRJ_LAST_PURCHASE_REQUEST") || "null");
-        return last?.backend === "gas" && last?.accessToken === token;
+        const requests = JSON.parse(localStorage.getItem("FRJ_PURCHASE_REQUESTS_V1") || "[]");
+        return (last?.backend === "gas" && last?.accessToken === token)
+          || (Array.isArray(requests) && requests.some((request) => request?.backend === "gas" && request?.accessToken === token));
       } catch { return false; }
+    }
+    function rememberOrder(order) {
+      try {
+        const stored = JSON.parse(localStorage.getItem("FRJ_PURCHASE_REQUESTS_V1") || "[]");
+        const requests = Array.isArray(stored) ? stored : [];
+        const current = {
+          reference: String(order.publicReference || ""),
+          accessToken: token,
+          backend: "d1",
+          submittedAt: String(order.createdAt || ""),
+          updatedAt: String(order.updatedAt || ""),
+          status: String(order.status || "submitted")
+        };
+        localStorage.setItem("FRJ_PURCHASE_REQUESTS_V1", JSON.stringify([
+          current,
+          ...requests.filter((request) => request?.accessToken !== token)
+        ]));
+      } catch { /* Le suivi reste utilisable même si le stockage local est bloqué. */ }
     }
     function showMessage(message, type = "") {
       const content = document.getElementById("trackingContent");
@@ -174,6 +194,7 @@
         lang = order.language === "FR" ? "FR" : "EN";
         localStorage.setItem("lang", lang);
         applyLanguage();
+        rememberOrder(order);
         renderOrder(order);
       } catch (error) {
         applyLanguage();
