@@ -461,6 +461,8 @@
   function trackingUrl(accessToken) {
     const url = new URL("./suivi-commande.html", global.location.href);
     url.searchParams.set("token", accessToken);
+    const backend = new URLSearchParams(global.location.search).get("backend") === "d1" ? "d1" : "gas";
+    url.searchParams.set("backend", backend);
     return url.toString();
   }
 

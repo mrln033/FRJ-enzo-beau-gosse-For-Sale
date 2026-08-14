@@ -56,7 +56,7 @@
   <main class="tracking-shell">
     <nav class="tracking-top" aria-label="Navigation">
       <img src="./Logo%20FRJ.png" alt="FRJ">
-      <a href="./">← <span id="catalogLink">Retour au catalogue</span></a>
+      <a id="catalogReturnLink" href="./?backend=gas">← <span id="catalogLink">Retour au catalogue</span></a>
     </nav>
     <article class="tracking-card">
       <header class="tracking-header">
@@ -105,9 +105,13 @@
       }
     };
 
-    const token = new URLSearchParams(location.search).get("token") || "";
+    const searchParams = new URLSearchParams(location.search);
+    const token = searchParams.get("token") || "";
+    const catalogBackend = searchParams.get("backend") === "d1" ? "d1" : "gas";
     let lang = localStorage.getItem("lang") === "FR" ? "FR" : "EN";
     let refreshing = false;
+
+    document.getElementById("catalogReturnLink").href = `./?backend=${catalogBackend}`;
 
     function text(key) { return COPY[lang][key] || key; }
     function formatPed(value) {
