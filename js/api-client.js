@@ -2,6 +2,7 @@
   "use strict";
 
   const GAS_URL = "https://script.google.com/macros/s/AKfycbxD_sOPcjLT-eWPrDMfLgaSx16yAeH17SCd8xByP2faU24z8ge5AiAWOueVBRanHjGx/exec";
+  const GAS_ORDER_URL = "https://script.google.com/macros/s/AKfycbxa0B_4R6tsn8aQCLy1Y3LEqbDj4SY22xbascJfMRd1I1thQkCRPySAjszdHoxX1h2a/exec";
   const D1_URL = "https://frj-for-sale-api.merlin-merzhin-lesage.workers.dev";
   const ADMIN_TOKEN_KEY = "FRJ_D1_ADMIN_TOKEN";
   const requestedBackend = new URLSearchParams(global.location.search).get("backend");
@@ -102,6 +103,60 @@
     }
     setActiveBackend("gas");
     return response;
+  }
+
+  async function submitOrder(payload) {
+    const body = JSON.stringify(payload);
+    try {
+      const response = await global.fetch(`${D1_URL}/orders`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body
+      });
+      const result = await readJsonResponse(response);
+      if (response.ok) return { ...result, backend: "d1" };
+      if (response.status < 500) {
+        const error = new Error(result.error || `D1 répond ${response.status}`);
+        error.status = response.status;
+        error.details = result;
+        throw error;
+      }
+      throw new Error(result.error || `D1 répond ${response.status}`);
+    } catch (d1Error) {
+      if (d1Error?.status && d1Error.status < 500) throw d1Error;
+      try {
+        setActiveBackend("gas");
+        const response = await global.fetch(`${GAS_ORDER_URL}?type=order`, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=UTF-8" },
+          body
+        });
+        const result = await readJsonResponse(response);
+        if (result.ok !== true) {
+          const error = new Error(result.error || "GAS a refusé la demande");
+          if (result.code === "stock-changed") {
+            error.status = 409;
+            error.details = result;
+          }
+          throw error;
+        }
+        return { ...result, backend: "gas" };
+      } catch (gasError) {
+        if (gasError?.status === 409) throw gasError;
+        const error = new Error(`D1 indisponible (${errorMessage(d1Error)}) ; secours GAS impossible (${errorMessage(gasError)})`);
+        error.cause = { d1Error, gasError };
+        throw error;
+      }
+    }
+  }
+
+  async function readJsonResponse(response) {
+    const text = await response.text();
+    try {
+      return text ? JSON.parse(text) : {};
+    } catch {
+      return { error: text || `Réponse ${response.status}` };
+    }
   }
 
   async function importToBoth(query, options = {}, config = {}) {
@@ -308,6 +363,7 @@
     importToBoth,
     requestSynchronization,
     publishGasObservation,
+    submitOrder,
     backend: preferredBackend,
     get activeBackend() { return activeBackend; },
     label: preferredBackend === "d1" ? "Cloudflare D1" : "Google Sheets / GAS",

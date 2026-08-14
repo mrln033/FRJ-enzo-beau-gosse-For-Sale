@@ -117,6 +117,7 @@ function setLanguage(lang) {
 	updateLanguageButtons();
 	applyTranslations();
 	renderCards(lastRenderedItems);
+	window.FRJ_CART?.refresh();
 }
 
 

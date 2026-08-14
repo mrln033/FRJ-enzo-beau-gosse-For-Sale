@@ -1,6 +1,6 @@
 // Fonction pour récupérer les données de la table BDD_APP
 function getBDDAppData(category = null) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("BDD_APP");
+  const sheet = SpreadsheetApp.openById("13r_PzIZE8dJiPFU8w7UXxtEednHhS-yijNgTiYLqYP0").getSheetByName("BDD_APP");
   if (!sheet) return [];
 
   const lastRow = sheet.getLastRow();
@@ -326,11 +326,273 @@ function processInventory(csv, avatar) {
   return `✅ Import inventaire OK dans ${SHEET_NAME} (${numRows} lignes)`;
 }
 
+function processPurchaseOrderRequest(rawBody) {
+  var featureValue = PropertiesService.getScriptProperties().getProperty("FRJ_CART_ENABLED");
+  if (String(featureValue || "true").toLowerCase() === "false") {
+    return purchaseJsonOutput_({ ok: false, error: "Transmission des paniers désactivée" });
+  }
+
+  var payload;
+  try { payload = JSON.parse(String(rawBody || "")); } catch (error) {
+    return purchaseJsonOutput_({ ok: false, error: "Demande d'achat invalide" });
+  }
+
+  try {
+    var normalized = normalizePurchaseOrderPayload_(payload);
+    var priced = pricePurchaseOrderFromSheet_(normalized);
+    if (priced.discrepancies.length) {
+      return purchaseJsonOutput_({
+        ok: false,
+        code: "stock-changed",
+        error: "Le stock, le prix affiché ou le MU a changé. Actualise le panier avant de confirmer.",
+        discrepancies: priced.discrepancies
+      });
+    }
+
+    var ss = SpreadsheetApp.openById("13r_PzIZE8dJiPFU8w7UXxtEednHhS-yijNgTiYLqYP0");
+    var sheet = getOrCreatePurchaseOrderSheet_(ss);
+    var existing = sheet.getLastRow() > 1
+      ? sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getDisplayValues().flat().indexOf(normalized.id)
+      : -1;
+    if (existing !== -1) {
+      return purchaseJsonOutput_({
+        ok: true,
+        duplicate: true,
+        order: { id: normalized.id, publicReference: normalized.publicReference, status: "submitted" }
+      });
+    }
+
+    var accessTokenHash = purchaseSha256_(normalized.accessToken);
+    var order = {
+      id: normalized.id,
+      publicReference: normalized.publicReference,
+      accessTokenHash: accessTokenHash,
+      status: "submitted",
+      buyerAvatar: normalized.buyerAvatar,
+      buyerContact: normalized.buyerContact,
+      buyerComment: normalized.buyerComment,
+      language: normalized.language,
+      frjMember: normalized.frjMember,
+      sourceBackend: "gas-fallback",
+      totalTtPed: priced.totalTtPed,
+      totalSalePed: priced.totalSalePed,
+      pricingStatus: priced.pricingStatus,
+      clientCreatedAt: normalized.clientCreatedAt
+    };
+    var syncPayload = JSON.stringify({ order: order, items: priced.lines });
+    sheet.appendRow([
+      order.id, order.publicReference, order.buyerAvatar, order.buyerContact || "",
+      order.buyerComment || "", order.language, order.frjMember ? "TRUE" : "FALSE",
+      order.status, order.totalTtPed, order.totalSalePed, order.pricingStatus,
+      order.clientCreatedAt || "", new Date(), syncPayload, "", ""
+    ]);
+    return purchaseJsonOutput_({
+      ok: true,
+      duplicate: false,
+      order: {
+        id: order.id,
+        publicReference: order.publicReference,
+        status: order.status,
+        totalTtPed: order.totalTtPed,
+        totalSalePed: order.totalSalePed,
+        pricingStatus: order.pricingStatus
+      }
+    });
+  } catch (error) {
+    return purchaseJsonOutput_({ ok: false, error: error.message || String(error) });
+  }
+}
+
+function normalizePurchaseOrderPayload_(payload) {
+  var id = String(payload && payload.id || "").trim().toLowerCase();
+  var publicReference = String(payload && payload.publicReference || "").trim().toUpperCase();
+  var accessToken = String(payload && payload.accessToken || "").trim();
+  var buyerAvatar = purchaseCleanText_(payload && payload.buyerAvatar, 80);
+  var language = String(payload && payload.language || "EN").toUpperCase() === "FR" ? "FR" : "EN";
+  var items = payload && Array.isArray(payload.items) ? payload.items : [];
+  if (String(payload && payload.website || "").trim()) throw new Error("Demande refusée");
+  if (!/^[a-f0-9-]{36}$/.test(id)) throw new Error("Identifiant de demande invalide");
+  if (!/^FRJ-\d{8}-[A-F0-9]{6}$/.test(publicReference)) throw new Error("Référence de demande invalide");
+  if (!/^[a-f0-9-]{70,80}$/i.test(accessToken)) throw new Error("Jeton de suivi invalide");
+  if (!buyerAvatar) throw new Error("L'avatar en jeu est obligatoire");
+  if (!items.length || items.length > 30) throw new Error("Le panier doit contenir entre 1 et 30 articles");
+  return {
+    id: id,
+    publicReference: publicReference,
+    accessToken: accessToken,
+    buyerAvatar: buyerAvatar,
+    buyerContact: purchaseCleanText_(payload.buyerContact, 160) || null,
+    buyerComment: purchaseCleanText_(payload.buyerComment, 800) || null,
+    language: language,
+    frjMember: payload.frjMember === true && language === "FR",
+    clientCreatedAt: purchaseIsoDate_(payload.clientCreatedAt),
+    items: items.map(function(item) {
+      var quantity = Number(item.quantity);
+      var normalizedItem = {
+        itemName: purchaseCleanText_(item.itemName, 180),
+        storage: purchaseCleanText_(item.storage, 80).toUpperCase(),
+        aisle: purchaseCleanText_(item.aisle, 120).toUpperCase(),
+        quantity: quantity,
+        observedUnitTtPed: purchaseOptionalNumber_(item.unitTtPed),
+        observedMarkupKind: item.markupKind === "percent" || item.markupKind === "ped" ? item.markupKind : "none",
+        observedMarkupValue: purchaseOptionalNumber_(item.markupValue)
+      };
+      if (!normalizedItem.itemName || !normalizedItem.storage || !normalizedItem.aisle) throw new Error("Article de panier incomplet");
+      if (!isFinite(quantity) || quantity <= 0 || quantity > 1000000) throw new Error("Quantité invalide pour " + normalizedItem.itemName);
+      return normalizedItem;
+    })
+  };
+}
+
+function pricePurchaseOrderFromSheet_(submission) {
+  var rows = getBDDAppData();
+  var catalog = {};
+  rows.forEach(function(row) {
+    catalog[purchaseItemKey_(row.ITEM, row.STORAGE, row.RAYON)] = row;
+  });
+  var discrepancies = [];
+  var lines = [];
+  submission.items.forEach(function(requested, index) {
+    var current = catalog[purchaseItemKey_(requested.itemName, requested.storage, requested.aisle)];
+    var stock = current ? Math.max(0, Number(current.QUANTITE) || 0) : 0;
+    if (!current || requested.quantity > stock) {
+      discrepancies.push({
+        itemName: requested.itemName,
+        storage: requested.storage,
+        aisle: requested.aisle,
+        reason: current ? "insufficient-stock" : "unavailable",
+        requestedQuantity: requested.quantity,
+        availableQuantity: stock
+      });
+      return;
+    }
+    var unitTt = Math.max(0, Number(current.PRIX_UNITAIRE) || 0);
+    var markup = purchaseParseMarkup_(current.MU);
+    if (!purchaseSameNumber_(requested.observedUnitTtPed, unitTt)
+        || requested.observedMarkupKind !== markup.kind
+        || !purchaseSameNumber_(requested.observedMarkupValue, markup.value)) {
+      discrepancies.push({
+        itemName: requested.itemName,
+        storage: requested.storage,
+        aisle: requested.aisle,
+        reason: "price-changed",
+        requestedQuantity: requested.quantity,
+        availableQuantity: stock,
+        unitTtPed: purchaseRound_(unitTt),
+        markupKind: markup.kind,
+        markupValue: markup.value,
+        markupDisplay: markup.kind === "percent"
+          ? (markup.value * 100).toFixed(2).replace(".", ",") + " %"
+          : (markup.kind === "ped" ? markup.value.toFixed(2).replace(".", ",") + " PED" : null)
+      });
+      return;
+    }
+    if (submission.frjMember && markup.kind === "percent") markup.value = 1 + ((markup.value - 1) / 2);
+    if (submission.frjMember && markup.kind === "ped") markup.value = markup.value / 2;
+    var unitSale = unitTt;
+    if (markup.kind === "percent") unitSale = unitTt * markup.value;
+    if (markup.kind === "ped") unitSale = unitTt + markup.value;
+    var lineTt = purchaseRound_(unitTt * requested.quantity);
+    var lineSale = purchaseRound_(unitSale * requested.quantity);
+    lines.push({
+      lineNo: index + 1,
+      itemName: String(current.ITEM),
+      storage: String(current.STORAGE).toUpperCase(),
+      aisle: String(current.RAYON).toUpperCase(),
+      quantity: requested.quantity,
+      stockAtSubmission: stock,
+      unitTtPed: purchaseRound_(unitTt),
+      markupKind: markup.kind,
+      markupValue: markup.value,
+      markupDisplay: markup.kind === "percent"
+        ? (markup.value * 100).toFixed(2).replace(".", ",") + " %"
+        : (markup.kind === "ped" ? markup.value.toFixed(2).replace(".", ",") + " PED" : null),
+      unitSalePed: purchaseRound_(unitSale),
+      lineTtPed: lineTt,
+      lineSalePed: lineSale,
+      priceStatus: markup.kind === "none" ? "to-confirm" : "estimated"
+    });
+  });
+  return {
+    lines: lines,
+    discrepancies: discrepancies,
+    totalTtPed: purchaseRound_(lines.reduce(function(sum, line) { return sum + line.lineTtPed; }, 0)),
+    totalSalePed: purchaseRound_(lines.reduce(function(sum, line) { return sum + line.lineSalePed; }, 0)),
+    pricingStatus: lines.some(function(line) { return line.priceStatus === "to-confirm"; }) ? "to-confirm" : "estimated"
+  };
+}
+
+function getOrCreatePurchaseOrderSheet_(ss) {
+  var sheet = ss.getSheetByName("COMMANDES_APP");
+  if (!sheet) sheet = ss.insertSheet("COMMANDES_APP");
+  var headers = [
+    "ORDER_ID", "REFERENCE", "AVATAR_ACHETEUR", "CONTACT", "COMMENTAIRE", "LANGUE",
+    "MEMBRE_FRJ", "STATUT", "TOTAL_TT_PED", "TOTAL_VENTE_PED", "PRIX_STATUT",
+    "DATE_CLIENT", "DATE_RECEPTION", "SYNC_PAYLOAD_JSON", "SYNCED_D1_AT", "SYNC_ERROR"
+  ];
+  if (sheet.getLastRow() === 0) sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  return sheet;
+}
+
+function purchaseParseMarkup_(raw) {
+  var text = String(raw || "").trim();
+  if (/%$/.test(text)) {
+    var percent = Number(text.replace("%", "").replace(",", "."));
+    return isFinite(percent) ? { kind: "percent", value: percent / 100 } : { kind: "none", value: null };
+  }
+  if (/PED$/i.test(text)) {
+    var ped = Number(text.replace(/PED$/i, "").trim().replace(",", "."));
+    return isFinite(ped) ? { kind: "ped", value: ped } : { kind: "none", value: null };
+  }
+  return { kind: "none", value: null };
+}
+
+function purchaseOptionalNumber_(value) {
+  if (value === null || value === undefined || value === "") return null;
+  var number = Number(value);
+  return isFinite(number) ? number : null;
+}
+
+function purchaseSameNumber_(left, right) {
+  if (left === null || right === null) return left === right;
+  return Math.abs(left - right) <= 0.0001;
+}
+
+function purchaseItemKey_(item, storage, aisle) {
+  return [item, storage, aisle].map(function(value) { return String(value || "").trim().toLowerCase(); }).join("\u001f");
+}
+
+function purchaseSha256_(value) {
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(value), Utilities.Charset.UTF_8)
+    .map(function(byte) { return (byte < 0 ? byte + 256 : byte).toString(16).padStart(2, "0"); }).join("");
+}
+
+function purchaseCleanText_(value, maxLength) {
+  return String(value || "").replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, maxLength);
+}
+
+function purchaseIsoDate_(value) {
+  var date = new Date(String(value || ""));
+  return isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function purchaseRound_(value) {
+  return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+}
+
+function purchaseJsonOutput_(data) {
+  return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
+}
+
 function frjMainDoPost_(e) {
   const type = e.parameter.type;
   if (type === "syncAudit") return frjHandleImmediateAuditPost_(e);
 
   return withFrjDataLock_(function() {
+    if (type === "order") {
+      return processPurchaseOrderRequest(e.postData && e.postData.contents);
+    }
+
     if (type === "mu") {
       return ContentService.createTextOutput(processMU(e.postData.contents));
     }

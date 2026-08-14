@@ -4,9 +4,12 @@
     <base target="_self">
 	<link rel="icon" href="./favicon.ico">
 	<link rel="stylesheet" href="./style.css?v=20260813-5">
+	<link rel="stylesheet" href="./cart.css?v=20260814-2">
 	<script src="./js/langues.js"></script>
-	<script src="./js/api-client.js?v=20260814-1"></script>
-	<script defer src="./js/admin-menu.js?v=20260814-2"></script>
+	<script src="./js/features.js?v=20260814-2"></script>
+	<script src="./js/api-client.js?v=20260814-3"></script>
+	<script defer src="./js/cart.js?v=20260814-2"></script>
+	<script defer src="./js/admin-menu.js?v=20260814-4"></script>
 	<title>[FRJ] - enzo beau gosse : Item List</title>
   </head>
   <body>
@@ -321,6 +324,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 	function setFRJMember(value) {
 		localStorage.setItem(FRJ_MEMBER_SESSION_KEY, value ? "TRUE" : "FALSE");
+		window.dispatchEvent(new CustomEvent("frj:memberchange", { detail: { member: value } }));
 	}
 
 	function initFRJMemberCheckbox() {
@@ -739,6 +743,14 @@ function getEffectiveMU(muStr) {
 
 				<div class="card-back"></div>
 			`;
+			if (window.FRJ_CART?.enabled) {
+				const cartButton = document.createElement("button");
+				cartButton.type = "button";
+				cartButton.className = "cart-add-button";
+				cartButton.textContent = currentLang === "FR" ? "Ajouter au panier" : "Add to cart";
+				cartButton.addEventListener("click", () => window.FRJ_CART.addItem(item));
+				card.querySelector(".card-front").appendChild(cartButton);
+			}
 
 			container.appendChild(card);
 		});

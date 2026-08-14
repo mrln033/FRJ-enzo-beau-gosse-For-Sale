@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <base target="_self">
+  <link rel="icon" href="./favicon.ico">
+  <link rel="stylesheet" href="./style.css?v=20260813-5">
+  <script src="./js/api-client.js?v=20260814-3"></script>
+  <script defer src="./js/admin-menu.js?v=20260814-4"></script>
+  <title>[FRJ] — Demandes d'achat</title>
+  <style>
+    body { max-width: 1250px; margin: 0 auto; padding: 78px 18px 40px; box-sizing: border-box; }
+    .orders-header { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+    .orders-header button { padding: 8px 13px; cursor: pointer; }
+    .orders-summary { margin: 8px 0 20px; color: #5e5547; }
+    .orders-list { display: grid; gap: 14px; }
+    .order-card { padding: 15px; border: 1px solid #c9bfae; border-radius: 9px; background: #fffdf7; box-shadow: 0 2px 7px rgba(0,0,0,.08); }
+    .order-card header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+    .order-card h2 { margin: 0 0 4px; font-size: 1.05rem; }
+    .order-meta { display: flex; flex-wrap: wrap; gap: 7px 15px; font-size: .88rem; color: #675e51; }
+    .order-card table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    .order-card th, .order-card td { padding: 6px; border-bottom: 1px solid #e2dbcf; text-align: left; }
+    .order-card th:not(:first-child), .order-card td:not(:first-child) { text-align: right; }
+    .order-total { margin: 10px 0 0; text-align: right; font-size: 1.05rem; }
+    .order-comment { margin: 10px 0 0; padding: 8px; background: #f1ece3; white-space: pre-wrap; }
+    .order-status { padding: 6px; border-radius: 5px; }
+    .orders-error { color: #a02323; white-space: pre-line; }
+    @media (max-width: 650px) {
+      body { padding-top: 125px; }
+      .order-card { overflow-x: auto; }
+      .orders-header { align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <section class="orders-header">
+    <div>
+      <h1>Demandes d'achat</h1>
+      <p class="orders-summary" id="ordersSummary">Chargement…</p>
+    </div>
+    <button type="button" id="refreshOrders">Actualiser</button>
+  </section>
+  <p id="ordersError" class="orders-error" hidden></p>
+  <main id="ordersList" class="orders-list"></main>
+
+  <script>
+    const STATUS_LABELS = {
+      submitted: "Transmise", viewed: "Vue", preparing: "À préparer",
+      ready: "Prête", completed: "Terminée", cancelled: "Annulée", expired: "Expirée"
+    };
+
+    function formatDate(value) {
+      if (!value) return "—";
+      return new Date(value).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
+    }
+
+    function formatPed(value) {
+      return Number(value || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    async function loadOrders() {
+      const list = document.getElementById("ordersList");
+      const summary = document.getElementById("ordersSummary");
+      const error = document.getElementById("ordersError");
+      summary.textContent = "Chargement…";
+      error.hidden = true;
+      try {
+        const response = await FRJ_API.fetchD1Admin("/admin/orders", { cache: "no-store" });
+        const report = await response.json();
+        const orders = report.orders || [];
+        summary.textContent = report.enabled === false
+          ? "Fonction panier désactivée. Les demandes existantes sont conservées."
+          : `${orders.length} demande(s) affichée(s) — actualisé ${formatDate(report.generatedAt)}`;
+        list.replaceChildren(...orders.map(renderOrder));
+        if (!orders.length && report.enabled !== false) {
+          const empty = document.createElement("p");
+          empty.textContent = "Aucune demande transmise.";
+          list.appendChild(empty);
+        }
+      } catch (loadError) {
+        list.replaceChildren();
+        summary.textContent = "Chargement impossible";
+        error.textContent = loadError.message;
+        error.hidden = false;
+      }
+    }
+
+    function renderOrder(order) {
+      const article = document.createElement("article");
+      article.className = "order-card";
+      const header = document.createElement("header");
+      const identity = document.createElement("div");
+      const title = document.createElement("h2");
+      title.textContent = `${order.publicReference} — ${order.buyerAvatar}`;
+      const meta = document.createElement("div");
+      meta.className = "order-meta";
+      [
+        formatDate(order.createdAt),
+        order.sourceBackend === "gas-fallback" ? "Reçue par secours GAS" : "Reçue par D1",
+        order.frjMember ? "Membre FRJ" : "Public",
+        order.buyerContact || "Pas de contact"
+      ].forEach((value) => {
+        const span = document.createElement("span");
+        span.textContent = value;
+        meta.appendChild(span);
+      });
+      identity.append(title, meta);
+      const select = document.createElement("select");
+      select.className = "order-status";
+      Object.entries(STATUS_LABELS).forEach(([value, label]) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = label;
+        option.selected = order.status === value;
+        select.appendChild(option);
+      });
+      select.addEventListener("change", () => updateStatus(order.id, select));
+      header.append(identity, select);
+      article.appendChild(header);
+
+      const table = document.createElement("table");
+      table.innerHTML = "<thead><tr><th>Article</th><th>Qté</th><th>Prix affiché</th><th>Estimation vente</th></tr></thead>";
+      const body = document.createElement("tbody");
+      (order.items || []).forEach((item) => {
+        const row = document.createElement("tr");
+        [
+          `${item.itemName} (${item.storage} · ${item.aisle})`,
+          item.quantity,
+          `${formatPed(item.unitTtPed)} PED`,
+          `${formatPed(item.lineSalePed)} PED${item.markupDisplay ? ` — ${item.markupDisplay}` : " — à confirmer"}`
+        ].forEach((value) => {
+          const cell = document.createElement("td");
+          cell.textContent = value;
+          row.appendChild(cell);
+        });
+        body.appendChild(row);
+      });
+      table.appendChild(body);
+      article.appendChild(table);
+      const total = document.createElement("p");
+      total.className = "order-total";
+      total.textContent = `Estimation totale : ${formatPed(order.totalSalePed)} PED`;
+      article.appendChild(total);
+      if (order.buyerComment) {
+        const comment = document.createElement("p");
+        comment.className = "order-comment";
+        comment.textContent = order.buyerComment;
+        article.appendChild(comment);
+      }
+      return article;
+    }
+
+    async function updateStatus(id, select) {
+      select.disabled = true;
+      try {
+        await FRJ_API.fetchD1Admin(`/admin/orders/${encodeURIComponent(id)}/status`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: select.value })
+        });
+      } catch (error) {
+        alert(error.message);
+        await loadOrders();
+      } finally {
+        select.disabled = false;
+      }
+    }
+
+    document.getElementById("refreshOrders").addEventListener("click", loadOrders);
+    loadOrders();
+  </script>
+</body>
+</html>

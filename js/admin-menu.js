@@ -13,13 +13,16 @@
       label: "MàJ Inventaire / MU (GAS + D1)",
       href: "maj_inventaire-enzo.html?admin=1"
     },
-    { section: "report", backend: "", label: "Rapport de synchronisation", href: "rapport-sync.html?admin=1" }
+    { section: "report", backend: "", label: "Rapport de synchronisation", href: "rapport-sync.html?admin=1" },
+    { section: "orders", backend: "", label: "Demandes d'achat", href: "commandes.html?admin=1" }
   ];
 
   function render() {
     if (document.querySelector(".admin-menu")) return;
     const pathname = global.location.pathname.toLowerCase();
-    const section = pathname.includes("rapport-sync")
+    const section = pathname.includes("commandes")
+      ? "orders"
+      : pathname.includes("rapport-sync")
       ? "report"
       : (pathname.includes("maj_") ? "update" : "catalog");
     const backend = params.get("backend") === "d1" ? "d1" : "gas";

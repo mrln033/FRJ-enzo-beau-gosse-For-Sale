@@ -13,9 +13,15 @@ import {
   normalizeSyncTimestamp,
   shouldSignalSyncAfterImport
 } from "./sync.js";
+import {
+  normalizeOrderSubmission,
+  priceOrderLines,
+  validateOrderStatus
+} from "./orders.js";
 
 const MAX_IMPORT_BYTES = 1_800_000;
 const MAX_OBSERVATION_BYTES = 2_200_000;
+const MAX_ORDER_BYTES = 80_000;
 const SYNC_AUDIT_RETENTION_COUNT = 500;
 
 const PUBLIC_ORIGINS = new Set([
@@ -60,6 +66,7 @@ export default {
       const url = new URL(request.url);
       const isSyncRequest = url.pathname.startsWith("/sync/");
       const isAdminRequest = url.pathname.startsWith("/admin/");
+      const isPublicOrderRequest = url.pathname === "/orders" || url.pathname.startsWith("/orders/status/");
 
       if (isSyncRequest && !(await isAuthorized(request, env.SYNC_TOKEN || env.ADMIN_TOKEN))) {
         return withCors(json({ error: "Unauthorized" }, 401), origin);
@@ -72,11 +79,18 @@ export default {
       if (request.method === "GET") {
         if (isSyncRequest) return withCors(await handleSyncGet(url, env), origin);
         if (isAdminRequest) return withCors(await handleAdminGet(url, env), origin);
+        if (isPublicOrderRequest) return withCors(await handlePublicOrderGet(url, env), origin);
         return withCors(await handleGet(url, env), origin);
       }
 
       if (request.method === "POST") {
         if (isSyncRequest) return withCors(await handleSyncPost(request, url, env), origin);
+        if (url.pathname === "/orders") {
+          if (!PUBLIC_ORIGINS.has(String(origin || ""))) {
+            return withCors(json({ error: "Origine non autorisée" }, 403), origin);
+          }
+          return withCors(await handlePublicOrderPost(request, env), origin);
+        }
         if (!(await isAuthorized(request, env.ADMIN_TOKEN))) {
           return withCors(json({ error: "Unauthorized" }, 401), origin);
         }
@@ -112,6 +126,10 @@ async function handleGet(url, env) {
   }
 
   const action = url.searchParams.get("action");
+
+  if (action === "features") {
+    return publicJson({ cart: isCartEnabled(env) });
+  }
 
   if (action === "categories") {
     const result = await env.DB.prepare(`
@@ -200,6 +218,9 @@ async function handleGet(url, env) {
 }
 
 async function handleAdminGet(url, env) {
+  if (url.pathname === "/admin/orders") {
+    return json(await readAdminOrders(env));
+  }
   if (url.pathname !== "/admin/sync-report") {
     return json({ error: "Endpoint administrateur inconnu" }, 404);
   }
@@ -473,6 +494,11 @@ async function handleSyncPost(request, url, env) {
   const body = await readTextBody(request, MAX_IMPORT_BYTES);
   const payload = parseJsonBody(body);
   const expectedHash = String(request.headers.get("X-Expected-Hash") || "").trim();
+
+  if (url.pathname === "/sync/order") {
+    if (!isCartEnabled(env)) throw new ApiError(503, "Transmission des paniers désactivée");
+    return json(await importGasFallbackOrder(env, payload));
+  }
 
   if (url.pathname === "/sync/observation") {
     return json(await storeGasObservation(env, payload));
@@ -1297,6 +1323,24 @@ function mapSyncState(row) {
 }
 
 async function handleAdminPost(request, url, env) {
+  const orderStatusMatch = url.pathname.match(/^\/admin\/orders\/([a-f0-9-]{36})\/status$/i);
+  if (orderStatusMatch) {
+    const body = await readTextBody(request, 20_000);
+    const payload = parseJsonBody(body);
+    const status = parseOrderValue(() => validateOrderStatus(payload.status));
+    const existing = await env.DB.prepare(`SELECT id, status FROM purchase_orders WHERE id = ?`)
+      .bind(orderStatusMatch[1].toLowerCase()).first();
+    if (!existing) throw new ApiError(404, "Demande introuvable");
+    if (existing.status === status) return json({ ok: true, noChange: true, status });
+    await env.DB.batch([
+      env.DB.prepare(`UPDATE purchase_orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
+        .bind(status, existing.id),
+      env.DB.prepare(`INSERT INTO purchase_order_events (order_id, action, details) VALUES (?, 'status-changed', ?)`)
+        .bind(existing.id, JSON.stringify({ from: existing.status, to: status }))
+    ]);
+    return json({ ok: true, noChange: false, status });
+  }
+
   if (url.pathname === "/admin/sync-audit-now") {
     const body = await readTextBody(request, 20_000);
     const payload = parseJsonBody(body);
@@ -1352,6 +1396,293 @@ async function handleAdminPost(request, url, env) {
   const dataset = String(payload.dataset || "").trim();
   const reason = String(payload.reason || "modification-gas").trim();
   return json(await notifyGasDataChanged(env, dataset, reason));
+}
+
+async function handlePublicOrderGet(url, env) {
+  if (!isCartEnabled(env)) throw new ApiError(404, "Suivi de panier désactivé");
+  const match = url.pathname.match(/^\/orders\/status\/([a-f0-9-]{70,80})$/i);
+  if (!match) throw new ApiError(404, "Demande introuvable");
+  const tokenHash = await sha256(match[1]);
+  const order = await env.DB.prepare(`
+    SELECT id, public_reference, status, buyer_avatar, language, frj_member,
+           total_tt_ped, total_sale_ped, pricing_status, created_at, updated_at
+    FROM purchase_orders
+    WHERE access_token_hash = ?
+  `).bind(tokenHash).first();
+  if (!order) throw new ApiError(404, "Demande introuvable");
+  const items = await env.DB.prepare(`
+    SELECT line_no, item_name, storage, aisle, quantity, stock_at_submission,
+           unit_tt_ped, markup_display, unit_sale_ped, line_tt_ped, line_sale_ped, price_status
+    FROM purchase_order_items WHERE order_id = ? ORDER BY line_no
+  `).bind(order.id).all();
+  return json({ order: mapPublicOrder(order, items.results) });
+}
+
+async function handlePublicOrderPost(request, env) {
+  if (!isCartEnabled(env)) throw new ApiError(503, "Transmission des paniers désactivée");
+  const contentLength = Number(request.headers.get("Content-Length") || 0);
+  if (contentLength > MAX_ORDER_BYTES) throw new ApiError(413, "Panier trop volumineux");
+  const body = await readTextBody(request, MAX_ORDER_BYTES);
+  const rawPayload = parseJsonBody(body);
+  const submission = parseOrderValue(() => normalizeOrderSubmission(rawPayload));
+  const accessTokenHash = await sha256(submission.accessToken);
+  const duplicate = await env.DB.prepare(`
+    SELECT id, public_reference, access_token_hash, status, total_tt_ped, total_sale_ped,
+           pricing_status, created_at, updated_at, buyer_avatar, language, frj_member
+    FROM purchase_orders WHERE id = ? OR public_reference = ?
+  `).bind(submission.id, submission.publicReference).first();
+  if (duplicate) {
+    if (!(await timingSafeEqual(String(duplicate.access_token_hash), accessTokenHash))) {
+      throw new ApiError(409, "Référence de demande déjà utilisée");
+    }
+    return json({ ok: true, duplicate: true, order: mapPublicOrder(duplicate, []) });
+  }
+
+  const submitterHash = await orderSubmitterHash(request, env);
+  const recentCount = await env.DB.prepare(`
+    SELECT COUNT(*) AS total
+    FROM purchase_orders
+    WHERE submitter_hash = ? AND datetime(created_at) >= datetime('now', '-1 hour')
+  `).bind(submitterHash).first();
+  if (Number(recentCount?.total || 0) >= 8) {
+    throw new ApiError(429, "Trop de demandes récentes. Réessaie dans un moment.");
+  }
+
+  const catalogRows = await readOrderCatalogRows(env, submission.items);
+  const pricing = priceOrderLines(submission.items, catalogRows, { frjMember: submission.frjMember });
+  if (pricing.discrepancies.length) {
+    return json({
+      error: "Le stock, le prix affiché ou le MU a changé. Actualise le panier avant de confirmer.",
+      discrepancies: pricing.discrepancies
+    }, 409);
+  }
+
+  const order = {
+    id: submission.id,
+    publicReference: submission.publicReference,
+    accessTokenHash,
+    status: "submitted",
+    buyerAvatar: submission.buyerAvatar,
+    buyerContact: submission.buyerContact,
+    buyerComment: submission.buyerComment,
+    language: submission.language,
+    frjMember: submission.frjMember,
+    sourceBackend: "d1",
+    totalTtPed: pricing.totalTtPed,
+    totalSalePed: pricing.totalSalePed,
+    pricingStatus: pricing.pricingStatus,
+    submitterHash,
+    clientCreatedAt: submission.clientCreatedAt
+  };
+  await storePurchaseOrder(env, order, pricing.lines, "submitted");
+  return json({ ok: true, duplicate: false, order: mapPublicOrder(order, pricing.lines) }, 201);
+}
+
+async function readOrderCatalogRows(env, requestedItems) {
+  const requestedJson = JSON.stringify(requestedItems);
+  const result = await env.DB.prepare(`
+    WITH requested AS (
+      SELECT
+        json_extract(value, '$.itemName') AS item_name,
+        upper(trim(json_extract(value, '$.storage'))) AS storage,
+        upper(trim(json_extract(value, '$.aisle'))) AS aisle
+      FROM json_each(?)
+    ), inventory AS (
+      SELECT ii.item_name, SUM(ii.quantity) AS stock
+      FROM inventory_current ii
+      WHERE ii.avatar_id = 'enzo' AND ${SALEABLE_CONTAINER_SQL}
+      GROUP BY ii.item_name COLLATE NOCASE
+    )
+    SELECT
+      c.name AS item_name,
+      l.storage,
+      l.aisle,
+      inventory.stock,
+      c.unit_price_ped,
+      CASE WHEN datetime(mc.observed_at) >= datetime('now', '-7 days') THEN mc.weighted_kind ELSE NULL END AS markup_kind,
+      CASE WHEN datetime(mc.observed_at) >= datetime('now', '-7 days') THEN mc.weighted_value ELSE NULL END AS markup_value
+    FROM requested r
+    JOIN catalog_listings l
+      ON l.item_name = r.item_name COLLATE NOCASE
+     AND l.storage = r.storage COLLATE NOCASE
+     AND l.aisle = r.aisle COLLATE NOCASE
+     AND l.enabled = 1
+    JOIN catalog_items c ON c.name = l.item_name COLLATE NOCASE
+    JOIN inventory ON inventory.item_name = c.name COLLATE NOCASE
+    LEFT JOIN market_current mc ON mc.item_name = c.name COLLATE NOCASE
+    WHERE inventory.stock > 0
+  `).bind(requestedJson).all();
+  return result.results.map((row) => ({
+    itemName: row.item_name,
+    storage: row.storage,
+    aisle: row.aisle,
+    stock: Number(row.stock || 0),
+    unitTtPed: Number(row.unit_price_ped || 0),
+    markupKind: row.markup_kind || "none",
+    markupValue: row.markup_value === null || row.markup_value === undefined ? null : Number(row.markup_value)
+  }));
+}
+
+async function storePurchaseOrder(env, order, items, eventAction) {
+  const statements = [
+    env.DB.prepare(`
+      INSERT INTO purchase_orders (
+        id, public_reference, access_token_hash, status, buyer_avatar, buyer_contact,
+        buyer_comment, language, frj_member, source_backend, total_tt_ped,
+        total_sale_ped, pricing_status, submitter_hash, client_created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      order.id, order.publicReference, order.accessTokenHash, order.status || "submitted",
+      order.buyerAvatar, order.buyerContact || null, order.buyerComment || null,
+      order.language || "EN", order.frjMember ? 1 : 0, order.sourceBackend || "d1",
+      Number(order.totalTtPed || 0), Number(order.totalSalePed || 0),
+      order.pricingStatus || "estimated", order.submitterHash || null, order.clientCreatedAt || null
+    ),
+    ...items.map((item, index) => env.DB.prepare(`
+      INSERT INTO purchase_order_items (
+        order_id, line_no, item_name, storage, aisle, quantity, stock_at_submission,
+        unit_tt_ped, markup_kind, markup_value, markup_display, unit_sale_ped,
+        line_tt_ped, line_sale_ped, price_status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      order.id, Number(item.lineNo || index + 1), item.itemName, item.storage, item.aisle,
+      Number(item.quantity), Number(item.stockAtSubmission), Number(item.unitTtPed),
+      item.markupKind || "none", item.markupValue ?? null, item.markupDisplay || null,
+      Number(item.unitSalePed), Number(item.lineTtPed), Number(item.lineSalePed),
+      item.priceStatus || "estimated"
+    )),
+    env.DB.prepare(`INSERT INTO purchase_order_events (order_id, action, details) VALUES (?, ?, ?)`)
+      .bind(order.id, eventAction, JSON.stringify({ sourceBackend: order.sourceBackend || "d1" }))
+  ];
+  await env.DB.batch(statements);
+}
+
+async function importGasFallbackOrder(env, payload) {
+  const order = payload?.order;
+  const items = Array.isArray(payload?.items) ? payload.items : [];
+  if (!order || items.length < 1 || items.length > 30) throw new ApiError(400, "Demande GAS de secours invalide");
+  const id = String(order.id || "").trim().toLowerCase();
+  if (!/^[a-f0-9-]{36}$/.test(id)) throw new ApiError(400, "Identifiant de demande invalide");
+  const existing = await env.DB.prepare(`SELECT id FROM purchase_orders WHERE id = ?`).bind(id).first();
+  if (existing) return { ok: true, duplicate: true, id };
+  const canonical = {
+    id,
+    publicReference: String(order.publicReference || "").trim().toUpperCase(),
+    accessTokenHash: String(order.accessTokenHash || "").trim().toLowerCase(),
+    status: "submitted",
+    buyerAvatar: String(order.buyerAvatar || "").trim().slice(0, 80),
+    buyerContact: String(order.buyerContact || "").trim().slice(0, 160) || null,
+    buyerComment: String(order.buyerComment || "").trim().slice(0, 800) || null,
+    language: order.language === "FR" ? "FR" : "EN",
+    frjMember: order.frjMember === true,
+    sourceBackend: "gas-fallback",
+    totalTtPed: Number(order.totalTtPed || 0),
+    totalSalePed: Number(order.totalSalePed || 0),
+    pricingStatus: order.pricingStatus || "estimated",
+    clientCreatedAt: order.clientCreatedAt || null
+  };
+  if (!/^FRJ-\d{8}-[A-F0-9]{6}$/.test(canonical.publicReference)) throw new ApiError(400, "Référence GAS invalide");
+  if (!/^[a-f0-9]{64}$/.test(canonical.accessTokenHash)) throw new ApiError(400, "Jeton GAS invalide");
+  if (!canonical.buyerAvatar) throw new ApiError(400, "Avatar GAS absent");
+  await storePurchaseOrder(env, canonical, items, "gas-fallback-synchronized");
+  return { ok: true, duplicate: false, id };
+}
+
+async function readAdminOrders(env) {
+  if (!isCartEnabled(env)) return { enabled: false, generatedAt: new Date().toISOString(), orders: [] };
+  const [ordersResult, itemsResult] = await env.DB.batch([
+    env.DB.prepare(`
+      SELECT id, public_reference, status, buyer_avatar, buyer_contact, buyer_comment,
+             language, frj_member, source_backend, total_tt_ped, total_sale_ped,
+             pricing_status, client_created_at, created_at, updated_at
+      FROM purchase_orders ORDER BY created_at DESC LIMIT 200
+    `),
+    env.DB.prepare(`
+      SELECT oi.order_id, oi.line_no, oi.item_name, oi.storage, oi.aisle, oi.quantity,
+             oi.stock_at_submission, oi.unit_tt_ped, oi.markup_display, oi.unit_sale_ped,
+             oi.line_tt_ped, oi.line_sale_ped, oi.price_status
+      FROM purchase_order_items oi
+      JOIN (SELECT id FROM purchase_orders ORDER BY created_at DESC LIMIT 200) recent
+        ON recent.id = oi.order_id
+      ORDER BY oi.order_id, oi.line_no
+    `)
+  ]);
+  const itemsByOrder = {};
+  itemsResult.results.forEach((item) => {
+    (itemsByOrder[item.order_id] ||= []).push(mapOrderItem(item));
+  });
+  return {
+    enabled: true,
+    generatedAt: new Date().toISOString(),
+    orders: ordersResult.results.map((order) => ({
+      ...mapAdminOrder(order),
+      items: itemsByOrder[order.id] || []
+    }))
+  };
+}
+
+function mapPublicOrder(order, items) {
+  return {
+    id: order.id,
+    publicReference: order.public_reference || order.publicReference,
+    status: order.status || "submitted",
+    buyerAvatar: order.buyer_avatar || order.buyerAvatar,
+    language: order.language || "EN",
+    frjMember: Number(order.frj_member ?? order.frjMember ?? 0) === 1 || order.frjMember === true,
+    totalTtPed: Number(order.total_tt_ped ?? order.totalTtPed ?? 0),
+    totalSalePed: Number(order.total_sale_ped ?? order.totalSalePed ?? 0),
+    pricingStatus: order.pricing_status || order.pricingStatus || "estimated",
+    createdAt: normalizeSyncTimestamp(order.created_at || order.createdAt || new Date().toISOString()),
+    updatedAt: normalizeSyncTimestamp(order.updated_at || order.updatedAt || order.created_at || new Date().toISOString()),
+    items: items.map(mapOrderItem)
+  };
+}
+
+function mapAdminOrder(order) {
+  return {
+    ...mapPublicOrder(order, []),
+    buyerContact: order.buyer_contact || null,
+    buyerComment: order.buyer_comment || null,
+    sourceBackend: order.source_backend || "d1",
+    clientCreatedAt: order.client_created_at ? normalizeSyncTimestamp(order.client_created_at) : null
+  };
+}
+
+function mapOrderItem(item) {
+  return {
+    lineNo: Number(item.line_no ?? item.lineNo ?? 0),
+    itemName: item.item_name || item.itemName,
+    storage: item.storage,
+    aisle: item.aisle,
+    quantity: Number(item.quantity || 0),
+    stockAtSubmission: Number(item.stock_at_submission ?? item.stockAtSubmission ?? 0),
+    unitTtPed: Number(item.unit_tt_ped ?? item.unitTtPed ?? 0),
+    markupDisplay: item.markup_display || item.markupDisplay || null,
+    unitSalePed: Number(item.unit_sale_ped ?? item.unitSalePed ?? 0),
+    lineTtPed: Number(item.line_tt_ped ?? item.lineTtPed ?? 0),
+    lineSalePed: Number(item.line_sale_ped ?? item.lineSalePed ?? 0),
+    priceStatus: item.price_status || item.priceStatus || "estimated",
+    markupKind: item.markup_kind || item.markupKind || "none",
+    markupValue: item.markup_value ?? item.markupValue ?? null
+  };
+}
+
+function parseOrderValue(callback) {
+  try {
+    return callback();
+  } catch (error) {
+    throw new ApiError(400, error instanceof Error ? error.message : "Demande invalide");
+  }
+}
+
+async function orderSubmitterHash(request, env) {
+  const address = String(request.headers.get("CF-Connecting-IP") || "unknown");
+  const salt = String(env.ADMIN_TOKEN || env.SYNC_TOKEN || "frj-order-rate-limit");
+  return sha256(`${salt}\n${address}`);
+}
+
+function isCartEnabled(env) {
+  return String(env.CART_ENABLED ?? "true").toLowerCase() !== "false";
 }
 
 async function runImmediateGasAudit(env, payload) {

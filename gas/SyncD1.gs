@@ -216,6 +216,8 @@ function frjD1SignalPollTrigger() {
       frjRequestSynchronization_(pending.reason || "modification-d1", pending.dataset || "", pending.createdAt);
       scheduled.push("D1:" + (pending.dataset || "tous"));
     }
+    var ordersPushed = frjPushPendingPurchaseOrders_();
+    if (ordersPushed) scheduled.push("COMMANDES:" + ordersPushed);
     properties.deleteProperty("FRJ_D1_POLL_LAST_ERROR");
   } catch (error) {
     properties.setProperty("FRJ_D1_POLL_LAST_ERROR", new Date().toISOString() + " — " + error.message);
@@ -223,6 +225,37 @@ function frjD1SignalPollTrigger() {
   }
 
   return scheduled.length ? "Synchronisation programmée : " + scheduled.join(" / ") : "Aucune modification détectée";
+}
+
+function frjPushPendingPurchaseOrders_() {
+  var featureValue = PropertiesService.getScriptProperties().getProperty("FRJ_CART_ENABLED");
+  if (String(featureValue || "true").toLowerCase() === "false") return 0;
+  var ss = SpreadsheetApp.openById(FRJ_SYNC_CONFIG.appSpreadsheetId);
+  var sheet = ss.getSheetByName("COMMANDES_APP");
+  if (!sheet || sheet.getLastRow() < 2) return 0;
+  var values = sheet.getDataRange().getValues();
+  var headers = values[0].map(function(value) { return String(value || "").trim(); });
+  var payloadIndex = headers.indexOf("SYNC_PAYLOAD_JSON");
+  var syncedIndex = headers.indexOf("SYNCED_D1_AT");
+  var errorIndex = headers.indexOf("SYNC_ERROR");
+  if (payloadIndex < 0 || syncedIndex < 0 || errorIndex < 0) return 0;
+
+  var pushed = 0;
+  for (var rowIndex = 1; rowIndex < values.length && pushed < 20; rowIndex++) {
+    if (values[rowIndex][syncedIndex] || !values[rowIndex][payloadIndex]) continue;
+    try {
+      frjD1Request_("/sync/order", {
+        method: "post",
+        payload: String(values[rowIndex][payloadIndex])
+      });
+      sheet.getRange(rowIndex + 1, syncedIndex + 1).setValue(new Date());
+      sheet.getRange(rowIndex + 1, errorIndex + 1).clearContent();
+      pushed++;
+    } catch (error) {
+      sheet.getRange(rowIndex + 1, errorIndex + 1).setValue(new Date().toISOString() + " — " + error.message);
+    }
+  }
+  return pushed;
 }
 
 function frjRunIntegrityAudit_(reason) {

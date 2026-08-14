@@ -2,7 +2,7 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "frj-for-sale-api",
 	"main": "src/index.js",
-	"compatibility_date": "2026-08-11",
+	"compatibility_date": "2026-08-14",
 	"compatibility_flags": ["nodejs_compat"],
 	"observability": {
 		"enabled": true,
@@ -15,7 +15,8 @@
 		}
 	},
 	"vars": {
-		"GAS_SYNC_URL": "https://script.google.com/macros/s/AKfycbxa0B_4R6tsn8aQCLy1Y3LEqbDj4SY22xbascJfMRd1I1thQkCRPySAjszdHoxX1h2a/exec"
+		"GAS_SYNC_URL": "https://script.google.com/macros/s/AKfycbxa0B_4R6tsn8aQCLy1Y3LEqbDj4SY22xbascJfMRd1I1thQkCRPySAjszdHoxX1h2a/exec",
+		"CART_ENABLED": "true"
 	},
 	"d1_databases": [
 		{
