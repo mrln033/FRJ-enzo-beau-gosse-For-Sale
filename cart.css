@@ -15,19 +15,29 @@
 
 .cart-launcher.pulse { animation: cart-pulse 0.35s ease; }
 
-.cart-add-button {
-  width: calc(100% - 24px);
-  margin: auto 12px 12px;
-  border: 1px solid #9b742d;
-  border-radius: 7px;
-  padding: 7px 9px;
-  color: #2f2412;
-  background: #f0dca7;
+.cart-back-icon {
+  position: absolute;
+  right: 10px;
+  bottom: 9px;
+  display: grid;
+  place-items: center;
+  width: 31px;
+  height: 31px;
+  padding: 0;
+  border: 0;
+  color: #666;
+  background: transparent;
   cursor: pointer;
-  font-weight: 700;
+  opacity: 0.72;
+  transition: opacity 0.2s ease, transform 0.2s ease, color 0.2s ease;
 }
 
-.cart-add-button:hover { background: #f8e9bd; }
+.cart-back-icon:hover,
+.cart-back-icon:focus-visible {
+  color: #000;
+  opacity: 1;
+  transform: scale(1.15);
+}
 
 .cart-drawer {
   position: fixed;

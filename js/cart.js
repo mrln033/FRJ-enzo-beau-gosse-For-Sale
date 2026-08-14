@@ -58,9 +58,11 @@
       .join("\u001f");
   }
 
-  function addItem(rawItem) {
+  function addItem(rawItem, options = {}) {
     if (!enabled) return;
     const normalized = normalizeCatalogItem(rawItem);
+    const requestedQuantity = clampQuantity(options.quantity ?? 1, normalized.stock);
+    if (requestedQuantity <= 0) return;
     const key = itemKey(normalized);
     const existing = cart.items.find((item) => item.key === key);
     if (!existing && cart.items.length >= MAX_LINES) {
@@ -74,9 +76,9 @@
       existing.markupKind = normalized.markupKind;
       existing.markupValue = normalized.markupValue;
       existing.markupDisplay = normalized.markupDisplay;
-      existing.quantity = clampQuantity(existing.quantity + 1, existing.stock);
+      existing.quantity = clampQuantity(existing.quantity + requestedQuantity, existing.stock);
     } else {
-      cart.items.push({ ...normalized, key, quantity: clampQuantity(1, normalized.stock) });
+      cart.items.push({ ...normalized, key, quantity: requestedQuantity });
     }
     saveCart();
     setStatus("");

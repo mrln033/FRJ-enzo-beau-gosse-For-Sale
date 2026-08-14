@@ -4,11 +4,11 @@
     <base target="_self">
 	<link rel="icon" href="./favicon.ico">
 	<link rel="stylesheet" href="./style.css?v=20260813-5">
-	<link rel="stylesheet" href="./cart.css?v=20260814-2">
+	<link rel="stylesheet" href="./cart.css?v=20260814-3">
 	<script src="./js/langues.js"></script>
 	<script src="./js/features.js?v=20260814-2"></script>
 	<script src="./js/api-client.js?v=20260814-3"></script>
-	<script defer src="./js/cart.js?v=20260814-2"></script>
+	<script defer src="./js/cart.js?v=20260814-3"></script>
 	<script defer src="./js/admin-menu.js?v=20260814-4"></script>
 	<title>[FRJ] - enzo beau gosse : Item List</title>
   </head>
@@ -743,15 +743,6 @@ function getEffectiveMU(muStr) {
 
 				<div class="card-back"></div>
 			`;
-			if (window.FRJ_CART?.enabled) {
-				const cartButton = document.createElement("button");
-				cartButton.type = "button";
-				cartButton.className = "cart-add-button";
-				cartButton.textContent = currentLang === "FR" ? "Ajouter au panier" : "Add to cart";
-				cartButton.addEventListener("click", () => window.FRJ_CART.addItem(item));
-				card.querySelector(".card-front").appendChild(cartButton);
-			}
-
 			container.appendChild(card);
 		});
 	}
@@ -817,7 +808,7 @@ function openCalculator(iconEl, item) {
     <div class="back-content">
       <div class="qty-row">
         <span>${t("quantity")}</span>
-        <input type="number" id="calcQty" value="${defaultQty}" min="1">
+        <input type="number" id="calcQty" value="${defaultQty}" min="0.0001" max="${item.QUANTITE}" step="any">
       </div>
 
       <p>${t("unitPrice")}: ${prix.toFixed(2)} peds</p>
@@ -828,6 +819,27 @@ function openCalculator(iconEl, item) {
 
     <button class="back-btn" onclick="closeCalculator(this)">←</button>
   `;
+
+  if (window.FRJ_CART?.enabled) {
+    const cartButton = document.createElement("button");
+    cartButton.type = "button";
+    cartButton.className = "cart-back-icon";
+    cartButton.title = currentLang === "FR" ? "Ajouter cette quantité au panier" : "Add this quantity to cart";
+    cartButton.setAttribute("aria-label", cartButton.title);
+    cartButton.innerHTML = `
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+        aria-hidden="true">
+        <circle cx="9" cy="20" r="1"/><circle cx="19" cy="20" r="1"/>
+        <path d="M3 4h2l2.4 10.4a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.6L21 8H6"/>
+        <path d="M12 8V3m-2 2 2-2 2 2"/>
+      </svg>`;
+    cartButton.addEventListener("click", () => {
+      const quantity = Number(back.querySelector("#calcQty")?.value) || 0;
+      window.FRJ_CART.addItem(item, { quantity });
+    });
+    back.appendChild(cartButton);
+  }
 
   card.classList.add("open");
 
