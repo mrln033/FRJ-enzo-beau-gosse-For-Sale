@@ -6,8 +6,16 @@ import {
   canonicalMarketPayload,
   aggregateInventoryRows,
   inventoryContentHash,
-  mergeMarketRows
+  mergeMarketRows,
+  shouldSignalSyncAfterImport
 } from "../src/sync.js";
+
+test("un import jumelé GAS + D1 ne programme pas de synchronisation de propagation", () => {
+  assert.equal(shouldSignalSyncAfterImport("gas"), false);
+  assert.equal(shouldSignalSyncAfterImport("GAS"), false);
+  assert.equal(shouldSignalSyncAfterImport(""), true);
+  assert.equal(shouldSignalSyncAfterImport(null), true);
+});
 
 test("l'empreinte inventaire ignore l'ordre et les numéros de ligne", async () => {
   const first = {

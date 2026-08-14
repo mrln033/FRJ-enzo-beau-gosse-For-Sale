@@ -10,7 +10,8 @@ import {
   marketRowKey,
   marketContentHash,
   mergeMarketRows,
-  normalizeSyncTimestamp
+  normalizeSyncTimestamp,
+  shouldSignalSyncAfterImport
 } from "./sync.js";
 
 const MAX_IMPORT_BYTES = 1_800_000;
@@ -333,6 +334,7 @@ async function handlePost(request, url, env) {
   if (contentLength > MAX_IMPORT_BYTES) throw new ApiError(413, "Import trop volumineux");
 
   const type = url.searchParams.get("type");
+  const shouldSignalSync = shouldSignalSyncAfterImport(url.searchParams.get("paired"));
   const body = await readTextBody(request, MAX_IMPORT_BYTES);
 
   if (type === "inventory") {
@@ -366,7 +368,9 @@ async function handlePost(request, url, env) {
       sourceUpdatedAt: new Date().toISOString(),
       contentHash
     });
-    await notifyGasDataChanged(env, `inventory:${avatar}`, "import-d1-inventory");
+    if (shouldSignalSync) {
+      await notifyGasDataChanged(env, `inventory:${avatar}`, "import-d1-inventory");
+    }
 
     return legacyText(
       `✅ Import inventaire OK dans ${AVATAR_SHEETS[avatar]} (${rows.length + 1} lignes)`,
@@ -402,7 +406,9 @@ async function handlePost(request, url, env) {
       sourceUpdatedAt: observedAt,
       contentHash
     });
-    await notifyGasDataChanged(env, "mu", "import-d1-mu");
+    if (shouldSignalSync) {
+      await notifyGasDataChanged(env, "mu", "import-d1-mu");
+    }
 
     return legacyText(`${updates} MAJ / ${inserts} AJOUTS`, result.importId, result.rowsWritten);
   }

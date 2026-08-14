@@ -116,14 +116,15 @@
       results.push({ backend: "gas", ok: false, message: errorMessage(error) });
     }
 
+    const gasResult = results.find((result) => result.backend === "gas");
+    const d1Query = gasResult?.ok ? appendQueryParameter(query, "paired", "gas") : query;
     try {
-      const response = await requestD1Admin(query, options);
+      const response = await requestD1Admin(d1Query, options);
       results.push({ backend: "d1", ok: true, message: await readImportMessage(response, "D1") });
     } catch (error) {
       results.push({ backend: "d1", ok: false, message: errorMessage(error) });
     }
 
-    const gasResult = results.find((result) => result.backend === "gas");
     const d1Result = results.find((result) => result.backend === "d1");
     if (gasResult?.ok && d1Result?.ok && config.dataset && typeof body === "string") {
       try {
@@ -152,6 +153,12 @@
 
   function errorMessage(error) {
     return error instanceof Error ? error.message : String(error);
+  }
+
+  function appendQueryParameter(query, name, value) {
+    const source = String(query || "");
+    const separator = source.includes("?") ? "&" : "?";
+    return `${source}${separator}${encodeURIComponent(name)}=${encodeURIComponent(value)}`;
   }
 
   async function requestSynchronization(dataset, reason) {

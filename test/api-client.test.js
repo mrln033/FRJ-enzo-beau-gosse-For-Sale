@@ -170,7 +170,7 @@ test("un import double écrit dans GAS puis D1 indépendamment du paramètre bac
   assert.equal(outcome.partial, false);
   assert.equal(requests.length, 2);
   assert.match(requests[0].url, /^https:\/\/script\.google\.com\//);
-  assert.match(requests[1].url, /workers\.dev/);
+  assert.match(requests[1].url, /workers\.dev.*[?&]paired=gas/);
   assert.equal(requests[1].options.headers.get("Authorization"), "Bearer jeton-double");
   assert.deepEqual(Array.from(outcome.results, (result) => result.message), ["Import GAS OK", "Import D1 OK"]);
 });
@@ -193,6 +193,7 @@ test("un échec GAS n'empêche pas l'import D1", async () => {
   assert.equal(requests.length, 2);
   assert.deepEqual(Array.from(outcome.results, (result) => result.ok), [false, true]);
   assert.match(outcome.results[0].message, /GAS indisponible/);
+  assert.doesNotMatch(requests[1], /[?&]paired=gas/);
 });
 
 test("un échec D1 n'annule pas l'import GAS et conserve un résultat partiel", async () => {
@@ -230,7 +231,7 @@ test("un double succès publie ensuite l'état GAS dans le rapport", async () =>
   assert.equal(outcome.ok, true);
   assert.equal(requests.length, 3);
   assert.match(requests[0].url, /^https:\/\/script\.google\.com\//);
-  assert.match(requests[1].url, /workers\.dev\?type=mu/);
+  assert.match(requests[1].url, /workers\.dev\?type=mu&paired=gas/);
   assert.match(requests[2].url, /workers\.dev\/admin\/sync-observation/);
   assert.equal(JSON.parse(requests[2].options.body).raw, "csv-mu");
 });

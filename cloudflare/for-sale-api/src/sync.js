@@ -19,6 +19,10 @@ export async function catalogContentHash(rows) {
   return sha256(canonicalCatalogPayload(rows));
 }
 
+export function shouldSignalSyncAfterImport(pairedBackend) {
+  return String(pairedBackend || "").toLowerCase() !== "gas";
+}
+
 export function canonicalInventoryPayload(rows) {
   return aggregateInventoryRows(rows).map((row) => JSON.stringify([
     cleanText(row.itemName),
