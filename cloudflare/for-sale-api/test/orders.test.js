@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { canReviseOrder, normalizeOrderSubmission, priceOrderLines, reviseOrderLine, validateOrderStatus } from "../src/orders.js";
+import { canClientCancelOrder, canReviseOrder, normalizeOrderSubmission, priceOrderLines, reviseOrderLine, validateOrderStatus } from "../src/orders.js";
 
 const validPayload = {
   id: "123e4567-e89b-42d3-a456-426614174000",
@@ -108,6 +108,17 @@ test("autorise les propositions uniquement avant la préparation", () => {
   assert.equal(canReviseOrder("completed"), false);
   assert.equal(canReviseOrder("cancelled"), false);
   assert.equal(canReviseOrder("expired"), false);
+});
+
+test("autorise le client à annuler uniquement avant la préparation", () => {
+  assert.equal(canClientCancelOrder("submitted"), true);
+  assert.equal(canClientCancelOrder("viewed"), true);
+  assert.equal(canClientCancelOrder("submitted", 1), true);
+  assert.equal(canClientCancelOrder("preparing"), false);
+  assert.equal(canClientCancelOrder("ready"), false);
+  assert.equal(canClientCancelOrder("completed"), false);
+  assert.equal(canClientCancelOrder("cancelled"), false);
+  assert.equal(canClientCancelOrder("expired"), false);
 });
 
 test("recalcule une proposition ponctuelle en pourcentage affiché", () => {

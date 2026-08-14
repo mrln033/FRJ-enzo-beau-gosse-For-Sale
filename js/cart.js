@@ -7,6 +7,11 @@
   const MAX_LINES = 10;
   const MAX_CLOSED_REQUEST_HISTORY = 20;
   const CLOSED_REQUEST_STATUSES = new Set(["completed", "cancelled", "expired"]);
+  const CANCELLABLE_REQUEST_STATUSES = new Set(["awaiting_approval", "submitted", "viewed"]);
+  const STATUS_SORT_ORDER = new Map([
+    ["awaiting_approval", 0], ["ready", 1], ["submitted", 2], ["viewed", 3],
+    ["preparing", 4], ["completed", 5], ["cancelled", 6], ["expired", 7]
+  ]);
   const copyLabels = {
     FR: {
       cart: "Panier", empty: "Votre panier est vide.", add: "Ajouter au panier",
@@ -24,8 +29,10 @@
       trackRequest: "Suivre ma demande", copyTracking: "Copier le lien de suivi",
       trackingCopied: "Lien de suivi copié.", gasTrackingPending: "Le suivi apparaîtra dès le transfert du secours GAS vers D1.",
       approvalRequired: "Action requise : Enzo a proposé des modifications à accepter.",
+      cancelRequest: "Annuler la demande", cancelConfirm: "Confirmer l’annulation de cette demande ?",
+      cancelledRequest: "Demande annulée.", hideRequest: "Masquer dans la liste", hiddenRequest: "Demande masquée de cette liste.",
       statusAwaiting: "À valider",
-      statusSubmitted: "Transmise", statusViewed: "Consultée", statusPreparing: "En préparation",
+      statusSubmitted: "Transmise", statusViewed: "Vue", statusPreparing: "À préparer",
       statusReady: "Prête", statusCompleted: "Terminée", statusCancelled: "Annulée", statusExpired: "Expirée"
     },
     EN: {
@@ -44,6 +51,8 @@
       trackRequest: "Track my request", copyTracking: "Copy tracking link",
       trackingCopied: "Tracking link copied.", gasTrackingPending: "Tracking will appear once the GAS fallback has transferred the request to D1.",
       approvalRequired: "Action required: Enzo proposed changes that need your approval.",
+      cancelRequest: "Cancel request", cancelConfirm: "Confirm cancellation of this request?",
+      cancelledRequest: "Request cancelled.", hideRequest: "Hide from list", hiddenRequest: "Request hidden from this list.",
       statusAwaiting: "Approval required",
       statusSubmitted: "Submitted", statusViewed: "Viewed", statusPreparing: "Being prepared",
       statusReady: "Ready", statusCompleted: "Completed", statusCancelled: "Cancelled", statusExpired: "Expired"
@@ -315,9 +324,13 @@
     const title = document.createElement("strong");
     title.textContent = label("lastRequest");
     wrapper.appendChild(title);
-    requests.forEach((request) => {
+    const orderedRequests = [...requests].sort((left, right) => {
+      const statusDifference = (STATUS_SORT_ORDER.get(left.status) ?? 99) - (STATUS_SORT_ORDER.get(right.status) ?? 99);
+      return statusDifference || Date.parse(right.submittedAt || 0) - Date.parse(left.submittedAt || 0);
+    });
+    orderedRequests.forEach((request) => {
       const section = document.createElement("article");
-      section.className = `cart-tracking${request.status === "awaiting_approval" ? " approval-required" : ""}`;
+      section.className = `cart-tracking status-${request.status || "submitted"}${request.status === "awaiting_approval" ? " approval-required" : ""}`;
       const reference = document.createElement("span");
       reference.textContent = `${request.reference} — ${requestStatusLabel(request.status)}`;
       const link = document.createElement("a");
@@ -329,6 +342,11 @@
         setStatus(label("trackingCopied"), "success");
       });
       section.append(reference, link, copy);
+      if (CANCELLABLE_REQUEST_STATUSES.has(request.status)) {
+        section.appendChild(button(label("cancelRequest"), "cart-secondary cart-cancel-request", () => cancelRequest(request)));
+      } else if (CLOSED_REQUEST_STATUSES.has(request.status)) {
+        section.appendChild(button(label("hideRequest"), "cart-secondary cart-hide-request", () => hideRequest(request.accessToken)));
+      }
       if (request.status === "awaiting_approval") {
         const alert = document.createElement("strong");
         alert.className = "cart-tracking-alert";
@@ -342,6 +360,31 @@
       wrapper.appendChild(section);
     });
     return wrapper;
+  }
+
+  async function cancelRequest(request) {
+    if (!global.confirm(label("cancelConfirm"))) return;
+    setStatus("");
+    try {
+      const result = await global.FRJ_API.cancelOrder(request.accessToken, request.backend);
+      request.status = "cancelled";
+      request.backend = result.backend === "gas" ? "gas" : "d1";
+      request.updatedAt = new Date().toISOString();
+      requests = mergeRequests(requests, readRequests());
+      saveRequests();
+      setStatus(label("cancelledRequest"), "success");
+      render();
+    } catch (error) {
+      await refreshRequestStatuses();
+      setStatus(error.message, "error");
+    }
+  }
+
+  function hideRequest(accessToken) {
+    requests = requests.filter((request) => request.accessToken !== accessToken);
+    saveRequests();
+    setStatus(label("hiddenRequest"), "success");
+    render();
   }
 
   async function submitCart(event) {
@@ -528,6 +571,7 @@
   function saveRequests() {
     global.localStorage.setItem(REQUESTS_KEY, JSON.stringify(requests));
     if (requests[0]) global.localStorage.setItem("FRJ_LAST_PURCHASE_REQUEST", JSON.stringify(requests[0]));
+    else global.localStorage.removeItem("FRJ_LAST_PURCHASE_REQUEST");
   }
 
   function requestStatusLabel(status) {

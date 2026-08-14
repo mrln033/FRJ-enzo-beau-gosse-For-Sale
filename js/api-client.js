@@ -198,6 +198,40 @@
     return result;
   }
 
+  async function cancelOrder(accessToken, sourceBackend = "d1") {
+    const token = String(accessToken || "").trim();
+    if (!/^[a-f0-9-]{70,80}$/i.test(token)) {
+      const error = new Error("Lien de suivi invalide");
+      error.status = 400;
+      throw error;
+    }
+    const response = await global.fetch(`${D1_URL}/orders/status/${encodeURIComponent(token)}/cancel`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}"
+    });
+    const result = await readJsonResponse(response);
+    if (response.ok) return result;
+    if (sourceBackend === "gas" && (response.status === 404 || response.status >= 500)) {
+      const gasResponse = await global.fetch(`${GAS_ORDER_URL}?type=orderCancel`, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=UTF-8" },
+        body: JSON.stringify({ accessToken: token })
+      });
+      const gasResult = await readJsonResponse(gasResponse);
+      if (gasResponse.ok && gasResult.ok === true) return { ...gasResult, backend: "gas" };
+      const gasError = new Error(gasResult.error || "GAS a refusé l’annulation");
+      gasError.status = gasResponse.status;
+      throw gasError;
+    }
+    {
+      const error = new Error(result.error || `D1 répond ${response.status}`);
+      error.status = response.status;
+      error.details = result;
+      throw error;
+    }
+  }
+
   async function readJsonResponse(response) {
     const text = await response.text();
     try {
@@ -414,6 +448,7 @@
     submitOrder,
     getOrderStatus,
     acceptOrderProposal,
+    cancelOrder,
     backend: preferredBackend,
     get activeBackend() { return activeBackend; },
     label: preferredBackend === "d1" ? "Cloudflare D1" : "Google Sheets / GAS",

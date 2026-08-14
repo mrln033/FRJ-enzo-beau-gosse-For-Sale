@@ -410,6 +410,58 @@ function processPurchaseOrderRequest(rawBody) {
   }
 }
 
+function processPurchaseOrderCancellation(rawBody) {
+  var payload;
+  try { payload = JSON.parse(String(rawBody || "")); } catch (error) {
+    return purchaseJsonOutput_({ ok: false, error: "Annulation de demande invalide" });
+  }
+  var accessToken = String(payload && payload.accessToken || "").trim();
+  if (!/^[a-f0-9-]{70,80}$/i.test(accessToken)) {
+    return purchaseJsonOutput_({ ok: false, error: "Jeton de suivi invalide" });
+  }
+
+  try {
+    var tokenHash = purchaseSha256_(accessToken);
+    var ss = SpreadsheetApp.openById("13r_PzIZE8dJiPFU8w7UXxtEednHhS-yijNgTiYLqYP0");
+    var sheet = getOrCreatePurchaseOrderSheet_(ss);
+    if (sheet.getLastRow() < 2) return purchaseJsonOutput_({ ok: false, error: "Demande introuvable" });
+    var values = sheet.getDataRange().getValues();
+    var headers = values[0].map(function(value) { return String(value || "").trim(); });
+    var indexes = {};
+    headers.forEach(function(header, index) { indexes[header] = index; });
+    var found = null;
+
+    for (var rowIndex = 1; rowIndex < values.length; rowIndex++) {
+      var rawSync = String(values[rowIndex][indexes.SYNC_PAYLOAD_JSON] || "");
+      if (!rawSync) continue;
+      var syncPayload;
+      try { syncPayload = JSON.parse(rawSync); } catch (error) { continue; }
+      var order = syncPayload && syncPayload.order;
+      if (!order || String(order.accessTokenHash || "").toLowerCase() !== tokenHash.toLowerCase()) continue;
+      found = { rowIndex: rowIndex, payload: syncPayload, order: order };
+      break;
+    }
+    if (!found) return purchaseJsonOutput_({ ok: false, error: "Demande introuvable" });
+    var canCancel = found.order.approvalRequired === true
+      || found.order.status === "submitted" || found.order.status === "viewed";
+    if (!canCancel) {
+      return purchaseJsonOutput_({ ok: false, error: "Cette demande ne peut plus être annulée par le client" });
+    }
+
+    found.order.status = "cancelled";
+    found.order.approvalRequired = false;
+    var targetRow = found.rowIndex + 1;
+    sheet.getRange(targetRow, indexes.STATUT + 1).setValue("cancelled");
+    sheet.getRange(targetRow, indexes.SYNC_PAYLOAD_JSON + 1).setValue(JSON.stringify(found.payload));
+    sheet.getRange(targetRow, indexes.SYNCED_D1_AT + 1).clearContent();
+    sheet.getRange(targetRow, indexes.SYNC_ERROR + 1).clearContent();
+    sheet.getRange(targetRow, indexes.APPROVAL_REQUIRED + 1).setValue("FALSE");
+    return purchaseJsonOutput_({ ok: true, status: "cancelled" });
+  } catch (error) {
+    return purchaseJsonOutput_({ ok: false, error: error.message || String(error) });
+  }
+}
+
 function normalizePurchaseOrderPayload_(payload) {
   var id = String(payload && payload.id || "").trim().toLowerCase();
   var publicReference = String(payload && payload.publicReference || "").trim().toUpperCase();
@@ -784,6 +836,9 @@ function frjMainDoPost_(e) {
   return withFrjDataLock_(function() {
     if (type === "order") {
       return processPurchaseOrderRequest(e.postData && e.postData.contents);
+    }
+    if (type === "orderCancel") {
+      return processPurchaseOrderCancellation(e.postData && e.postData.contents);
     }
 
     if (type === "mu") {

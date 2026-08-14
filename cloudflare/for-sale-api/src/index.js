@@ -14,6 +14,7 @@ import {
   shouldSignalSyncAfterImport
 } from "./sync.js";
 import {
+  canClientCancelOrder,
   canReviseOrder,
   normalizeOrderSubmission,
   priceOrderLines,
@@ -88,9 +89,12 @@ export default {
 
       if (request.method === "POST") {
         if (isSyncRequest) return withCors(await handleSyncPost(request, url, env), origin);
-        if (/^\/orders\/status\/[a-f0-9-]{70,80}\/accept$/i.test(url.pathname)) {
+        if (/^\/orders\/status\/[a-f0-9-]{70,80}\/(?:accept|cancel)$/i.test(url.pathname)) {
           if (!PUBLIC_ORIGINS.has(String(origin || ""))) {
             return withCors(json({ error: "Origine non autorisée" }, 403), origin);
+          }
+          if (url.pathname.toLowerCase().endsWith("/cancel")) {
+            return withCors(await handlePublicOrderCancellation(url, env), origin);
           }
           return withCors(await handlePublicOrderAcceptance(request, url, env), origin);
         }
@@ -1661,6 +1665,36 @@ async function handlePublicOrderAcceptance(request, url, env) {
   return json({ ok: true, noChange: false, status: "submitted", discord: publicDiscordResult(discord) });
 }
 
+async function handlePublicOrderCancellation(url, env) {
+  if (!isCartEnabled(env)) throw new ApiError(503, "Suivi de panier désactivé");
+  const match = url.pathname.match(/^\/orders\/status\/([a-f0-9-]{70,80})\/cancel$/i);
+  if (!match) throw new ApiError(404, "Demande introuvable");
+  const tokenHash = await sha256(match[1]);
+  const order = await env.DB.prepare(`
+    SELECT id, status, approval_required
+    FROM purchase_orders WHERE access_token_hash = ?
+  `).bind(tokenHash).first();
+  if (!order) throw new ApiError(404, "Demande introuvable");
+  if (!canClientCancelOrder(order.status, order.approval_required)) {
+    throw new ApiError(409, "Cette demande ne peut plus être annulée par le client");
+  }
+
+  const result = await env.DB.prepare(`
+    UPDATE purchase_orders
+    SET status = 'cancelled', approval_required = 0, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ? AND (approval_required = 1 OR status IN ('submitted', 'viewed'))
+  `).bind(order.id).run();
+  if (Number(result.meta?.changes || 0) !== 1) {
+    throw new ApiError(409, "Le statut de la demande a changé. Actualisez le panier.");
+  }
+  await env.DB.prepare(`
+    INSERT INTO purchase_order_events (order_id, action, details)
+    VALUES (?, 'client-cancelled', '{}')
+  `).bind(order.id).run();
+  const discord = await synchronizeDiscordOrder(env, order.id);
+  return json({ ok: true, status: "cancelled", discord: publicDiscordResult(discord) });
+}
+
 async function handlePublicOrderPost(request, env) {
   if (!isCartEnabled(env)) throw new ApiError(503, "Transmission des paniers désactivée");
   const contentLength = Number(request.headers.get("Content-Length") || 0);
@@ -1830,7 +1864,7 @@ async function importGasFallbackOrder(env, payload) {
     id,
     publicReference: String(order.publicReference || "").trim().toUpperCase(),
     accessTokenHash: String(order.accessTokenHash || "").trim().toLowerCase(),
-    status: "submitted",
+    status: order.status === "cancelled" ? "cancelled" : "submitted",
     buyerAvatar: String(order.buyerAvatar || "").trim().slice(0, 80),
     buyerContact: String(order.buyerContact || "").trim().slice(0, 160) || null,
     buyerComment: String(order.buyerComment || "").trim().slice(0, 800) || null,
@@ -1849,9 +1883,9 @@ async function importGasFallbackOrder(env, payload) {
   if (!/^[a-f0-9]{64}$/.test(canonical.accessTokenHash)) throw new ApiError(400, "Jeton GAS invalide");
   if (!canonical.buyerAvatar) throw new ApiError(400, "Avatar GAS absent");
   await storePurchaseOrder(env, canonical, items, "gas-fallback-synchronized");
-  const discord = canonical.discordMessageId
-    ? { ok: true, action: "imported", messageId: canonical.discordMessageId }
-    : await synchronizeDiscordOrder(env, canonical.id);
+  // Rejouer systématiquement l'état canonique dans Discord : la demande a pu
+  // être annulée côté secours GAS avant son premier transfert vers D1.
+  const discord = await synchronizeDiscordOrder(env, canonical.id);
   return { ok: true, duplicate: false, id, discord: publicDiscordResult(discord) };
 }
 
