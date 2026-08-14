@@ -9,7 +9,7 @@ Ce projet est volontairement séparé de `../worker.js`, qui gère Discord pour 
 - Données source : 1 113 lignes catalogue, 3 097 lignes d’inventaire brut consolidées en 2 148 triplets
   `avatar + item + container`, et 802 observations MU.
 - Le front GitHub Pages peut utiliser GAS ou D1 sans changer son adresse publique.
-- Les lectures D1 sont publiques ; `ADMIN_TOKEN` est configuré dans les secrets Cloudflare.
+- Les lectures D1 sont publiques ; `ADMIN_TOKEN`, `SYNC_TOKEN` et `DISCORD_ORDER_WEBHOOK_URL` sont configurés dans les secrets Cloudflare.
 - Le frontend local possède une bascule progressive, mais ces modifications ne sont pas encore publiées sur GitHub Pages.
 
 ## Contrat HTTP conservé
@@ -48,7 +48,7 @@ de mots de passe ; Cloudflare ne permet pas de la relire ensuite.
 
 1. Appliquer le schéma distant : `pnpm db:migrate:remote`.
 2. Charger le snapshot distant : `pnpm db:seed:remote`.
-3. Créer le secret d’administration : `pnpm wrangler secret put ADMIN_TOKEN`.
+3. Créer les secrets nécessaires : `pnpm wrangler secret put ADMIN_TOKEN`, `SYNC_TOKEN` et `DISCORD_ORDER_WEBHOOK_URL`.
 4. Déployer : `pnpm deploy`.
 5. Contrôler l’API distante : `pnpm smoke`.
 

@@ -377,15 +377,22 @@ function processPurchaseOrderRequest(rawBody) {
       totalTtPed: priced.totalTtPed,
       totalSalePed: priced.totalSalePed,
       pricingStatus: priced.pricingStatus,
-      clientCreatedAt: normalized.clientCreatedAt
+      clientCreatedAt: normalized.clientCreatedAt,
+      discordMessageId: null
     };
-    var syncPayload = JSON.stringify({ order: order, items: priced.lines });
     sheet.appendRow([
       order.id, order.publicReference, order.buyerAvatar, order.buyerContact || "",
       order.buyerComment || "", order.language, order.frjMember ? "TRUE" : "FALSE",
       order.status, order.totalTtPed, order.totalSalePed, order.pricingStatus,
-      order.clientCreatedAt || "", new Date(), syncPayload, "", ""
+      order.clientCreatedAt || "", new Date(), "", "", "", "", ""
     ]);
+    var orderRow = sheet.getLastRow();
+    var discordResult = purchasePublishDiscord_(order, priced.lines);
+    if (discordResult.ok) order.discordMessageId = discordResult.messageId;
+    var syncPayload = JSON.stringify({ order: order, items: priced.lines });
+    sheet.getRange(orderRow, 14).setValue(syncPayload);
+    if (discordResult.messageId) sheet.getRange(orderRow, 17).setValue(discordResult.messageId);
+    if (discordResult.error) sheet.getRange(orderRow, 18).setValue(discordResult.error);
     return purchaseJsonOutput_({
       ok: true,
       duplicate: false,
@@ -528,10 +535,132 @@ function getOrCreatePurchaseOrderSheet_(ss) {
   var headers = [
     "ORDER_ID", "REFERENCE", "AVATAR_ACHETEUR", "CONTACT", "COMMENTAIRE", "LANGUE",
     "MEMBRE_FRJ", "STATUT", "TOTAL_TT_PED", "TOTAL_VENTE_PED", "PRIX_STATUT",
-    "DATE_CLIENT", "DATE_RECEPTION", "SYNC_PAYLOAD_JSON", "SYNCED_D1_AT", "SYNC_ERROR"
+    "DATE_CLIENT", "DATE_RECEPTION", "SYNC_PAYLOAD_JSON", "SYNCED_D1_AT", "SYNC_ERROR",
+    "DISCORD_MESSAGE_ID", "DISCORD_ERROR"
   ];
-  if (sheet.getLastRow() === 0) sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  if (sheet.getMaxColumns() < headers.length) {
+    sheet.insertColumnsAfter(sheet.getMaxColumns(), headers.length - sheet.getMaxColumns());
+  }
+  var currentHeaders = sheet.getLastRow() > 0
+    ? sheet.getRange(1, 1, 1, headers.length).getDisplayValues()[0]
+    : [];
+  if (headers.some(function(header, index) { return currentHeaders[index] !== header; })) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
   return sheet;
+}
+
+function purchasePublishDiscord_(order, items) {
+  var webhook = String(PropertiesService.getScriptProperties().getProperty("FRJ_DISCORD_ORDER_WEBHOOK_URL") || "").trim();
+  if (!webhook) return { ok: false, skipped: true };
+  if (!/^https:\/\/(?:discord\.com|discordapp\.com)\/api\/webhooks\/\d+\/[A-Za-z0-9._-]+\/?$/.test(webhook)) {
+    return { ok: false, error: "Webhook Discord invalide" };
+  }
+  try {
+    var response = UrlFetchApp.fetch(webhook.replace(/\/+$/, "") + "?wait=true", {
+      method: "post",
+      contentType: "application/json; charset=UTF-8",
+      payload: JSON.stringify(purchaseDiscordPayload_(order, items)),
+      muteHttpExceptions: true
+    });
+    var status = response.getResponseCode();
+    var raw = response.getContentText();
+    var data;
+    try { data = raw ? JSON.parse(raw) : {}; } catch (parseError) { data = {}; }
+    if (status < 200 || status >= 300) {
+      return { ok: false, error: "Discord HTTP " + status };
+    }
+    var messageId = String(data.id || "").trim();
+    if (!/^\d{15,22}$/.test(messageId)) return { ok: false, error: "ID du message Discord absent" };
+    return { ok: true, messageId: messageId };
+  } catch (error) {
+    return { ok: false, error: String(error.message || error).slice(0, 500) };
+  }
+}
+
+function purchaseDiscordPayload_(order, items) {
+  var statusLabels = {
+    submitted: "Demande transmise", viewed: "Demande consultée", preparing: "Préparation en cours",
+    ready: "Prête", completed: "Terminée", cancelled: "Annulée", expired: "Expirée"
+  };
+  var statusColors = {
+    submitted: 13144610, viewed: 3504324, preparing: 14186520,
+    ready: 2589514, completed: 1467700, cancelled: 11811892, expired: 7829367
+  };
+  var status = String(order.status || "submitted").toLowerCase();
+  var memberLabel = order.frjMember ? "MU FRJ" : "MU";
+  var fields = [
+    { name: "Avatar", value: purchaseDiscordText_(order.buyerAvatar || "—", 1024), inline: true },
+    { name: "Statut", value: statusLabels[status] || status, inline: true },
+    { name: "Total estimé", value: purchaseDiscordNumber_(order.totalSalePed, 2) + " PED", inline: true },
+    { name: "Contact", value: purchaseDiscordText_(order.buyerContact || "Non renseigné", 1024), inline: true },
+    { name: "Origine", value: "Secours GAS", inline: true },
+    { name: "Profil tarifaire", value: order.frjMember ? "Membre FRJ" : "Public", inline: true }
+  ];
+  purchaseDiscordItemFields_(items, memberLabel).forEach(function(field) { fields.push(field); });
+  if (order.buyerComment) {
+    fields.push({ name: "Commentaire", value: purchaseDiscordText_(order.buyerComment, 900), inline: false });
+  }
+  return {
+    username: "FRJ — For Sale",
+    allowed_mentions: { parse: [] },
+    embeds: [{
+      title: "🛒 " + purchaseDiscordText_(order.publicReference || "Nouvelle demande", 220),
+      url: "https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/commandes.html?admin=1",
+      description: "État actuel : **" + (statusLabels[status] || status) + "**",
+      color: statusColors[status] || statusColors.submitted,
+      fields: fields,
+      footer: { text: "Demande " + purchaseDiscordText_(order.id || "sans identifiant", 180) },
+      timestamp: new Date().toISOString()
+    }]
+  };
+}
+
+function purchaseDiscordItemFields_(items, memberLabel) {
+  var lines = (items || []).map(function(item) {
+    return "• " + purchaseDiscordNumber_(item.quantity, 4) + " × "
+      + purchaseDiscordText_(item.itemName || "Article", 180) + " — "
+      + purchaseDiscordNumber_(item.lineSalePed, 2) + " PED (" + memberLabel + " : "
+      + purchaseDiscordText_(item.markupDisplay || "à confirmer", 80) + ")";
+  });
+  var chunks = [];
+  var current = "";
+  var included = 0;
+  for (var index = 0; index < lines.length; index++) {
+    var candidate = current ? current + "\n" + lines[index] : lines[index];
+    if (candidate.length <= 980 && chunks.length < 4) {
+      current = candidate;
+      included++;
+      continue;
+    }
+    if (current && chunks.length < 4) chunks.push(current);
+    if (chunks.length >= 4) break;
+    current = lines[index].slice(0, 980);
+    included++;
+  }
+  if (current && chunks.length < 4) chunks.push(current);
+  var omitted = Math.max(0, lines.length - included);
+  if (omitted && chunks.length) {
+    var suffix = "\n… et " + omitted + " autre(s) article(s)";
+    chunks[chunks.length - 1] = chunks[chunks.length - 1].slice(0, 980 - suffix.length) + suffix;
+  }
+  return chunks.map(function(value, index) {
+    return { name: index === 0 ? "Articles (" + lines.length + ")" : "Articles — suite", value: value || "—", inline: false };
+  });
+}
+
+function purchaseDiscordText_(value, maxLength) {
+  return String(value == null ? "" : value)
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .replace(/@/g, "@\u200b")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxLength);
+}
+
+function purchaseDiscordNumber_(value, decimals) {
+  var number = Number(value || 0);
+  return number.toFixed(decimals).replace(".", ",").replace(/,?0+$/, "");
 }
 
 function purchaseParseMarkup_(raw) {

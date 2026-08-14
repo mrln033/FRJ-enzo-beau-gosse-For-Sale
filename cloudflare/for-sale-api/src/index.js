@@ -18,6 +18,7 @@ import {
   priceOrderLines,
   validateOrderStatus
 } from "./orders.js";
+import { sendOrUpdateDiscordOrder } from "./discord.js";
 
 const MAX_IMPORT_BYTES = 1_800_000;
 const MAX_OBSERVATION_BYTES = 2_200_000;
@@ -1338,7 +1339,8 @@ async function handleAdminPost(request, url, env) {
       env.DB.prepare(`INSERT INTO purchase_order_events (order_id, action, details) VALUES (?, 'status-changed', ?)`)
         .bind(existing.id, JSON.stringify({ from: existing.status, to: status }))
     ]);
-    return json({ ok: true, noChange: false, status });
+    const discord = await synchronizeDiscordOrder(env, existing.id);
+    return json({ ok: true, noChange: false, status, discord: publicDiscordResult(discord) });
   }
 
   if (url.pathname === "/admin/sync-audit-now") {
@@ -1428,14 +1430,23 @@ async function handlePublicOrderPost(request, env) {
   const accessTokenHash = await sha256(submission.accessToken);
   const duplicate = await env.DB.prepare(`
     SELECT id, public_reference, access_token_hash, status, total_tt_ped, total_sale_ped,
-           pricing_status, created_at, updated_at, buyer_avatar, language, frj_member
+           pricing_status, created_at, updated_at, buyer_avatar, language, frj_member,
+           discord_message_id
     FROM purchase_orders WHERE id = ? OR public_reference = ?
   `).bind(submission.id, submission.publicReference).first();
   if (duplicate) {
     if (!(await timingSafeEqual(String(duplicate.access_token_hash), accessTokenHash))) {
       throw new ApiError(409, "Référence de demande déjà utilisée");
     }
-    return json({ ok: true, duplicate: true, order: mapPublicOrder(duplicate, []) });
+    const discord = duplicate.discord_message_id
+      ? { ok: true, action: "already-published", messageId: duplicate.discord_message_id }
+      : await synchronizeDiscordOrder(env, duplicate.id);
+    return json({
+      ok: true,
+      duplicate: true,
+      order: mapPublicOrder(duplicate, []),
+      discord: publicDiscordResult(discord)
+    });
   }
 
   const submitterHash = await orderSubmitterHash(request, env);
@@ -1475,7 +1486,13 @@ async function handlePublicOrderPost(request, env) {
     clientCreatedAt: submission.clientCreatedAt
   };
   await storePurchaseOrder(env, order, pricing.lines, "submitted");
-  return json({ ok: true, duplicate: false, order: mapPublicOrder(order, pricing.lines) }, 201);
+  const discord = await synchronizeDiscordOrder(env, order.id);
+  return json({
+    ok: true,
+    duplicate: false,
+    order: mapPublicOrder(order, pricing.lines),
+    discord: publicDiscordResult(discord)
+  }, 201);
 }
 
 async function readOrderCatalogRows(env, requestedItems) {
@@ -1529,14 +1546,16 @@ async function storePurchaseOrder(env, order, items, eventAction) {
       INSERT INTO purchase_orders (
         id, public_reference, access_token_hash, status, buyer_avatar, buyer_contact,
         buyer_comment, language, frj_member, source_backend, total_tt_ped,
-        total_sale_ped, pricing_status, submitter_hash, client_created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        total_sale_ped, pricing_status, submitter_hash, client_created_at,
+        discord_message_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       order.id, order.publicReference, order.accessTokenHash, order.status || "submitted",
       order.buyerAvatar, order.buyerContact || null, order.buyerComment || null,
       order.language || "EN", order.frjMember ? 1 : 0, order.sourceBackend || "d1",
       Number(order.totalTtPed || 0), Number(order.totalSalePed || 0),
-      order.pricingStatus || "estimated", order.submitterHash || null, order.clientCreatedAt || null
+      order.pricingStatus || "estimated", order.submitterHash || null, order.clientCreatedAt || null,
+      order.discordMessageId || null
     ),
     ...items.map((item, index) => env.DB.prepare(`
       INSERT INTO purchase_order_items (
@@ -1579,13 +1598,80 @@ async function importGasFallbackOrder(env, payload) {
     totalTtPed: Number(order.totalTtPed || 0),
     totalSalePed: Number(order.totalSalePed || 0),
     pricingStatus: order.pricingStatus || "estimated",
-    clientCreatedAt: order.clientCreatedAt || null
+    clientCreatedAt: order.clientCreatedAt || null,
+    discordMessageId: /^\d{15,22}$/.test(String(order.discordMessageId || ""))
+      ? String(order.discordMessageId)
+      : null
   };
   if (!/^FRJ-\d{8}-[A-F0-9]{6}$/.test(canonical.publicReference)) throw new ApiError(400, "Référence GAS invalide");
   if (!/^[a-f0-9]{64}$/.test(canonical.accessTokenHash)) throw new ApiError(400, "Jeton GAS invalide");
   if (!canonical.buyerAvatar) throw new ApiError(400, "Avatar GAS absent");
   await storePurchaseOrder(env, canonical, items, "gas-fallback-synchronized");
-  return { ok: true, duplicate: false, id };
+  const discord = canonical.discordMessageId
+    ? { ok: true, action: "imported", messageId: canonical.discordMessageId }
+    : await synchronizeDiscordOrder(env, canonical.id);
+  return { ok: true, duplicate: false, id, discord: publicDiscordResult(discord) };
+}
+
+async function synchronizeDiscordOrder(env, orderId) {
+  const webhookUrl = String(env.DISCORD_ORDER_WEBHOOK_URL || "").trim();
+  if (!webhookUrl) return { ok: false, skipped: true, reason: "webhook-not-configured" };
+
+  const [orderResult, itemsResult] = await env.DB.batch([
+    env.DB.prepare(`
+      SELECT id, public_reference, status, buyer_avatar, buyer_contact, buyer_comment,
+             language, frj_member, source_backend, total_tt_ped, total_sale_ped,
+             pricing_status, created_at, updated_at, discord_message_id
+      FROM purchase_orders WHERE id = ?
+    `).bind(orderId),
+    env.DB.prepare(`
+      SELECT line_no, item_name, storage, aisle, quantity, stock_at_submission,
+             unit_tt_ped, markup_kind, markup_value, markup_display, unit_sale_ped,
+             line_tt_ped, line_sale_ped, price_status
+      FROM purchase_order_items WHERE order_id = ? ORDER BY line_no
+    `).bind(orderId)
+  ]);
+  const row = orderResult.results[0];
+  if (!row) return { ok: false, skipped: true, reason: "order-not-found" };
+  const order = mapAdminOrder(row);
+  const items = itemsResult.results.map(mapOrderItem);
+
+  try {
+    const result = await sendOrUpdateDiscordOrder({
+      webhookUrl,
+      messageId: row.discord_message_id,
+      order,
+      items
+    });
+    await env.DB.batch([
+      env.DB.prepare(`
+        UPDATE purchase_orders
+        SET discord_message_id = ?, discord_synced_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).bind(result.messageId, orderId),
+      env.DB.prepare(`
+        INSERT INTO purchase_order_events (order_id, action, details)
+        VALUES (?, ?, ?)
+      `).bind(orderId, `discord-${result.action}`, JSON.stringify({ messageId: result.messageId }))
+    ]);
+    return result;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(JSON.stringify({ message: "Notification Discord impossible", orderId, error: message }));
+    await env.DB.prepare(`
+      INSERT INTO purchase_order_events (order_id, action, details)
+      VALUES (?, 'discord-notification-failed', ?)
+    `).bind(orderId, JSON.stringify({ error: message.slice(0, 500) })).run();
+    return { ok: false, error: message };
+  }
+}
+
+function publicDiscordResult(result) {
+  return {
+    ok: result?.ok === true,
+    action: result?.action || null,
+    skipped: result?.skipped === true
+  };
 }
 
 async function readAdminOrders(env) {
@@ -1644,7 +1730,8 @@ function mapAdminOrder(order) {
     buyerContact: order.buyer_contact || null,
     buyerComment: order.buyer_comment || null,
     sourceBackend: order.source_backend || "d1",
-    clientCreatedAt: order.client_created_at ? normalizeSyncTimestamp(order.client_created_at) : null
+    clientCreatedAt: order.client_created_at ? normalizeSyncTimestamp(order.client_created_at) : null,
+    discordMessageId: order.discord_message_id || null
   };
 }
 
