@@ -510,19 +510,83 @@ html[data-frj-backend="d1"] .backend-status-dot {
 /* =========================
    NAV ADMIN
 ========================= */
-.admin-menu {
-  position: sticky;
+.admin-menu-drawer {
+  position: fixed;
   top: 0;
+  left: 50%;
   z-index: 10000;
+  width: min(920px, calc(100vw - 24px));
+  height: 24px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.admin-menu-drawer.open {
+  height: auto;
+}
+
+.admin-menu-toggle {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid #8c6b2e;
+  border-top: 0;
+  border-radius: 0 0 14px 14px;
+  color: #fff;
+  background: rgba(43, 33, 19, 0.96);
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.25);
+  transform: translateX(-50%);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.admin-menu-toggle-icon {
+  display: block;
+  font-size: 1rem;
+  line-height: 1;
+  transition: transform 0.2s ease;
+}
+
+.admin-menu-drawer.open .admin-menu-toggle-icon {
+  transform: rotate(180deg);
+}
+
+.admin-menu-toggle:hover,
+.admin-menu-toggle:focus-visible {
+  background: #5a4526;
+}
+
+.admin-menu {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 8px;
-  margin: 0 90px 20px;
-  padding: 10px;
+  margin: 0;
+  padding: 32px 10px 10px;
   background: rgba(245, 245, 245, 0.96);
-  border-bottom: 1px solid #ccc;
+  border: 1px solid #ccc;
+  border-top: 0;
+  border-radius: 0 0 10px 10px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(calc(-100% - 4px));
+  transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+  pointer-events: none;
+}
+
+.admin-menu-drawer.open .admin-menu {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  pointer-events: auto;
 }
 
 .admin-menu a {
@@ -634,9 +698,13 @@ html[data-frj-backend="d1"] .backend-status-dot {
 }
 
 @media (max-width: 800px) {
+  .admin-menu-drawer {
+    width: calc(100vw - 12px);
+  }
+
   .admin-menu {
-    position: static;
-    margin: 0 0 20px;
+    max-height: calc(100vh - 12px);
+    overflow-y: auto;
   }
 
   .admin-menu a {

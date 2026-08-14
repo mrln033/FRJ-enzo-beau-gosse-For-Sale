@@ -1,7 +1,7 @@
 .cart-launcher {
   position: fixed;
   top: 42px;
-  right: 14px;
+  right: 90px;
   z-index: 940;
   border: 1px solid #8c6b2e;
   border-radius: 999px;
@@ -127,6 +127,6 @@
 }
 
 @media (max-width: 600px) {
-  .cart-launcher { top: 44px; right: 8px; padding: 6px 10px; font-size: 0.82rem; }
+  .cart-launcher { top: 44px; right: 82px; padding: 6px 10px; font-size: 0.82rem; }
   .cart-line { grid-template-columns: 1fr 88px; }
 }
