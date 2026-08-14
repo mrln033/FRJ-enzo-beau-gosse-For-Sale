@@ -11,7 +11,7 @@
       section: "update",
       backend: "",
       label: "MàJ Inventaire / MU (GAS + D1)",
-      href: "maj_inventaire-enzo.html?admin=1&avatar=enzo"
+      href: "maj_inventaire-enzo.html?admin=1"
     },
     { section: "report", backend: "", label: "Rapport de synchronisation", href: "rapport-sync.html?admin=1" }
   ];
