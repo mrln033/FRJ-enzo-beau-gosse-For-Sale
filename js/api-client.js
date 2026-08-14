@@ -128,7 +128,7 @@
     const d1Result = results.find((result) => result.backend === "d1");
     if (gasResult?.ok && d1Result?.ok && config.dataset && typeof body === "string") {
       try {
-        await publishGasObservation(config.dataset, body);
+        await publishGasObservation(config.dataset, body, { paired: true });
       } catch (error) {
         gasResult.warning = `État GAS non publié immédiatement dans le rapport : ${errorMessage(error)}`;
       }
@@ -169,14 +169,14 @@
     });
   }
 
-  async function publishGasObservation(dataset, raw) {
+  async function publishGasObservation(dataset, raw, options = {}) {
     const eventId = global.crypto?.randomUUID
       ? global.crypto.randomUUID()
       : `gas-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     return requestD1Admin("/admin/sync-observation", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dataset, raw, eventId })
+      body: JSON.stringify({ dataset, raw, eventId, paired: options.paired === true })
     });
   }
 

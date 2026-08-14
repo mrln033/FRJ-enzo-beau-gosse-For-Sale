@@ -233,5 +233,7 @@ test("un double succès publie ensuite l'état GAS dans le rapport", async () =>
   assert.match(requests[0].url, /^https:\/\/script\.google\.com\//);
   assert.match(requests[1].url, /workers\.dev\?type=mu&paired=gas/);
   assert.match(requests[2].url, /workers\.dev\/admin\/sync-observation/);
-  assert.equal(JSON.parse(requests[2].options.body).raw, "csv-mu");
+  const observation = JSON.parse(requests[2].options.body);
+  assert.equal(observation.raw, "csv-mu");
+  assert.equal(observation.paired, true);
 });

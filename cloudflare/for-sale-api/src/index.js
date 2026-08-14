@@ -1309,6 +1309,7 @@ async function handleAdminPost(request, url, env) {
     const dataset = String(payload.dataset || "").trim();
     const raw = String(payload.raw || "");
     const eventId = String(payload.eventId || crypto.randomUUID()).trim();
+    const shouldSignalObservation = shouldSignalSyncAfterImport(payload.paired === true ? "gas" : null);
     const observedAt = new Date().toISOString();
     let rows;
     let hash;
@@ -1339,7 +1340,9 @@ async function handleAdminPost(request, url, env) {
       eventId,
       provisional
     });
-    const signal = await notifyGasDataChanged(env, dataset, `import-gas-${dataset === "mu" ? "mu" : "inventory"}`);
+    const signal = shouldSignalObservation
+      ? await notifyGasDataChanged(env, dataset, `import-gas-${dataset === "mu" ? "mu" : "inventory"}`)
+      : { ok: true, skipped: true, reason: "paired-import-already-current" };
     return json({ ok: true, observation, signal });
   }
 
