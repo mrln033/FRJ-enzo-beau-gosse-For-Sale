@@ -16,7 +16,8 @@
       fallback: "Demande reçue par le secours GAS ; elle sera transférée vers D1.",
       stockChanged: "Le stock, le prix affiché ou le MU a changé. Le panier a été actualisé ; vérifiez-le avant de renvoyer.",
       failure: "Transmission impossible. Le panier reste enregistré sur cette machine.",
-      noPrice: "Prix à confirmer", maxLines: "Le panier est limité à 30 articles."
+      noPrice: "Prix à confirmer", markupPending: "à confirmer",
+      maxLines: "Le panier est limité à 30 articles."
     },
     EN: {
       cart: "Cart", empty: "Your cart is empty.", add: "Add to cart",
@@ -29,7 +30,8 @@
       fallback: "Request received by GAS fallback; it will be transferred to D1.",
       stockChanged: "Stock, displayed price or MU changed. The cart was updated; review it before sending again.",
       failure: "Unable to send. The cart remains saved on this device.",
-      noPrice: "Price to confirm", maxLines: "The cart is limited to 30 items."
+      noPrice: "Price to confirm", markupPending: "to confirm",
+      maxLines: "The cart is limited to 30 items."
     }
   };
 
@@ -136,6 +138,22 @@
     return { tt, sale: roundPed(sale), hasMarkup: markup.kind !== "none" };
   }
 
+  function displayedMarkup(item) {
+    const markup = effectiveMarkup(item);
+    const prefix = isFrjMember() ? "MU FRJ" : "MU";
+    if (markup.kind === "percent" && Number.isFinite(markup.value)) {
+      const percent = (markup.value * 100).toLocaleString(language() === "FR" ? "fr-FR" : "en-GB", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+      return `${prefix} : ${percent} %`;
+    }
+    if (markup.kind === "ped" && Number.isFinite(markup.value)) {
+      return `${prefix} : ${formatPed(markup.value)} PED`;
+    }
+    return `${prefix} : ${label("markupPending")}`;
+  }
+
   function createUi() {
     launcher = document.createElement("button");
     launcher.type = "button";
@@ -212,7 +230,10 @@
         <input class="cart-quantity" type="number" min="0.0001" max="${item.stock}" step="any" value="${item.quantity}">
       </label>
       <div class="cart-line-prices">
-        <span>${escapeHtml(label("unitTt"))}: ${formatPed(item.unitTtPed)} PED</span>
+        <span class="cart-line-price-detail">
+          <span>${escapeHtml(label("unitTt"))}: ${formatPed(item.unitTtPed)} PED</span>
+          <small>${escapeHtml(displayedMarkup(item))}</small>
+        </span>
         <strong>${formatPed(prices.sale)} PED</strong>
       </div>`;
     const input = line.querySelector("input");

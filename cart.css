@@ -90,7 +90,10 @@
 .cart-line-title small { color: #776e61; }
 .cart-line label { font-size: 0.8rem; }
 .cart-line input { width: 100%; box-sizing: border-box; padding: 5px; }
-.cart-line-prices { grid-column: 1 / -1; display: flex; justify-content: space-between; font-size: 0.9rem; }
+.cart-line-prices { grid-column: 1 / -1; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; font-size: 0.9rem; }
+.cart-line-price-detail { display: flex; flex-direction: column; gap: 2px; }
+.cart-line-price-detail small { color: #665c4e; font-size: 0.82rem; }
+.cart-line-prices > strong { white-space: nowrap; }
 .cart-remove { position: absolute; top: 7px; right: 0; border: 0; background: transparent; color: #a7332f; cursor: pointer; font-size: 0; }
 .cart-remove::after { content: "×"; font-size: 1.35rem; }
 
