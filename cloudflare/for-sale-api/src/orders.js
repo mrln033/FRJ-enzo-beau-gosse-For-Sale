@@ -1,6 +1,12 @@
 const ORDER_STATUSES = new Set([
   "submitted", "viewed", "preparing", "ready", "completed", "cancelled", "expired"
 ]);
+const EDITABLE_ORDER_STATUSES = new Set(["submitted", "viewed"]);
+
+export function canReviseOrder(status, approvalRequired = false) {
+  return approvalRequired === true || Number(approvalRequired || 0) === 1
+    || EDITABLE_ORDER_STATUSES.has(String(status || "").trim().toLowerCase());
+}
 
 export function normalizeOrderSubmission(payload) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {

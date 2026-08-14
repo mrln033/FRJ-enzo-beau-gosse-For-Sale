@@ -14,6 +14,7 @@ import {
   shouldSignalSyncAfterImport
 } from "./sync.js";
 import {
+  canReviseOrder,
   normalizeOrderSubmission,
   priceOrderLines,
   reviseOrderLine,
@@ -1348,6 +1349,9 @@ async function updateOrderProposal(env, orderId, requestedItems) {
   ]);
   const order = orderResult.results[0];
   if (!order) throw new ApiError(404, "Demande introuvable");
+  if (!canReviseOrder(order.status, order.approval_required)) {
+    throw new ApiError(409, "Les quantités et MU ne sont plus modifiables à partir du statut À préparer");
+  }
   const existingByLine = new Map(itemsResult.results.map((item) => [Number(item.line_no), item]));
   const requestedLineNumbers = new Set();
   requestedItems.forEach((item) => {
@@ -1461,12 +1465,15 @@ async function handleAdminPost(request, url, env) {
     const lineNo = Number(orderItemMatch[2]);
     const existing = await env.DB.prepare(`
       SELECT oi.order_id, oi.line_no, oi.item_name, oi.storage, oi.aisle, oi.unit_tt_ped,
-             oi.quantity, oi.markup_kind, oi.markup_value
+             oi.quantity, oi.markup_kind, oi.markup_value, po.status, po.approval_required
       FROM purchase_order_items oi
       JOIN purchase_orders po ON po.id = oi.order_id
       WHERE oi.order_id = ? AND oi.line_no = ?
     `).bind(orderId, lineNo).first();
     if (!existing) throw new ApiError(404, "Article de demande introuvable");
+    if (!canReviseOrder(existing.status, existing.approval_required)) {
+      throw new ApiError(409, "Les quantités et MU ne sont plus modifiables à partir du statut À préparer");
+    }
 
     const stockRow = await env.DB.prepare(`
       SELECT COALESCE(SUM(ii.quantity), 0) AS stock

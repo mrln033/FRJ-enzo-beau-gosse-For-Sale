@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalizeOrderSubmission, priceOrderLines, reviseOrderLine, validateOrderStatus } from "../src/orders.js";
+import { canReviseOrder, normalizeOrderSubmission, priceOrderLines, reviseOrderLine, validateOrderStatus } from "../src/orders.js";
 
 const validPayload = {
   id: "123e4567-e89b-42d3-a456-426614174000",
@@ -97,6 +97,17 @@ test("calcule avec le MU arrondi exactement comme sur la tuile", () => {
 test("valide uniquement les statuts connus", () => {
   assert.equal(validateOrderStatus("READY"), "ready");
   assert.throws(() => validateOrderStatus("deleted"), /invalide/);
+});
+
+test("autorise les propositions uniquement avant la préparation", () => {
+  assert.equal(canReviseOrder("submitted"), true);
+  assert.equal(canReviseOrder("viewed"), true);
+  assert.equal(canReviseOrder("submitted", 1), true);
+  assert.equal(canReviseOrder("preparing"), false);
+  assert.equal(canReviseOrder("ready"), false);
+  assert.equal(canReviseOrder("completed"), false);
+  assert.equal(canReviseOrder("cancelled"), false);
+  assert.equal(canReviseOrder("expired"), false);
 });
 
 test("recalcule une proposition ponctuelle en pourcentage affiché", () => {

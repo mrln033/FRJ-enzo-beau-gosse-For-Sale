@@ -37,6 +37,7 @@
     .order-save-row button { padding: 8px 13px; border: 1px solid #735117; border-radius: 6px; background: #d5aa54; cursor: pointer; font-weight: 800; }
     .order-save-row button:disabled { opacity: .5; cursor: default; }
     .order-dirty { color: #7045b2; font-size: .85rem; font-weight: 700; }
+    .order-save-row.is-locked { color: #756c60; font-size: .88rem; }
     .orders-error { color: #a02323; white-space: pre-line; }
     @media (max-width: 650px) {
       body { padding-top: 125px; }
@@ -61,6 +62,7 @@
       awaiting_approval: "À valider", submitted: "Transmise", viewed: "Vue", preparing: "À préparer",
       ready: "Prête", completed: "Terminée", cancelled: "Annulée", expired: "Expirée"
     };
+    const EDITABLE_PROPOSAL_STATUSES = new Set(["awaiting_approval", "submitted", "viewed"]);
 
     function formatDate(value) {
       if (!value) return "—";
@@ -104,6 +106,7 @@
     }
 
     function renderOrder(order) {
+      const proposalEditable = EDITABLE_PROPOSAL_STATUSES.has(order.status);
       const article = document.createElement("article");
       article.className = `order-card${order.status === "awaiting_approval" ? " awaiting-approval" : ""}`;
       const header = document.createElement("header");
@@ -161,6 +164,7 @@
         quantity.max = "1000000";
         quantity.step = "0.0001";
         quantity.value = item.quantity;
+        quantity.disabled = !proposalEditable;
         quantity.setAttribute("aria-label", `Quantité ${item.itemName}`);
         quantityCell.appendChild(quantity);
         const priceCell = document.createElement("td");
@@ -176,6 +180,7 @@
           option.selected = item.markupKind === value;
           kind.appendChild(option);
         });
+        kind.disabled = !proposalEditable;
         const amount = document.createElement("input");
         amount.className = "markup-amount";
         amount.type = "number";
@@ -184,10 +189,10 @@
         amount.value = item.markupKind === "percent"
           ? Number(item.markupValue || 0) * 100
           : (item.markupKind === "ped" ? Number(item.markupValue || 0) : "");
-        amount.disabled = item.markupKind === "none";
+        amount.disabled = !proposalEditable || item.markupKind === "none";
         amount.setAttribute("aria-label", `Valeur du MU ${item.itemName}`);
         kind.addEventListener("change", () => {
-          amount.disabled = kind.value === "none";
+          amount.disabled = !proposalEditable || kind.value === "none";
           if (kind.value === "none") amount.value = "";
         });
         markupCell.append(kind, amount);
@@ -213,6 +218,11 @@
       save.disabled = true;
       saveRow.append(dirtyLabel, save);
       article.appendChild(saveRow);
+      if (!proposalEditable) {
+        save.hidden = true;
+        saveRow.classList.add("is-locked");
+        dirtyLabel.textContent = "Quantités et MU verrouillés à partir du statut À préparer.";
+      }
 
       const readEditor = (editor) => {
         const quantity = Number(editor.quantity.value);
@@ -245,8 +255,8 @@
         const dirtyCount = values.filter((value) => value.dirty).length;
         const totalValue = valid ? roundPed(values.reduce((sum, value) => sum + value.lineSale, 0)) : null;
         total.textContent = valid ? `Estimation totale : ${formatPed(totalValue)} PED` : "Estimation totale : —";
-        dirtyLabel.textContent = dirtyCount ? `${dirtyCount} ligne(s) modifiée(s)` : "";
-        save.disabled = !valid || dirtyCount === 0;
+        if (proposalEditable) dirtyLabel.textContent = dirtyCount ? `${dirtyCount} ligne(s) modifiée(s)` : "";
+        save.disabled = !proposalEditable || !valid || dirtyCount === 0;
         return values;
       };
       editors.forEach((editor) => {
@@ -254,7 +264,7 @@
         editor.amount.addEventListener("input", recalculate);
         editor.kind.addEventListener("change", recalculate);
       });
-      save.addEventListener("click", () => updateProposal(order.id, recalculate(), save));
+      if (proposalEditable) save.addEventListener("click", () => updateProposal(order.id, recalculate(), save));
       recalculate();
       if (order.buyerComment) {
         const comment = document.createElement("p");
