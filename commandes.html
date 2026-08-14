@@ -120,15 +120,17 @@
       article.appendChild(header);
 
       const table = document.createElement("table");
-      table.innerHTML = "<thead><tr><th>Article</th><th>Qté</th><th>Prix affiché</th><th>Estimation vente</th></tr></thead>";
+      table.innerHTML = "<thead><tr><th>Article</th><th>Qté</th><th>Prix affiché</th><th>MU appliqué</th><th>Estimation vente</th></tr></thead>";
       const body = document.createElement("tbody");
       (order.items || []).forEach((item) => {
         const row = document.createElement("tr");
+        const markupLabel = order.frjMember ? "MU FRJ" : "MU";
         [
           `${item.itemName} (${item.storage} · ${item.aisle})`,
           item.quantity,
           `${formatPed(item.unitTtPed)} PED`,
-          `${formatPed(item.lineSalePed)} PED${item.markupDisplay ? ` — ${item.markupDisplay}` : " — à confirmer"}`
+          `${markupLabel} : ${item.markupDisplay || "à confirmer"}`,
+          `${formatPed(item.lineSalePed)} PED`
         ].forEach((value) => {
           const cell = document.createElement("td");
           cell.textContent = value;
