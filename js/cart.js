@@ -4,6 +4,7 @@
   const enabled = global.FRJ_FEATURES?.cart === true;
   const STORAGE_KEY = "FRJ_PURCHASE_CART_V1";
   const REQUESTS_KEY = "FRJ_PURCHASE_REQUESTS_V1";
+  const HIDDEN_REQUESTS_KEY = "FRJ_HIDDEN_PURCHASE_REQUESTS_V1";
   const MAX_LINES = 10;
   const MAX_CLOSED_REQUEST_HISTORY = 20;
   const CLOSED_REQUEST_STATUSES = new Set(["completed", "cancelled", "expired"]);
@@ -196,7 +197,7 @@
     });
     document.body.append(launcher, drawer);
     global.addEventListener("storage", (event) => {
-      if (event.key !== REQUESTS_KEY && event.key !== "FRJ_LAST_PURCHASE_REQUEST") return;
+      if (event.key !== REQUESTS_KEY && event.key !== HIDDEN_REQUESTS_KEY && event.key !== "FRJ_LAST_PURCHASE_REQUEST") return;
       requests = readRequests();
       render();
       refreshRequestStatuses();
@@ -381,6 +382,7 @@
   }
 
   function hideRequest(accessToken) {
+    saveHiddenRequestTokens([...readHiddenRequestTokens(), accessToken]);
     requests = requests.filter((request) => request.accessToken !== accessToken);
     saveRequests();
     setStatus(label("hiddenRequest"), "success");
@@ -535,10 +537,28 @@
     try {
       const stored = JSON.parse(global.localStorage.getItem(REQUESTS_KEY) || "[]");
       const legacy = JSON.parse(global.localStorage.getItem("FRJ_LAST_PURCHASE_REQUEST") || "null");
-      return mergeRequests(Array.isArray(stored) ? stored : [], legacy ? [legacy] : []);
+      const hidden = new Set(readHiddenRequestTokens());
+      return mergeRequests(Array.isArray(stored) ? stored : [], legacy ? [legacy] : [])
+        .filter((request) => !hidden.has(request.accessToken));
     } catch {
       return [];
     }
+  }
+
+  function readHiddenRequestTokens() {
+    try {
+      const stored = JSON.parse(global.localStorage.getItem(HIDDEN_REQUESTS_KEY) || "[]");
+      return Array.isArray(stored)
+        ? stored.filter((value) => /^[a-f0-9-]{70,80}$/i.test(String(value || "")))
+        : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveHiddenRequestTokens(tokens) {
+    const unique = [...new Set(tokens.map((value) => String(value || "")))].slice(-100);
+    global.localStorage.setItem(HIDDEN_REQUESTS_KEY, JSON.stringify(unique));
   }
 
   function mergeRequests(...groups) {

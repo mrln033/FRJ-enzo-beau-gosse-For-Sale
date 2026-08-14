@@ -7,7 +7,7 @@
   <meta name="robots" content="noindex,nofollow">
   <base target="_self">
   <link rel="icon" href="./favicon.ico">
-  <script src="./js/api-client.js?v=20260814-5"></script>
+  <script src="./js/api-client.js?v=20260814-7"></script>
   <title>[FRJ] — Suivi de demande</title>
   <style>
     :root { color-scheme: light; font-family: Arial, sans-serif; color: #2d261b; background: #eee9df; }
@@ -33,6 +33,10 @@
     .tracking-status.awaiting_approval::before { background: #8b5cf6; }
     button { padding: 8px 12px; border: 1px solid #8b795a; border-radius: 6px; background: #fff; cursor: pointer; }
     button:hover { background: #f5eee1; }
+    button:disabled { opacity: .65; cursor: wait; }
+    .tracking-action-danger { border-color: #b76560; color: #7a2420; background: #fbe8e6; font-weight: 700; }
+    .tracking-action-danger:hover { background: #f5d8d5; }
+    .tracking-action-muted { color: #51493f; background: #eee9df; }
     .tracking-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px 20px; margin: 0 0 20px; }
     .tracking-meta div { display: grid; gap: 2px; }
     .tracking-meta dt { color: #746a5d; font-size: .8rem; }
@@ -46,6 +50,7 @@
     .tracking-note { color: #6a6053; font-size: .86rem; }
     .tracking-message { padding: 26px 20px; text-align: center; white-space: pre-line; }
     .tracking-message.error { color: #932d29; }
+    .tracking-message.success { color: #21623a; }
     .tracking-actions { display: flex; flex-wrap: wrap; gap: 8px; }
     .tracking-proposal { margin: 0 0 20px; padding: 14px; border: 1px solid #a78bda; border-radius: 8px; color: #3f2868; background: #f3efff; }
     .tracking-proposal p { margin: 0 0 12px; }
@@ -95,6 +100,9 @@
         proposal: "Enzo a modifié une ou plusieurs quantités ou MU. Vérifiez les nouvelles conditions affichées ci-dessous, puis acceptez-les pour retransmettre la demande.",
         accept: "Accepter les modifications", accepting: "Validation…",
         acceptError: "La validation a échoué. Actualisez la page et réessayez.",
+        cancel: "Annuler la demande", cancelConfirm: "Confirmer l’annulation de cette demande ?",
+        cancelling: "Annulation…", cancelError: "L’annulation a échoué. Actualisez la page et réessayez.",
+        hide: "Masquer dans la liste", hidden: "Cette demande a été masquée de la liste de votre panier sur cette machine.",
         note: "Prix indicatif, à confirmer avec Enzo. Le stock n’est pas réservé par cette demande.",
         loading: "Actualisation…", missing: "Lien de suivi invalide ou incomplet.",
         gasPending: "Votre demande a été reçue par le secours GAS. Elle apparaîtra ici après son transfert automatique vers D1 (généralement sous cinq minutes).",
@@ -110,6 +118,9 @@
         proposal: "Enzo changed one or more quantities or MUs. Review the new terms below, then accept them to resubmit the request.",
         accept: "Accept changes", accepting: "Accepting…",
         acceptError: "Acceptance failed. Refresh the page and try again.",
+        cancel: "Cancel request", cancelConfirm: "Confirm cancellation of this request?",
+        cancelling: "Cancelling…", cancelError: "Cancellation failed. Refresh the page and try again.",
+        hide: "Hide from list", hidden: "This request has been hidden from your cart list on this device.",
         note: "Indicative price, to be confirmed with Enzo. Stock is not reserved by this request.",
         loading: "Refreshing…", missing: "Invalid or incomplete tracking link.",
         gasPending: "Your request was received by the GAS fallback. It will appear here after its automatic transfer to D1 (usually within five minutes).",
@@ -120,6 +131,10 @@
 
     const searchParams = new URLSearchParams(location.search);
     const token = searchParams.get("token") || "";
+    const REQUESTS_KEY = "FRJ_PURCHASE_REQUESTS_V1";
+    const HIDDEN_REQUESTS_KEY = "FRJ_HIDDEN_PURCHASE_REQUESTS_V1";
+    const CANCELLABLE_STATUSES = new Set(["awaiting_approval", "submitted", "viewed"]);
+    const HIDEABLE_STATUSES = new Set(["completed", "cancelled", "expired"]);
     const catalogBackend = searchParams.get("backend") === "d1" ? "d1" : "gas";
     let lang = localStorage.getItem("lang") === "FR" ? "FR" : "EN";
     let refreshing = false;
@@ -158,7 +173,8 @@
     }
     function rememberOrder(order) {
       try {
-        const stored = JSON.parse(localStorage.getItem("FRJ_PURCHASE_REQUESTS_V1") || "[]");
+        if (readHiddenTokens().includes(token)) return;
+        const stored = JSON.parse(localStorage.getItem(REQUESTS_KEY) || "[]");
         const requests = Array.isArray(stored) ? stored : [];
         const current = {
           reference: String(order.publicReference || ""),
@@ -168,11 +184,21 @@
           updatedAt: String(order.updatedAt || ""),
           status: String(order.status || "submitted")
         };
-        localStorage.setItem("FRJ_PURCHASE_REQUESTS_V1", JSON.stringify([
+        localStorage.setItem(REQUESTS_KEY, JSON.stringify([
           current,
           ...requests.filter((request) => request?.accessToken !== token)
         ]));
       } catch { /* Le suivi reste utilisable même si le stockage local est bloqué. */ }
+    }
+    function readHiddenTokens() {
+      try {
+        const stored = JSON.parse(localStorage.getItem(HIDDEN_REQUESTS_KEY) || "[]");
+        return Array.isArray(stored) ? stored.map(String) : [];
+      } catch { return []; }
+    }
+    function rememberHiddenToken() {
+      const tokens = [...new Set([...readHiddenTokens(), token])].slice(-100);
+      localStorage.setItem(HIDDEN_REQUESTS_KEY, JSON.stringify(tokens));
     }
     function showMessage(message, type = "") {
       const content = document.getElementById("trackingContent");
@@ -230,6 +256,21 @@
         copy.textContent = text("copied");
       });
       actions.append(refresh, copy);
+      if (CANCELLABLE_STATUSES.has(order.status)) {
+        const cancel = document.createElement("button");
+        cancel.type = "button";
+        cancel.className = "tracking-action-danger";
+        cancel.textContent = text("cancel");
+        cancel.addEventListener("click", () => cancelOrder(order, cancel));
+        actions.appendChild(cancel);
+      } else if (HIDEABLE_STATUSES.has(order.status)) {
+        const hide = document.createElement("button");
+        hide.type = "button";
+        hide.className = "tracking-action-muted";
+        hide.textContent = text("hide");
+        hide.addEventListener("click", hideOrder);
+        actions.appendChild(hide);
+      }
       statusRow.append(status, actions);
       content.appendChild(statusRow);
 
@@ -310,6 +351,35 @@
         button.disabled = false;
         button.textContent = text("accept");
       }
+    }
+
+    async function cancelOrder(order, button) {
+      if (!confirm(text("cancelConfirm"))) return;
+      button.disabled = true;
+      button.textContent = text("cancelling");
+      try {
+        await FRJ_API.cancelOrder(token, "d1");
+        await loadOrder();
+      } catch (error) {
+        alert(error.message || text("cancelError"));
+        button.disabled = false;
+        button.textContent = text("cancel");
+      }
+    }
+
+    function hideOrder() {
+      try {
+        rememberHiddenToken();
+        const stored = JSON.parse(localStorage.getItem(REQUESTS_KEY) || "[]");
+        const remaining = Array.isArray(stored) ? stored.filter((request) => request?.accessToken !== token) : [];
+        localStorage.setItem(REQUESTS_KEY, JSON.stringify(remaining));
+        const legacy = JSON.parse(localStorage.getItem("FRJ_LAST_PURCHASE_REQUEST") || "null");
+        if (legacy?.accessToken === token) {
+          if (remaining[0]) localStorage.setItem("FRJ_LAST_PURCHASE_REQUEST", JSON.stringify(remaining[0]));
+          else localStorage.removeItem("FRJ_LAST_PURCHASE_REQUEST");
+        }
+      } catch { /* Le suivi reste utilisable même si le stockage local est bloqué. */ }
+      showMessage(text("hidden"), "success");
     }
 
     applyLanguage();
