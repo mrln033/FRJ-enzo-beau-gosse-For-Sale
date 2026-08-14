@@ -93,6 +93,67 @@
     return response;
   }
 
+  async function requestGas(query, options = {}) {
+    setActiveBackend("gas");
+    const response = await global.fetch(buildUrl("gas", query), options);
+    if (!response.ok) {
+      const details = await response.text();
+      throw new Error(details || `GAS répond ${response.status}`);
+    }
+    setActiveBackend("gas");
+    return response;
+  }
+
+  async function importToBoth(query, options = {}, config = {}) {
+    const body = options.body;
+    const results = [];
+
+    try {
+      if (typeof config.beforeGas === "function") await config.beforeGas();
+      const response = await requestGas(query, options);
+      results.push({ backend: "gas", ok: true, message: await readImportMessage(response, "GAS") });
+    } catch (error) {
+      results.push({ backend: "gas", ok: false, message: errorMessage(error) });
+    }
+
+    try {
+      const response = await requestD1Admin(query, options);
+      results.push({ backend: "d1", ok: true, message: await readImportMessage(response, "D1") });
+    } catch (error) {
+      results.push({ backend: "d1", ok: false, message: errorMessage(error) });
+    }
+
+    const gasResult = results.find((result) => result.backend === "gas");
+    const d1Result = results.find((result) => result.backend === "d1");
+    if (gasResult?.ok && d1Result?.ok && config.dataset && typeof body === "string") {
+      try {
+        await publishGasObservation(config.dataset, body);
+      } catch (error) {
+        gasResult.warning = `État GAS non publié immédiatement dans le rapport : ${errorMessage(error)}`;
+      }
+    }
+
+    return {
+      ok: results.every((result) => result.ok),
+      partial: results.some((result) => result.ok) && results.some((result) => !result.ok),
+      results
+    };
+  }
+
+  async function readImportMessage(response, backend) {
+    const message = String(await response.text()).trim();
+    if (backend === "GAS" && (/^<!doctype html/i.test(message) || /<title>Erreur<\/title>/i.test(message))) {
+      const plainText = message.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+      throw new Error(plainText || "GAS a retourné une page d’erreur");
+    }
+    if (/^❌/.test(message)) throw new Error(message);
+    return message || `Import ${backend} terminé`;
+  }
+
+  function errorMessage(error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+
   async function requestSynchronization(dataset, reason) {
     return requestD1Admin("/admin/sync-request", {
       method: "POST",
@@ -235,7 +296,9 @@
 
   global.FRJ_API = Object.freeze({
     fetch: request,
+    fetchGas: requestGas,
     fetchD1Admin: requestD1Admin,
+    importToBoth,
     requestSynchronization,
     publishGasObservation,
     backend: preferredBackend,

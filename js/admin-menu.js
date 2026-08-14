@@ -9,15 +9,9 @@
     { section: "catalog", backend: "d1", label: "Catalogue (D1)", href: "./?admin=1&backend=d1" },
     {
       section: "update",
-      backend: "gas",
-      label: "MàJ Inventaire / MU (GAS)",
-      href: "maj_inventaire-enzo.html?admin=1&backend=gas&avatar=enzo"
-    },
-    {
-      section: "update",
-      backend: "d1",
-      label: "MàJ Inventaire / MU (D1)",
-      href: "maj_inventaire-enzo.html?admin=1&backend=d1&avatar=enzo"
+      backend: "",
+      label: "MàJ Inventaire / MU (GAS + D1)",
+      href: "maj_inventaire-enzo.html?admin=1&avatar=enzo"
     },
     { section: "report", backend: "", label: "Rapport de synchronisation", href: "rapport-sync.html?admin=1" }
   ];

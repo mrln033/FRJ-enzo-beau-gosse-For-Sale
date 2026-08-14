@@ -156,3 +156,81 @@ test("un import GAS publie immédiatement son observation sans écrire le snapsh
   assert.equal(payload.raw, "Item\tTier\nTest\t1");
   assert.match(payload.eventId, /^gas-/);
 });
+
+test("un import double écrit dans GAS puis D1 indépendamment du paramètre backend", async () => {
+  const requests = [];
+  const { api } = loadClient("?admin=1&backend=d1", async (url, options) => {
+    requests.push({ url, options });
+    return new Response(url.includes("script.google.com") ? "Import GAS OK" : "Import D1 OK", { status: 200 });
+  }, () => "jeton-double");
+
+  const outcome = await api.importToBoth("?type=mu", { method: "POST", body: "csv" });
+
+  assert.equal(outcome.ok, true);
+  assert.equal(outcome.partial, false);
+  assert.equal(requests.length, 2);
+  assert.match(requests[0].url, /^https:\/\/script\.google\.com\//);
+  assert.match(requests[1].url, /workers\.dev/);
+  assert.equal(requests[1].options.headers.get("Authorization"), "Bearer jeton-double");
+  assert.deepEqual(Array.from(outcome.results, (result) => result.message), ["Import GAS OK", "Import D1 OK"]);
+});
+
+test("un échec GAS n'empêche pas l'import D1", async () => {
+  const requests = [];
+  const { api } = loadClient("?admin=1", async (url) => {
+    requests.push(url);
+    if (url.includes("script.google.com")) throw new Error("GAS indisponible");
+    return new Response("Import D1 OK", { status: 200 });
+  }, () => "jeton-d1");
+
+  const outcome = await api.importToBoth("?type=inventory&avatar=enzo", {
+    method: "POST",
+    body: "csv"
+  });
+
+  assert.equal(outcome.ok, false);
+  assert.equal(outcome.partial, true);
+  assert.equal(requests.length, 2);
+  assert.deepEqual(Array.from(outcome.results, (result) => result.ok), [false, true]);
+  assert.match(outcome.results[0].message, /GAS indisponible/);
+});
+
+test("un échec D1 n'annule pas l'import GAS et conserve un résultat partiel", async () => {
+  const requests = [];
+  const { api } = loadClient("?admin=1", async (url) => {
+    requests.push(url);
+    if (url.includes("workers.dev")) {
+      return new Response(JSON.stringify({ error: "quota épuisé" }), { status: 429 });
+    }
+    return new Response("Import GAS OK", { status: 200 });
+  }, () => "jeton-quota");
+
+  const outcome = await api.importToBoth("?type=mu", { method: "POST", body: "csv" });
+
+  assert.equal(outcome.ok, false);
+  assert.equal(outcome.partial, true);
+  assert.equal(requests.length, 2);
+  assert.deepEqual(Array.from(outcome.results, (result) => result.ok), [true, false]);
+  assert.match(outcome.results[1].message, /quota épuisé/);
+});
+
+test("un double succès publie ensuite l'état GAS dans le rapport", async () => {
+  const requests = [];
+  const { api } = loadClient("?admin=1", async (url, options) => {
+    requests.push({ url, options });
+    return new Response(url.includes("sync-observation") ? JSON.stringify({ ok: true }) : "Import OK", {
+      status: 200
+    });
+  }, () => "jeton-observation-double");
+
+  const outcome = await api.importToBoth("?type=mu", { method: "POST", body: "csv-mu" }, {
+    dataset: "mu"
+  });
+
+  assert.equal(outcome.ok, true);
+  assert.equal(requests.length, 3);
+  assert.match(requests[0].url, /^https:\/\/script\.google\.com\//);
+  assert.match(requests[1].url, /workers\.dev\?type=mu/);
+  assert.match(requests[2].url, /workers\.dev\/admin\/sync-observation/);
+  assert.equal(JSON.parse(requests[2].options.body).raw, "csv-mu");
+});
