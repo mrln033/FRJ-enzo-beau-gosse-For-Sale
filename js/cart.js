@@ -248,9 +248,8 @@
     statusNode.className = `cart-status${statusType ? ` ${statusType}` : ""}`;
     content.appendChild(statusNode);
 
-    if (requests.length) content.appendChild(renderTracking());
-
     if (cart.items.length) content.appendChild(renderActions());
+    if (requests.length) content.appendChild(renderTracking());
     drawer.replaceChildren(content);
   }
 
