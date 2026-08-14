@@ -14,6 +14,10 @@
     .orders-header { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
     .orders-header button { padding: 8px 13px; cursor: pointer; }
     .orders-summary { margin: 8px 0 20px; color: #5e5547; }
+    .orders-filters { display: flex; flex-wrap: wrap; gap: 7px 13px; margin: 8px 0 4px; padding: 10px 12px; border: 1px solid #d3c9b8; border-radius: 8px; background: rgba(255,253,247,.72); }
+    .orders-filters-label { flex-basis: 100%; color: #5e5547; font-size: .82rem; font-weight: 700; }
+    .orders-filter { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; font-size: .9rem; white-space: nowrap; }
+    .orders-filter input { margin: 0; }
     .orders-list { display: grid; gap: 14px; }
     .order-card { padding: 15px; border: 1px solid #c9bfae; border-radius: 9px; background: #fffdf7; box-shadow: 0 2px 7px rgba(0,0,0,.08); }
     .order-card.awaiting-approval { border-color: #8b5cf6; box-shadow: 0 0 0 2px rgba(139,92,246,.12); }
@@ -50,6 +54,7 @@
   <section class="orders-header">
     <div>
       <h1>Demandes d'achat</h1>
+      <div id="ordersFilters" class="orders-filters" aria-label="Filtrer les demandes par statut"></div>
       <p class="orders-summary" id="ordersSummary">Chargement…</p>
     </div>
     <button type="button" id="refreshOrders">Actualiser</button>
@@ -63,6 +68,24 @@
       ready: "Prête", completed: "Terminée", cancelled: "Annulée", expired: "Expirée"
     };
     const EDITABLE_PROPOSAL_STATUSES = new Set(["awaiting_approval", "submitted", "viewed"]);
+    const STATUS_FILTER_KEY = "FRJ_ADMIN_ORDER_STATUS_FILTER_V1";
+    const STATUS_KEYS = Object.keys(STATUS_LABELS);
+    let selectedStatuses = readSelectedStatuses();
+
+    function readSelectedStatuses() {
+      try {
+        const raw = localStorage.getItem(STATUS_FILTER_KEY);
+        if (raw === null) return new Set(STATUS_KEYS);
+        const stored = JSON.parse(raw);
+        return new Set(Array.isArray(stored) ? stored.filter((status) => STATUS_KEYS.includes(status)) : STATUS_KEYS);
+      } catch {
+        return new Set(STATUS_KEYS);
+      }
+    }
+
+    function saveSelectedStatuses() {
+      localStorage.setItem(STATUS_FILTER_KEY, JSON.stringify(STATUS_KEYS.filter((status) => selectedStatuses.has(status))));
+    }
 
     function formatDate(value) {
       if (!value) return "—";
@@ -88,20 +111,58 @@
         const response = await FRJ_API.fetchD1Admin("/admin/orders", { cache: "no-store" });
         const report = await response.json();
         const orders = report.orders || [];
-        summary.textContent = report.enabled === false
-          ? "Fonction panier désactivée. Les demandes existantes sont conservées."
-          : `${orders.length} demande(s) affichée(s) — actualisé ${formatDate(report.generatedAt)}`;
-        list.replaceChildren(...orders.map(renderOrder));
-        if (!orders.length && report.enabled !== false) {
-          const empty = document.createElement("p");
-          empty.textContent = "Aucune demande transmise.";
-          list.appendChild(empty);
-        }
+        renderStatusFilters(orders, () => renderOrderResults(report, orders));
+        renderOrderResults(report, orders);
       } catch (loadError) {
         list.replaceChildren();
         summary.textContent = "Chargement impossible";
         error.textContent = loadError.message;
         error.hidden = false;
+      }
+    }
+
+    function renderStatusFilters(orders, onChange) {
+      const filters = document.getElementById("ordersFilters");
+      const counts = Object.fromEntries(STATUS_KEYS.map((status) => [status, 0]));
+      orders.forEach((order) => {
+        if (Object.hasOwn(counts, order.status)) counts[order.status] += 1;
+      });
+      const heading = document.createElement("span");
+      heading.className = "orders-filters-label";
+      heading.textContent = "Statuts affichés :";
+      const controls = STATUS_KEYS.map((status) => {
+        const label = document.createElement("label");
+        label.className = "orders-filter";
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.value = status;
+        checkbox.checked = selectedStatuses.has(status);
+        checkbox.addEventListener("change", () => {
+          if (checkbox.checked) selectedStatuses.add(status);
+          else selectedStatuses.delete(status);
+          saveSelectedStatuses();
+          onChange();
+        });
+        const caption = document.createElement("span");
+        caption.textContent = `${STATUS_LABELS[status]} (${counts[status]})`;
+        label.append(checkbox, caption);
+        return label;
+      });
+      filters.replaceChildren(heading, ...controls);
+    }
+
+    function renderOrderResults(report, orders) {
+      const list = document.getElementById("ordersList");
+      const summary = document.getElementById("ordersSummary");
+      const displayed = orders.filter((order) => selectedStatuses.has(order.status));
+      summary.textContent = report.enabled === false
+        ? `Fonction panier désactivée — ${displayed.length} demande(s) affichée(s) sur ${orders.length} — actualisé ${formatDate(report.generatedAt)}`
+        : `${displayed.length} demande(s) affichée(s) sur ${orders.length} — actualisé ${formatDate(report.generatedAt)}`;
+      list.replaceChildren(...displayed.map(renderOrder));
+      if (!displayed.length && report.enabled !== false) {
+        const empty = document.createElement("p");
+        empty.textContent = orders.length ? "Aucune demande ne correspond aux statuts sélectionnés." : "Aucune demande transmise.";
+        list.appendChild(empty);
       }
     }
 
