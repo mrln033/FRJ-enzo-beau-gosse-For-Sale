@@ -1,0 +1,29 @@
+Comment ça fonctionne ?
+
+Le panier permet de mettre de côté et de rassembler des items en vue d'une commande à passer.
+Chaque card d'article avec un MU a un calculatrice dans le coin inférieur droit. Cela affiche une petite calculatrice qui permet de choisir la quantité désirée et de calculé le prix avec le MU. Dan cette vue, la calculatrice est remplacer par un chariot.
+Un clic sur le chariot ajoute la quantite indiquée de l'item dans le panier. L'icone/bouton en haut à droite de l'écran indique la quantité d'item dans le panier et le montant total (MU compris)
+
+Un panier peut contenir jusqu'à 10 lignes d'articles.
+
+A ce stade, le panier est 'local' : rien n'est envoyé à [enzo beau gosse]. Les MU ou MU FRJ sont ceux affichés sur le site.
+
+2 solutions s'offre à vous dans le panier à ce stade :
+- 'Copier ma liste'  ==> une simple copie de la demande complète dans le presse papier, pour un envoi par mail IG ou par MP Discord à [enzo]
+- 'Tranmettre à Enzo'  ==> après avoir renseigné votre nom complet (MAJ/Min inclus) obligatoire (indispensable pour  vous contacter IG), vous pouvez mettre un commentaire au choix ("125% c un peu trop pour moi... Discutons !!" par exemple), la demande est envoyée sur le serveur et [enzo] est averti via Discord. Un tableau de bord Admin permet aux enzoboys d'accéder à toutes les demandes transmises.
+
+Un lien de 'suivi de demande' est ajouté dans la fenêtre du panier à votre attention.
+
+La demande possède 7 statuts d'état qui évoluerons au cours de sa vie :
+- Transmise  ==> La demande est sur le serveur, en attente de traitement
+- Vue  ==> La demande a été lue et est prise en charge
+- A valider  ==> Durant les 2 premiers statuts, on discute des prix, et enzo peut modifier les quantités et le MU... A ce moment-là, le statut 'A valider' est appliqué, et le client doit approuver les changements. La demande repasse alors à 'Tranmise' et reprend son parcours.
+- A préparer  ==> Indique que les items peuvent commencer à être rassemblés.
+- Prête  ==> Voilà ! tout est rassemblé, prêt à être retiré !!
+- Terminée  ==> La commande a été retirée et payée par le client.
+- Annulée  ==> Durant les 3 premières phases, le client peut supprimer sa demande via un bouton présent dans la liste des 'Demandes Transmises' et/ou dans le 'Suivi de Demande'. Elle passe alors en statut 'Annulée'
+- Expirée  ==> En phase 'A valider', le client dispose de 3 jours pour accepter les modifications proposées suite aux négociations. Passé ce délai, la demande est invalidée et passe en 'Expirée'.
+
+A chaque changement de statut, le post Discord (à destination des enzoboys) est mis à jour.
+
+Coté client, toutes les demandes transmises sont listées localement dans le panier. Un bouton 'Retirer de la liste' présent aux 3 derniers statuts permet de les masquer. C'est définitif. Cependant, grâce au lien de suivi de demande (si vous l'avez copié), vous pouvez toujours afficher la fiche de suivi de demande.

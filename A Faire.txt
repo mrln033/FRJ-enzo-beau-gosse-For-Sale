@@ -1,0 +1,84 @@
+Projet 'FRJ For Sale' ==> Listes 'A faire' et 'Fait'
+
+----------------
+= INSTRUCTIONS =
+Les pragraphes ci-dessous sont des idées de choses à faire/améliorer dans le projet.
+Pour chaque 'taches' réalisée, maintient ce fichier à jour, en déplaçant le paragraphe traité (la Demande) tel que (pour savoir ce qui a été demandé) et en détaillant ce qui a été fait (la Réalisation), dans la section suivante (REALISATIONS). Datation souhaitée ;)
+Par la même occasion, si tu as de l'historique de ton côté, n'hésite pas à renseigner au mieux la partie REALISATIONS
+Je tiens à garder une trace de tout ce qu'on a fait sur ce projet.
+
+-------------------------------
+DEMANDES  => CE QUI EST A FAIRE
+
+d.1/ Pages de mise à jour des MU  ==> depuis l'introduction du menu Admin, lors de l'import des MU, le message 'Envoi en cours' n'apparait plus au bon endroit quand on clique sur le bouton 'Envoi'. Par contre, ça fonctionne bien pour les inventaires.
+
+d.2/ Mettre en forme (dans le style du site) 'aide-panier.txt' en HTML. Ajouter un bouton '?' dans le panier coté client pour y accéder. Affichage en popup.
+
+d.3/ je ne m'y retrouve pas dans le dossier du projet !!! Peux-tu le ranger lisiblement stp. Egalement, peux-tu commenter clairement le code ?
+J'aimerais aussi que les fichier HTML dans GitHub ne contiennent pas ou peu de javascript : crée des fichier .js pour les mettre dedans avec : nom identique au fichier html pour les fonctions dédiées au fichier. Si des fonctions sont partagées et mutualisées, met les dans un fichier commun.
+Le but est clairement de pouvoir utiliser le coté D1 de façon complètement autonome, sans dépendre de GAS.... Quant à GAS, il pourrait utiliser les fichiers déployés sur GitHub (puisque c'est aussi sa porte d'entrée), et donc pouvoir également être autonome en cas de défaillance de D1.
+
+d.4/ Console Admin "Demandes d'Achat" ==> ajouter un bouton 'Supprimer' à chaque demande avec message de confirmation. Celà supprimerais l'enregistrement complet dans D1. Propagation Discord avec modification du statut en 'SUPPRIMEE' pour archivage.
+
+d.5/ Console Admin "Demandes d'Achat" ==> ajouter un bouton 'Suivre la demande' avec le lien initialement présent dans le panier client. Si un client 'rouvre' un suivi de demande (précédemment retiré de sa liste), via un lien 'Suivre ma demande', j'aimerais qu'il réapparaissent à nouveau dans sa liste (variable locale).
+
+d.6/ 'Rows read'...  ==> Cloudflare D1 gratuit limite les 'Rows read' à 5M ... limite rapidement atteinte, surtout en développement... Trouver une solution pour les limiter (a l'instar de ce qu'on a déjà fait pour les 'Rows written'. Vérifer comment sont chargées les données, et si nécessaire, prévoir des chargements de données plus ciblées et moins gourmands en 'Rows read'. Faire également la même chose coté GAS si possible (précise moi l'impact prévisible).
+
+d.7/ Panier client, Suivi de demande, Console Admin "Demandes d'achat"  => le champ Quantité soit être sans décimales (0). Le champ MU doit avoir 2 décimales affichées quant à lui. Par contre, la modification acceptera jusqu'à 6 décimales.
+D'autre part, le chiffre 'Estimation' dans le 'Suivi de demande' n'est pas toujours exact. Et en cas de modification des quantités/MU via la console admin, il ne se met pas à jour. ==> j'ai une piste ! dans la table 'purchase_order_items', le MU est appliqué sur 'unit_tt_ped' et enregistré dans 'unit_sale_ped' avec 2 décimales. Le calcul dans 'line_sale_ped' est alors fait sur cette valeur. Le pb vient de là : un 'unit_tt_ped' de 0.01 sera souvent le même après aplication du MU si on reste sur 2 décimales :s .
+Il faudrait soit baser les calculs et enregistrements sur 6 décimales (mais rester sur un affichage à 2 décimales), soit faire le calcul de 'line_sale_ped' sur 'line_ped_tt'. Penser à répercuté le résultat, ainsi que 'Estimation totale' dans les autres tables, notamment 'purchase_orders'. A moins qu'il soit plus simple et rapide de faire les calculs finaux en JS, à l'affichage seulement. Dis-moi la meilleure solution.
+Pour info, le calcul 'à la volée' s'effectue bien en modification dans la Console Admin>Demandes d'achat, mais n'est pas suivi d'une mise à jour des tables.
+
+d.8/ GAS et D1  ==> j'ai ajouté une table dans GoogleSheet "CONFIG_CONTAINER" avec 2 champs (Container | Enabled). 'Container' contient tous les container unique présents dans l'inventaire 'enzo beau gosse' (Inventaire Enzo). Le champ 'Enabled' est une cse à cocher, indiquant si ce container doit être inclus dans le compte des Quantité de BDD_APP (formule à refaire avec cette table). Je voudrais un fichier HTML+JS pour gérer cette liste semi-automatiquement : à l'ouverture, je veux que la liste se mette à jour uniquement en ajout (aucune suppression) avec Enabled = FALSE. Pour l'instant, uniquement l'invetaire de 'enzo beau gosse' est concerné, mais pourquoi ne pas prévoir une extension pour les 3 autres inventaires d'enzos (Inventaire Kenza | Inventaire ArkaMan | Inventaire Nocturnal). Prévoir l'import de cette table dans D1, et faire les fichiers pour les memes fonctionnalité d'ajout et de gestion. Prévoir également l'adaptation des formules de calcul des quantités coté D1.
+
+d.9/ GAS et D1  ==> je voudrais implémenter un système de "Promotions" quotidienne(concernant un couple CATEGORIE/RAYON) et de "Soldes" (concernant tous les articles sur une période). Bien sur, les 2 pas ensemble : un Solde oblitère une Promotion si ça se chevauche. Il faudrait je pense une table dédié pour les 'Promotions' et peut etre une également pour les 'Soldes'. 'Promotions' contiendrait : une date (de la promotion), Catégorie, Rayon, Taux applicable. La table Solde contiendrait : Date de début, Date de fin, Taux applicable). Les tuiles d'article aurait une 'étiquette' 'Promo' dans un coin, et afficherait le MU / Prix de vente 'normal' barré suivi du MU / Prix de vente remisés. Coté GAS, j'ai déjà ajouté une colonne Remise_Promo censée indiqué le taux aappliqué à l'article. Actuellement, ce taux est récupéré dans ma feuille 'PROMOS' non exploitée'. J'ai également ajouté une formule dans la dernière colonne (sans nom pour l'instant) pour m'assurer que le calcul fonctionne. Le but final serait d'automatiser (par un choix aléatoire) la 'classe' (CATEGORIE+RAYON) à remiser chaque jour, avec un taux par défaut défini (5% par exemple) qui resterait modifiable. Il faut donc prévoir cette fonctionnalité qui doit tourner des 2 côté (GAS et D1) à l'identique ! FAIT MOI UNE ANALYSE/ETUDE DE LA MISE EN PLACE ET UNE PROPOSITION REALISABLE.
+
+d.10/ Console Admin - Demandes d'Achat ==> j'aimerais implémenter un historique de la vie d'une demande : à chaque changement de statut, une ligne d'historisation sera créée, avec la date, le nouveau statut et un commentaire (automatique mais modifiable par l'admin). Bien entendu, c'est historisation ne doit être visible que par l'admin. Celà passerait surement par une nouvelle table dans les BDD GAS et D1. A implémenter des 2 cotés, avec enregistrement simultané. Je crois que la journalisation existe déjà partiellement coté D1 mais n'est pas exploitée (table 'purchase_order_events').
+
+d.11/ Sytème de panier ==> dans les demandes d'achat, le prix est 'de base' dans un statut 'Estimé'. Lors du passage de la demande en 'A préparer' | 'Prête' | 'Terminée', je voudrais les le statut des prix passe à 'Confirmé'. Celà correspond à une acceptation du client pour les prix affichés ,)
+
+d.12/ Console Admin > Demandes d'Achat  ==> j'aimerais pouvoir créer 'de toute pièce' une Demande d'achat dans cette page. Un bouton 'Ajouter une nouvelle demande' déploierait un formulaire (jusque-là masqué), demandant les infos nécessaires :
+> Pour l'entête :
+- N° de demande   ==> générée au même format que les autres demandes
+- Date   ==> générée à la création
+- Nom d'avatar   => A saisir
+- Profil de joueur   => A saisir (Public | Membre FRJ)
+- Origine de la demande   ==> généré : 'Demande directe'
+- Statut   ==> forcé : "A valider"
+Pour les autres champs présent dans la table ('purchase_order' je dirais...), je te laisse 'gérer' les valeurs à mettre ou à récupérer.
+> pour les articles :
+- Article   ==> saisie 'dirigée' par une liste déroulante contenant l'intégralité du listing (donc, items avec quantité positive)
+- Quantité  ==> saisie. Quantité supérieur au listing interdite
+- Prix Affiché   ==> non saisissable, mais calculé et affiché immédiatement
+- MU  ==> en 2 parties : liste déroulante (PED | %) + saisie numérique à 2 déccimales
+- Estimation vente   ==> non saisie, mais calculée et affichée immédiatement
+Comme précédemment, tu gères les autres champs de la table ('purchase_items' semble-t-il)
+
+Un bouton 'Enregistrer' global permettra de finaliser l'enregistrement dans la BDD et rafraichira la liste des demandes d'achats. Un lien de suivi sera alors généré et proposé à la copie, pour transmettre au client. Celà équivaudra donc à un 'devis' qu'il devra approuver ,)
+Le parcours 'Discord' doit être le même (envoi d'un post, modification, ...).
+
+Dans la même optique, j'aimerais également pouvoir rajouter une ligne d'article dans une commande existante (en statut A valider | Transmise | Vue). Un bouton 'Ajouter un Article' serait ajouté en fin de tableau (garder la contrainte de 10 max par demande), et permettrait d'ajouter une ligne d'article, avec les mêmes caractéristiques que le formulaire décrit plus haut, sans toucher aux infos 'communes' de la demande.
+
+Bien sût, toute création ou modification provoquerait un passage en statut 'A valider' et serait soumise à validation du client.
+
+La table de journalisation 'purchase_order_events' doit bien entendu être maintenue également.
+
+Dans un premier temps, effectue ces changements/modifications du coté D1 seulement : on transposera coté GAS une fois validé.
+
+------------------------------------
+REALISATIONS ==> CE QUI A ETE FAIT :
+
+- Projet GAS + GitHub  ==> Affichage du stock, issu de l'inventaire MindArk.
+. Table BDD_APP : contient le détail de tous les items à faire apparaitre dans le catalogue. Les champs 'Catégorie', Rayons' et 'Item' sont à remplir manuellement, directement dans le fichier GoogleSheet. Les infos sont récupérées dans un autre classeur, ayant un référentiel plus fourni. Téléchargment manuel de l'image, mise à jour manuelle du référentiel distant, et push GitHub dans le répertoire 'img' du projet.
+. Table MU_PONDERES  ==> Mis à jour par import (via un fichier HTML + JS). Des cellules contiennent des formules afin de calculer le MU 'pondéré' à prendre en compte.
+. Feuille "PROMOS"  ==> non utilisée actuellement... en cours de réflexion... La feuille existe, mais pour l'instant, c'est seulement un tableau croisé dynamique et des testes de formules...
+. Feuille "Calcul"  ==> Actuellement utilisé 'localement' (aucune page HTML ou JS ne l'exploite). Pleine de formules, me permet de faire les comptes lors de ventes à la criée.
+- Projet GAS  ==> Interface d'affichage du Catalogue, classé par onglet d'inventaire et par 'rayon', avec 1 tuile par item. Si un MU est indiqué, une calculatrice ouvre le verso de la tuile et permet de calculer le prix de vente selon la quantité. Le markup affiché est soit public (MU), soit Soc (MU FRJ).
+
+14/08/2026 = Ajout d'un menu 'admin' (déterminé par le paramètre ?admin=1) permettant d'accéder à :
+- Catalogue (version GAS)
+- Catalogue (version D1)
+- Formulaire d'import de MU et des Inventaires des enzos
+- Rapport de Synchronisatio des données GAS<->D1
+- Liste des demandes d'achats (générée par la panier)
+
