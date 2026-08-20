@@ -27,7 +27,7 @@ Les lectures restent publiques. Les écritures exigent `Authorization: Bearer <A
 
 - URL normale : GAS reste prioritaire et D1 sert de repli en lecture seule.
 - URL avec `?backend=d1` : D1 devient prioritaire et GAS sert de repli en lecture seule.
-- Pages administrateur avec `?admin=1&backend=d1` : les imports vont uniquement vers D1.
+- Après activation du mode Admin dans l'onglet, les pages ouvertes avec `?backend=d1` utilisent D1 comme backend explicite ; les imports jumelés continuent de cibler GAS et D1 selon leur action dédiée.
 - Le jeton est demandé au premier import D1 et conservé dans `sessionStorage` jusqu'à la fermeture de l'onglet.
 - Une écriture ne bascule jamais automatiquement vers l'autre backend, afin d'éviter les doubles imports.
 
@@ -95,16 +95,17 @@ script, puis exécuter `installFrjBidirectionalSync()` et un audit initial.
 
 ## Administration et rapport
 
-Avec `?admin=1`, le frontend affiche un menu commun permettant d’ouvrir explicitement les catalogues et les
-pages d’import GAS ou D1. La page `rapport-sync.html?admin=1` affiche l’état des six datasets et les 100
-derniers événements du journal croisé GAS ↔ D1.
+L'entrée discrète `?admin=1` active le menu commun dans `sessionStorage` pour l'onglet courant, puis le paramètre
+est immédiatement retiré de l'URL. Le menu permet d’ouvrir explicitement les catalogues et les pages d’import
+GAS ou D1 sans propager ce paramètre. La page `rapport-sync.html` affiche l’état des six datasets et les 100
+derniers événements du journal croisé GAS ↔ D1 lorsque la session Admin est active.
 
 Le bouton « Auditer maintenant » appelle `POST /admin/sync-audit-now`. Le Worker authentifie le jeton
 administrateur, puis appelle la web app privée de synchronisation GAS avec `SYNC_TOKEN`. Ce premier audit
 ignore les délais ordinaires ; une correction déclenche immédiatement la synchronisation puis conserve le
 cycle normal de vérification à +30 minutes.
 
-Le paramètre `admin=1` contrôle seulement l’affichage du menu. Le rapport appelle
+La session activée par `admin=1` contrôle seulement l’affichage du menu et l'accès aux pages frontend. Le rapport appelle
 `GET /admin/sync-report`, protégé par `ADMIN_TOKEN`; aucune donnée de synchronisation n’est exposée sans ce
 jeton. GAS remonte dans `sync_audit` le résultat global de chaque exécution, tandis que D1 conserve les 500
 derniers événements par dataset.

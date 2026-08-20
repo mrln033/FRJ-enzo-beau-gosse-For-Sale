@@ -29,6 +29,7 @@ function loadPage(search) {
 
   let replacedUrl = "";
   const window = {
+    FRJ_ADMIN: { active: true, require: () => true },
     location: {
       search,
       href: `https://example.test/maj_inventaire-enzo.html${search}`
@@ -55,23 +56,23 @@ function loadPage(search) {
 }
 
 test("la page ouverte depuis le menu ne présélectionne aucun inventaire", () => {
-  const page = loadPage("?admin=1");
+  const page = loadPage("");
   assert.equal(page.elements.get("sendButton").disabled, true);
   assert.match(page.elements.get("title").innerText, /Choisis l'inventaire/);
   assert.equal(page.inventoryLinks.some((link) => link.classList.contains("active")), false);
 });
 
 test("un avatar explicite sélectionne uniquement son bouton", () => {
-  const page = loadPage("?admin=1&avatar=kenza");
+  const page = loadPage("?avatar=kenza");
   assert.equal(page.elements.get("sendButton").disabled, false);
   assert.equal(page.elements.get("btnINV-kenza").classList.contains("active"), true);
   assert.equal(page.elements.get("btnINV-enzo").classList.contains("active"), false);
 });
 
 test("la remise à zéro retire l'avatar, la sélection et désactive l'envoi", () => {
-  const page = loadPage("?admin=1&avatar=enzo");
+  const page = loadPage("?avatar=enzo");
   vm.runInContext("resetInventorySelection()", page.context);
-  assert.equal(page.replacedUrl, "/maj_inventaire-enzo.html?admin=1");
+  assert.equal(page.replacedUrl, "/maj_inventaire-enzo.html");
   assert.equal(page.elements.get("sendButton").disabled, true);
   assert.equal(page.inventoryLinks.some((link) => link.classList.contains("active")), false);
 });

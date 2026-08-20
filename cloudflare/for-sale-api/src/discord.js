@@ -1,5 +1,5 @@
 const DISCORD_RESPONSE_LIMIT = 20_000;
-const ADMIN_ORDERS_URL = "https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/commandes.html?admin=1";
+const ADMIN_ORDERS_URL = "https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/commandes.html";
 
 const STATUS_LABELS = {
   submitted: "Demande transmise",

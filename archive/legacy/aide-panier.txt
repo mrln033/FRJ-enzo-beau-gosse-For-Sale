@@ -1,3 +1,5 @@
+[Archive du texte source utilisé pour créer aide-panier.html le 20/08/2026]
+
 Comment ça fonctionne ?
 
 Le panier permet de mettre de côté et de rassembler des items en vue d'une commande à passer.

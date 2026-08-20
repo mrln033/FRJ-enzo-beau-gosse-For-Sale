@@ -722,7 +722,7 @@ function purchaseDiscordPayload_(order, items) {
     allowed_mentions: { parse: [] },
     embeds: [{
       title: "🛒 " + purchaseDiscordText_(order.publicReference || "Nouvelle demande", 220),
-      url: "https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/commandes.html?admin=1",
+      url: "https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/commandes.html",
       description: "État actuel : **" + (statusLabels[status] || status) + "**",
       color: statusColors[status] || statusColors.submitted,
       fields: fields,

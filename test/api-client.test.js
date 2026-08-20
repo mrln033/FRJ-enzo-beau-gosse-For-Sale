@@ -109,7 +109,7 @@ test("une écriture D1 envoie le jeton sans repli automatique", async () => {
 test("le rapport administrateur lit uniquement D1 avec le jeton", async () => {
   const requests = [];
   let promptCount = 0;
-  const { api } = loadClient("?admin=1", async (url, options) => {
+  const { api } = loadClient("", async (url, options) => {
     requests.push({ url, options });
     return new Response(JSON.stringify({ status: "ok", datasets: [], events: [] }), { status: 200 });
   }, () => {
@@ -131,7 +131,7 @@ test("le rapport administrateur lit uniquement D1 avec le jeton", async () => {
 test("un jeton enregistré sur cette machine est réutilisé sans nouvelle saisie", async () => {
   const localValues = new Map([["FRJ_D1_ADMIN_TOKEN", "jeton-persistant"]]);
   let promptCount = 0;
-  const { api } = loadClient("?admin=1&backend=d1", async (_url, options) => {
+  const { api } = loadClient("?backend=d1", async (_url, options) => {
     assert.equal(options.headers.get("Authorization"), "Bearer jeton-persistant");
     return new Response("[]", { status: 200 });
   }, () => {
@@ -147,7 +147,7 @@ test("un jeton enregistré sur cette machine est réutilisé sans nouvelle saisi
 
 test("un import GAS enregistre une demande de synchronisation côté D1", async () => {
   const requests = [];
-  const { api } = loadClient("?admin=1", async (url, options) => {
+  const { api } = loadClient("", async (url, options) => {
     requests.push({ url, options });
     return new Response(JSON.stringify({ ok: true, requestId: 42 }), { status: 200 });
   }, () => "jeton-sync");
@@ -163,7 +163,7 @@ test("un import GAS enregistre une demande de synchronisation côté D1", async 
 
 test("un import GAS publie immédiatement son observation sans écrire le snapshot D1", async () => {
   const requests = [];
-  const { api } = loadClient("?admin=1", async (url, options) => {
+  const { api } = loadClient("", async (url, options) => {
     requests.push({ url, options });
     return new Response(JSON.stringify({ ok: true }), { status: 200 });
   }, () => "jeton-observation");
@@ -179,7 +179,7 @@ test("un import GAS publie immédiatement son observation sans écrire le snapsh
 
 test("un import double écrit dans GAS puis D1 indépendamment du paramètre backend", async () => {
   const requests = [];
-  const { api } = loadClient("?admin=1&backend=d1", async (url, options) => {
+  const { api } = loadClient("?backend=d1", async (url, options) => {
     requests.push({ url, options });
     return new Response(url.includes("script.google.com") ? "Import GAS OK" : "Import D1 OK", { status: 200 });
   }, () => "jeton-double");
@@ -197,7 +197,7 @@ test("un import double écrit dans GAS puis D1 indépendamment du paramètre bac
 
 test("un échec GAS n'empêche pas l'import D1", async () => {
   const requests = [];
-  const { api } = loadClient("?admin=1", async (url) => {
+  const { api } = loadClient("", async (url) => {
     requests.push(url);
     if (url.includes("script.google.com")) throw new Error("GAS indisponible");
     return new Response("Import D1 OK", { status: 200 });
@@ -218,7 +218,7 @@ test("un échec GAS n'empêche pas l'import D1", async () => {
 
 test("un échec D1 n'annule pas l'import GAS et conserve un résultat partiel", async () => {
   const requests = [];
-  const { api } = loadClient("?admin=1", async (url) => {
+  const { api } = loadClient("", async (url) => {
     requests.push(url);
     if (url.includes("workers.dev")) {
       return new Response(JSON.stringify({ error: "quota épuisé" }), { status: 429 });
@@ -237,7 +237,7 @@ test("un échec D1 n'annule pas l'import GAS et conserve un résultat partiel", 
 
 test("un double succès publie ensuite l'état GAS dans le rapport", async () => {
   const requests = [];
-  const { api } = loadClient("?admin=1", async (url, options) => {
+  const { api } = loadClient("", async (url, options) => {
     requests.push({ url, options });
     return new Response(url.includes("sync-observation") ? JSON.stringify({ ok: true }) : "Import OK", {
       status: 200

@@ -1,5 +1,6 @@
 	<style>
-		body {
+/* Archive antérieure à la réorganisation d.3 — conservée pour référence. */
+body {
 		font-family: Arial;
 		padding: 20px;
 		background: #f5f5f5;

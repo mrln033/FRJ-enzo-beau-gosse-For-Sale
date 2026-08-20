@@ -1,11 +1,12 @@
 <!DOCTYPE html>
+<!-- Archive antérieure à la réorganisation d.3 — conservée pour référence. -->
 <html>
 <head>
     <base target="_self">
 	<link rel="icon" href="./favicon.ico">
 	<link rel="stylesheet" href="./style.css">
 	<meta charset="UTF-8">
-	<title>MAJ MU</title>
+	<title>MAJ Inventaire enzo</title>
 
 	<style>
 		body {
@@ -15,8 +16,8 @@
 		}
 
 		textarea {
-		width: 100%;
-		height: 300px;
+		width: 95%;
+		height: 350px;
 		font-family: monospace;
 		padding: 10px;
 		}
@@ -37,9 +38,9 @@
 
     <div align="center"><h1 id="title">[FRJ] - enzo beau gosse = A VENDRE</h1></div>
     <hr>
-<h2>MAJ MU (Admin)</h2>
+<h2>MAJ Inventaire enzo beau gosse (Admin)</h2>
 
-<textarea id="csvInput" placeholder="Colle ton CSV ici..."></textarea>
+<textarea id="csvInput" placeholder="Colle ici le CSV de l'inventaire de : [enzo beau gosse] uniquement, issu du site de MA, non groupés par container..."></textarea>
 <br>
 <button onclick="sendData()">Envoi</button>
 
@@ -64,7 +65,7 @@ function sendData() {
   btn.disabled = true;
   btn.innerText = "Envoi en cours...";
 
-  fetch("https://script.google.com/macros/s/AKfycbxDLU93_rtARjYZKi10BusFYpMcKVS4Qu4I4zIqH8wtsS43pXM3afqsMm6KADE-dbxg/exec?type=mu", {
+  fetch("https://script.google.com/macros/s/AKfycbxDLU93_rtARjYZKi10BusFYpMcKVS4Qu4I4zIqH8wtsS43pXM3afqsMm6KADE-dbxg/exec?type=inventory", {
     method: "POST",
     body: csv
   })

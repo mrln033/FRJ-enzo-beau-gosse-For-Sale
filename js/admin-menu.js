@@ -1,20 +1,21 @@
 (function initAdminMenu(global) {
   "use strict";
 
+  if (global.FRJ_ADMIN?.active !== true) return;
+
   const params = new URLSearchParams(global.location.search);
-  if (params.get("admin") !== "1") return;
 
   const items = [
-    { section: "catalog", backend: "gas", label: "Catalogue (GAS)", href: "./?admin=1&backend=gas" },
-    { section: "catalog", backend: "d1", label: "Catalogue (D1)", href: "./?admin=1&backend=d1" },
+    { section: "catalog", backend: "gas", label: "Catalogue (GAS)", href: "./?backend=gas" },
+    { section: "catalog", backend: "d1", label: "Catalogue (D1)", href: "./?backend=d1" },
     {
       section: "update",
       backend: "",
       label: "MàJ Inventaire / MU (GAS + D1)",
-      href: "maj_inventaire-enzo.html?admin=1"
+      href: "maj_inventaire-enzo.html"
     },
-    { section: "report", backend: "", label: "Rapport de synchronisation", href: "rapport-sync.html?admin=1" },
-    { section: "orders", backend: "", label: "Demandes d'achat", href: "commandes.html?admin=1" }
+    { section: "report", backend: "", label: "Rapport de synchronisation", href: "rapport-sync.html" },
+    { section: "orders", backend: "", label: "Demandes d'achat", href: "commandes.html" }
   ];
 
   function render() {
