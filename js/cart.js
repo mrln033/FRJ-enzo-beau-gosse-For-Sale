@@ -210,7 +210,7 @@
           <h2 id="cartHelpTitle"></h2>
           <button type="button" class="cart-help-close" aria-label=""></button>
         </header>
-        <iframe class="cart-help-frame" src="./aide-panier.html" title=""></iframe>
+        <iframe class="cart-help-frame" src="about:blank" title=""></iframe>
       </div>`;
     helpDialog.querySelector(".cart-help-close").addEventListener("click", closeHelp);
     helpDialog.addEventListener("click", (event) => {
@@ -543,7 +543,10 @@
     const closeButton = helpDialog.querySelector(".cart-help-close");
     closeButton.textContent = "×";
     closeButton.setAttribute("aria-label", label("close"));
-    helpDialog.querySelector(".cart-help-frame").title = title;
+    const helpFrame = helpDialog.querySelector(".cart-help-frame");
+    const helpSource = language() === "FR" ? "./aide-panier.html" : "./aide-panier-en.html";
+    if (helpFrame.getAttribute("src") !== helpSource) helpFrame.src = helpSource;
+    helpFrame.title = title;
     helpDialog.hidden = false;
     closeButton.focus();
   }
