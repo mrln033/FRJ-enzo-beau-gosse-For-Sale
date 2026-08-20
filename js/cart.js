@@ -21,7 +21,7 @@
       member: "Remise membre FRJ : 50 % du MU", remove: "Retirer", clear: "Vider",
       copy: "Copier ma liste", copied: "Liste copiée.", send: "Transmettre à Enzo",
       avatar: "Avatar en jeu", contact: "Contact (facultatif)", comment: "Commentaire (facultatif)",
-      close: "Fermer", sending: "Transmission…", sent: "Demande transmise",
+      close: "Fermer", help: "Aide du panier", sending: "Transmission…", sent: "Demande transmise",
       fallback: "Demande reçue par le secours GAS ; elle sera transférée vers D1.",
       stockChanged: "Le stock, le prix affiché ou le MU a changé. Le panier a été actualisé ; vérifiez-le avant de renvoyer.",
       failure: "Transmission impossible. Le panier reste enregistré sur cette machine.",
@@ -43,7 +43,7 @@
       member: "FRJ member discount: 50% off MU", remove: "Remove", clear: "Clear",
       copy: "Copy my list", copied: "List copied.", send: "Send to Enzo",
       avatar: "In-game avatar", contact: "Contact (optional)", comment: "Comment (optional)",
-      close: "Close", sending: "Sending…", sent: "Request sent",
+      close: "Close", help: "Cart help", sending: "Sending…", sent: "Request sent",
       fallback: "Request received by GAS fallback; it will be transferred to D1.",
       stockChanged: "Stock, displayed price or MU changed. The cart was updated; review it before sending again.",
       failure: "Unable to send. The cart remains saved on this device.",
@@ -64,6 +64,8 @@
   let requests = readRequests();
   let drawer;
   let launcher;
+  let helpDialog;
+  let helpTrigger;
   let statusNode;
   let statusMessage = "";
   let statusType = "";
@@ -195,7 +197,30 @@
     drawer.addEventListener("click", (event) => {
       if (event.target === drawer) close();
     });
-    document.body.append(launcher, drawer);
+
+    helpDialog = document.createElement("aside");
+    helpDialog.className = "cart-help-overlay";
+    helpDialog.hidden = true;
+    helpDialog.setAttribute("aria-modal", "true");
+    helpDialog.setAttribute("aria-labelledby", "cartHelpTitle");
+    helpDialog.setAttribute("role", "dialog");
+    helpDialog.innerHTML = `
+      <div class="cart-help-dialog">
+        <header>
+          <h2 id="cartHelpTitle"></h2>
+          <button type="button" class="cart-help-close" aria-label=""></button>
+        </header>
+        <iframe class="cart-help-frame" src="./aide-panier.html" title=""></iframe>
+      </div>`;
+    helpDialog.querySelector(".cart-help-close").addEventListener("click", closeHelp);
+    helpDialog.addEventListener("click", (event) => {
+      if (event.target === helpDialog) closeHelp();
+    });
+    global.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && helpDialog && !helpDialog.hidden) closeHelp();
+    });
+
+    document.body.append(launcher, drawer, helpDialog);
     global.addEventListener("storage", (event) => {
       if (event.key !== REQUESTS_KEY && event.key !== HIDDEN_REQUESTS_KEY && event.key !== "FRJ_LAST_PURCHASE_REQUEST") return;
       requests = readRequests();
@@ -228,9 +253,15 @@
     content.className = "cart-panel";
     const header = document.createElement("header");
     header.innerHTML = `<h2>🛒 ${escapeHtml(label("cart"))}</h2>`;
+    const headerActions = document.createElement("div");
+    headerActions.className = "cart-header-actions";
+    const helpButton = button("?", "cart-help-button", openHelp);
+    helpButton.setAttribute("aria-label", label("help"));
+    helpButton.title = label("help");
     const closeButton = button("×", "cart-close", close);
     closeButton.setAttribute("aria-label", label("close"));
-    header.appendChild(closeButton);
+    headerActions.append(helpButton, closeButton);
+    header.appendChild(headerActions);
     content.appendChild(header);
 
     const list = document.createElement("div");
@@ -504,8 +535,29 @@
     refreshRequestStatuses();
   }
 
+  function openHelp() {
+    if (!helpDialog) return;
+    helpTrigger = document.activeElement;
+    const title = label("help");
+    helpDialog.querySelector("#cartHelpTitle").textContent = title;
+    const closeButton = helpDialog.querySelector(".cart-help-close");
+    closeButton.textContent = "×";
+    closeButton.setAttribute("aria-label", label("close"));
+    helpDialog.querySelector(".cart-help-frame").title = title;
+    helpDialog.hidden = false;
+    closeButton.focus();
+  }
+
+  function closeHelp(restoreFocus = true) {
+    if (!helpDialog || helpDialog.hidden) return;
+    helpDialog.hidden = true;
+    if (restoreFocus && helpTrigger instanceof HTMLElement) helpTrigger.focus();
+    helpTrigger = null;
+  }
+
   function close() {
     if (!drawer) return;
+    closeHelp(false);
     drawer.hidden = true;
     document.body.classList.remove("cart-open");
   }

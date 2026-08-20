@@ -30,7 +30,7 @@
 
 <textarea id="csvInput" placeholder="Colle ton CSV ici..."></textarea>
 <br>
-<button onclick="sendData()">Envoi</button>
+<button id="sendButton" onclick="sendData()">Envoi</button>
 
 <script>
   // 🔐 Vérification admin
@@ -42,7 +42,7 @@
 
 
 async function sendData() {
-  const btn = document.querySelector("button");
+  const btn = document.getElementById("sendButton");
   const csv = document.getElementById("csvInput").value;
 
   if (!csv.trim()) {
