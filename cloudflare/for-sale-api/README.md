@@ -2,6 +2,16 @@
 
 Ce projet est volontairement séparé de `../worker.js`, qui gère Discord pour une autre application.
 
+## Organisation du code
+
+- `src/index.js` : point d'entrée et routage HTTP, authentification et CORS ;
+- `src/application.js` : traitements catalogue, imports, synchronisation et demandes ;
+- `src/config.js` : limites, origines autorisées et constantes D1 ;
+- `src/http.js` : réponses HTTP, lecture bornée, empreintes et erreurs API ;
+- `src/domain.js`, `src/orders.js`, `src/sync.js`, `src/discord.js` : règles métier spécialisées.
+
+Le point d'entrée déclaré dans `wrangler.jsonc` et tous les contrats HTTP restent inchangés.
+
 ## État actuel
 
 - Worker déployé : <https://frj-for-sale-api.merlin-merzhin-lesage.workers.dev>
