@@ -45,7 +45,7 @@ Cette arborescence sera mise en place progressivement. Les chemins actuels reste
 1. Rangement documentaire et suppression des copies inutilisées. **Terminé (d.3.1).**
 2. Extraction des scripts des pages d'import. **Terminé (d.3.2).**
 3. Extraction du rapport de synchronisation. **Terminé (d.3.3).**
-4. Extraction et mutualisation de la console des demandes et du suivi client.
+4. Extraction et mutualisation de la console des demandes et du suivi client. **Terminé (d.3.4).**
 5. Extraction du catalogue principal.
 6. Rangement des feuilles de style.
 7. Découpage interne du Worker D1, sans modifier son URL ni ses contrats HTTP.
@@ -55,3 +55,5 @@ Cette arborescence sera mise en place progressivement. Les chemins actuels reste
 Les pages d'import chargent désormais leur contrôleur homonyme depuis `js/pages/`.
 Le rendu partagé des bilans GAS/D1 se trouve dans `js/common/import-feedback.js`.
 Le contrôleur du rapport D1 se trouve dans `js/pages/rapport-sync.js` ; la page HTML ne contient plus de logique intégrée.
+Les contrôleurs des demandes sont `js/pages/commandes.js` et `js/pages/suivi-commande.js`.
+Leurs statuts, règles d'action et formats communs sont centralisés dans `js/common/order-ui.js` ; leurs textes et parcours propres restent séparés.
