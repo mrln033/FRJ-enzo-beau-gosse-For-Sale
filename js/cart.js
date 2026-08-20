@@ -544,7 +544,7 @@
     closeButton.textContent = "×";
     closeButton.setAttribute("aria-label", label("close"));
     const helpFrame = helpDialog.querySelector(".cart-help-frame");
-    const helpSource = language() === "FR" ? "./aide-panier.html" : "./aide-panier-en.html";
+    const helpSource = `./aide-panier.html?lang=${language()}`;
     if (helpFrame.getAttribute("src") !== helpSource) helpFrame.src = helpSource;
     helpFrame.title = title;
     helpDialog.hidden = false;
