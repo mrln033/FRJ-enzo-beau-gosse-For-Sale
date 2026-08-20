@@ -16,11 +16,10 @@ Le point d'entrée déclaré dans `wrangler.jsonc` et tous les contrats HTTP res
 
 - Worker déployé : <https://frj-for-sale-api.merlin-merzhin-lesage.workers.dev>
 - D1 distant : `frj-for-sale` (`6afa102c-94a4-4b40-a61b-0fdc2e0a2b86`), région WEUR.
-- Données source : 1 113 lignes catalogue, 3 097 lignes d’inventaire brut consolidées en 2 148 triplets
-  `avatar + item + container`, et 802 observations MU.
+- La volumétrie évolue avec les imports ; `GET /health` fournit les compteurs catalogue courants.
 - Le front GitHub Pages peut utiliser GAS ou D1 sans changer son adresse publique.
 - Les lectures D1 sont publiques ; `ADMIN_TOKEN`, `SYNC_TOKEN` et `DISCORD_ORDER_WEBHOOK_URL` sont configurés dans les secrets Cloudflare.
-- Le frontend local possède une bascule progressive, mais ces modifications ne sont pas encore publiées sur GitHub Pages.
+- Le frontend publié permet de choisir D1 avec `?backend=d1`, tout en conservant GAS comme secours de lecture.
 
 ## Contrat HTTP conservé
 
@@ -68,7 +67,7 @@ Pour vérifier un jeton sans écrire en base, définir temporairement `FRJ_ADMIN
 Le fichier `seed/initial.sql` et les classeurs du dossier `save/` sont ignorés par Git, car ils
 contiennent les inventaires complets. Ne pas les forcer dans le dépôt public.
 
-Ne pas remplacer l’URL GAS dans le front avant validation des réponses locales et distantes.
+Conserver les URLs GAS et D1 stables : les mécanismes de repli et les liens de suivi en dépendent.
 
 ## Stockage différentiel et retour arrière
 
@@ -85,7 +84,7 @@ arrière du code ; D1 Time Travel reste disponible pour une restauration de la b
 
 ## Synchronisation GAS ↔ D1
 
-Le script `../../gas/SyncD1.gs` synchronise six datasets : catalogue, MU et les quatre inventaires.
+Les modules `../../gas/Sync*.gs` synchronisent six datasets : catalogue, MU et les quatre inventaires.
 Une modification demande une synchronisation dans un délai maximal de cinq minutes. Toute synchronisation
 ayant corrigé des données programme un audit d’intégrité 30 minutes plus tard. Un audit quotidien est aussi
 exécuté vers 02 h 00, et le signal D1 est contrôlé toutes les cinq minutes.
@@ -99,9 +98,8 @@ Le catalogue est inclus afin de garantir la même liste d’articles vendables, 
 provisoirement sa source maîtresse : les colonnes prix/image/wiki dépendent encore de formules
 `IMPORTRANGE`. D1 en reçoit un miroir complet sans écraser ces formules Google Sheets.
 
-Installation : activer l’API Google Apps Script dans les paramètres du compte, créer un projet Apps Script
-autonome, y pousser `SyncD1.gs`, configurer le même secret `SYNC_TOKEN` dans Cloudflare et les propriétés du
-script, puis exécuter `installFrjBidirectionalSync()` et un audit initial.
+Installation et publication : suivre `../../gas/README.md`, configurer le même secret `SYNC_TOKEN` dans
+Cloudflare et les propriétés du script, puis exécuter `installFrjBidirectionalSync()` et un audit initial.
 
 ## Administration et rapport
 

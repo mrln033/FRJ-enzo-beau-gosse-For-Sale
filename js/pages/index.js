@@ -12,14 +12,14 @@ document.addEventListener("DOMContentLoaded", () => {
   const container = document.getElementById("rayonImages");
   container.innerHTML = "";
 
-  // 🔥 on récupère les catégories dispo
+  // Le backend décide quelles catégories possèdent réellement du stock publiable.
   FRJ_API.fetch("?action=categories")
     .then(res => res.json())
     .then(categories => {
 
       Object.keys(CATEGORY_IMAGES).forEach(cat => {
 
-        // ❌ si catégorie vide → on skip
+        // Ignorer une catégorie vide évite de créer un onglet inutilisable.
         if (!categories.includes(cat)) return;
 
         const img = document.createElement("img");
@@ -30,7 +30,6 @@ document.addEventListener("DOMContentLoaded", () => {
         img.dataset.category = cat;
         img.title = cat;
 
-        // hover
         img.onmouseenter = () => {
           if (selectedCategory !== cat) {
             img.src = IMG_URL + config.hover;
@@ -43,7 +42,6 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         };
 
-        // click
         img.onclick = () => {
 
           if (selectedCategory === cat) {
@@ -221,7 +219,6 @@ document.addEventListener("DOMContentLoaded", () => {
 		renderFilterLabel();
 		renderBackendStatusDot();
 
-		// Select
 		const select = document.getElementById("rayonFilter");
 
 		if (!selectedCategory) {
@@ -283,13 +280,11 @@ document.addEventListener("DOMContentLoaded", () => {
 function loadCategoryData(category) {
   isLoading = true;
 
-  // 🔥 cacher filtre pendant chargement
+  // Masquer les filtres pendant le chargement évite d'agir sur l'ancienne catégorie.
   document.querySelector(".filter").style.display = "none";
 
-  // 🔥 afficher loading seul
   document.getElementById("loadingState").style.display = "block";
 
-  // 🔥 vider affichage
   renderCards([]);
 
   FRJ_API.fetch("?category=" + encodeURIComponent(category))
@@ -299,10 +294,8 @@ function loadCategoryData(category) {
 
       isLoading = false;
 
-      // 🔥 cacher loading
       document.getElementById("loadingState").style.display = "none";
 
-      // 🔥 remettre filtre
       updateFilterVisibility();
 
       updateRayonFilter();
@@ -417,7 +410,7 @@ function parseMUDate(dateStr) {
   const d = parts[0].split("/");
   const t = parts[1].split(":");
 
-  // ⚠️ FORCE FORMAT FR: dd/MM/yyyy
+  // Les dates GAS historiques sont toujours reçues au format français dd/MM/yyyy.
   return new Date(
     parseInt(d[2]),      // year
     parseInt(d[1]) - 1,  // month
@@ -479,19 +472,19 @@ function getMUColor(dateStr) {
 
   const now = new Date();
 
-  const diffMs = now - d; // ✅ ancienneté
+  const diffMs = now - d;
   const days = diffMs / (1000 * 60 * 60 * 24);
 
-  // ❗ si futur → considérer comme 0 jour (évite bugs noirs)
+  // Une horloge source légèrement en avance ne doit pas masquer un MU récent.
   const safeDays = Math.max(0, days);
 
-  // ❌ plus de 7 jours → on cache
+  // Les MU âgés de plus de sept jours ne sont plus considérés comme fiables.
   if (safeDays > 7) return null;
 
-  // ⚫ 0 à 1 jour → noir
+  // Un MU de moins d'un jour conserve la couleur la plus lisible.
   if (safeDays <= 1) return "#000000";
 
-  // 🎨 dégradé 1 → 8 jours
+  // Le dégradé signale progressivement l'ancienneté jusqu'à expiration.
   const ratio = (safeDays - 1) / 7;
   const gray = Math.round(ratio * 200);
 
@@ -530,17 +523,16 @@ function getEffectiveMU(muStr) {
 		lastRenderedItems = items;
 		container.innerHTML = '';
 		
-		// ⏳ Affichage loading prioritaire
+		// Pendant le chargement, aucun état vide intermédiaire ne doit apparaître.
 		if (isLoading) {
 			loadingState.style.display = "block";
 
-			// ❌ NE PAS afficher empty pendant loading
 			emptyState.style.display = "none";
 
 			return;
 		}
 		
-		// 📘 Message explicatif si aucune catégorie sélectionnée
+		// L'état initial explique explicitement qu'une catégorie doit être choisie.
 		if (!selectedCategory || items.length === 0) {
 
 			document.getElementById("emptyText").innerHTML = t("empty");
@@ -631,7 +623,7 @@ function getEffectiveMU(muStr) {
 				`;
 			}
 				
-			// 👉 afficher l'icône SEULEMENT si prix + MU existent + MU %
+			// Le calculateur n'est pertinent qu'avec un prix et un MU exploitable.
 			const hasPrice = item.PRIX_UNITAIRE !== "" && item.PRIX_UNITAIRE != null && !isNaN(item.PRIX_UNITAIRE);
 			const hasMU = item.MU !== "" && item.MU != null;
 			const isPercentMU = typeof item.MU === "string" && item.MU.includes("%");
@@ -728,15 +720,14 @@ function openCalculator(event, iconEl, item) {
   const card = iconEl.closest(".card");
   const back = card.querySelector(".card-back");
 
-  // 👉 empêcher le click global de se déclencher
+  // Empêcher le gestionnaire global de refermer immédiatement la carte.
   event.stopPropagation();
 
-  // 👉 fermer ancienne card si différente
+  // Une seule carte peut présenter son calculateur à la fois.
   if (openCard && openCard !== card) {
     openCard.classList.remove("open");
   }
 
-  // 👉 toggle si même card
   if (card === openCard) {
     card.classList.remove("open");
     openCard = null;
@@ -819,13 +810,13 @@ function updateCalc(card, prix, muStr, muLabel = "MU") {
   let sell = tt;
   let muDisplay = "";
 
-  // 🟢 CAS 1 : MU en %
+  // Un MU en pourcentage s'applique à la valeur TT totale.
   if (mu.type === "percent") {
     sell = tt * mu.value;
     muDisplay = `${muLabel}: ${muStr}`;
   }
 
-  // 🟡 CAS 2 : MU en PED (nouveau comportement dynamique)
+  // Un MU en PED s'applique par unité avant multiplication par la quantité.
   else if (mu.type === "ped") {
     const muTotal = qty * mu.value;
     sell = tt + muTotal;
@@ -833,7 +824,7 @@ function updateCalc(card, prix, muStr, muLabel = "MU") {
     muDisplay = `Total ${muLabel}: ${formatMUValue(muTotal)} peds`;
   }
 
-  // 🔴 fallback (normalement jamais utilisé chez toi)
+  // Sans MU exploitable, le prix de vente reste égal au TT.
   else {
     muDisplay = "";
   }
@@ -876,7 +867,7 @@ function closeCalculator(btn) {
   openCard = null;
 }
 	
-	// 🔥 détecte si iframe
+	// Dans une iframe, la page parente fournit déjà sa propre navigation.
 	if (window.self !== window.top) {
 		const logo = document.getElementById("logoLink");
 		if (logo) {

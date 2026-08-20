@@ -1,8 +1,8 @@
 # Migration Google Sheets / GAS vers Cloudflare D1
 
-## État constaté
+## État initial avant migration
 
-- Le front GitHub Pages lit un Apps Script public avec une constante `API_URL`.
+- Le front GitHub Pages lisait uniquement un Apps Script public.
 - `BDD_APP` réserve 3 255 lignes et contient 1 113 articles renseignés.
 - Les prix, images et liens wiki viennent du classeur externe `Referentiel!A:G`.
 - Les quantités viennent de l’inventaire Enzo et sont agrégées selon une liste de conteneurs autorisés.
@@ -36,21 +36,21 @@ Le snapshot SQL reproduit exactement les quantités publiées dans neuf catégor
 trois références `Ferguson's …` deviennent visibles : l’apostrophe casse actuellement la chaîne de la
 formule Google `QUERY`, tandis que SQL utilise une jointure sûre. Cet écart est une correction métier connue.
 
-## Déploiement progressif
+## État du déploiement
 
 1. [x] Tester le schéma, le seed et les endpoints en D1 local.
 2. [x] Créer la base D1 distante et appliquer `migrations/0001_initial.sql`.
 3. [x] Charger le seed privé construit depuis les XLSX.
 4. [x] Déployer le nouveau Worker sans changer le front.
-5. [ ] Comparer les réponses GAS et Worker pour chaque catégorie. Le script
-   `tools/compare-gas-d1.mjs` est prêt, mais GAS renvoie actuellement des 404 intermittentes depuis
-   l’environnement de contrôle.
-6. [x] Ajouter localement au front une bascule `?backend=d1`, GAS restant le secours en lecture. Le frontend
-   publié n'est pas encore modifié.
-7. [x] Créer `ADMIN_TOKEN` et adapter localement les pages d'import : jeton en `sessionStorage`, aucune écriture
+5. [x] Comparer les réponses GAS et Worker pour chaque catégorie avec `tools/compare-gas-d1.mjs` : les neuf
+   catégories correspondent. Huit ont exactement les mêmes articles ; D1 contient les trois références
+   `Ferguson's …` supplémentaires déjà documentées dans `BLUEPRINTS`.
+6. [x] Publier la bascule `?backend=d1`, GAS restant le secours en lecture.
+7. [x] Créer `ADMIN_TOKEN` et adapter les pages d'import : jeton en `sessionStorage`, aucune écriture
    de secours automatique, contrôle authentifié sans mutation réussi.
-8. [ ] Déployer la synchronisation privée, installer les triggers 15/30 minutes et réussir l’audit initial.
-9. [ ] Retirer le secours GAS seulement après validation des imports réels et d’un exercice de retour arrière.
+8. [x] Déployer la synchronisation privée, son contrôle toutes les cinq minutes, l’audit différé à 30 minutes
+   après correction et l’audit quotidien.
+9. [ ] Décider ultérieurement si le secours GAS doit être retiré ; il reste volontairement actif aujourd’hui.
 
 ## Données privées
 

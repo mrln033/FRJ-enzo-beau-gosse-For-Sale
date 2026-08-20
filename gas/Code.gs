@@ -1,4 +1,4 @@
-// Fonction pour afficher la page HTML
+// Point d'entrée GET public : métadonnées du catalogue ou articles d'une catégorie.
 function doGet(e) {
   const action = e.parameter.action;
 

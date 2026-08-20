@@ -196,10 +196,8 @@ if (!currentLang) {
 function setLanguage(lang) {
 	currentLang = lang;
 
-	// sauvegarde
 	localStorage.setItem("lang", lang);
 
-	// mise à jour UI
 	updateLanguageButtons();
 	applyTranslations();
 	renderCards(lastRenderedItems);

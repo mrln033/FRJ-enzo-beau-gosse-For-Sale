@@ -10,7 +10,7 @@ Je tiens à garder une trace de tout ce qu'on a fait sur ce projet.
 -------------------------------
 DEMANDES  => CE QUI EST A FAIRE
 
-d.3/ je ne m'y retrouve pas dans le dossier du projet !!! Peux-tu le ranger lisiblement stp. Egalement, peux-tu commenter clairement le code ?
+d.3/ [TERMINE LE 20/08/2026] je ne m'y retrouve pas dans le dossier du projet !!! Peux-tu le ranger lisiblement stp. Egalement, peux-tu commenter clairement le code ?
 J'aimerais aussi que les fichier HTML dans GitHub ne contiennent pas ou peu de javascript : crée des fichier .js pour les mettre dedans avec : nom identique au fichier html pour les fonctions dédiées au fichier. Si des fonctions sont partagées et mutualisées, met les dans un fichier commun.
 Le but est clairement de pouvoir utiliser le coté D1 de façon complètement autonome, sans dépendre de GAS.... Quant à GAS, il pourrait utiliser les fichiers déployés sur GitHub (puisque c'est aussi sa porte d'entrée), et donc pouvoir également être autonome en cas de défaillance de D1.
 
@@ -63,6 +63,9 @@ Dans un premier temps, effectue ces changements/modifications du coté D1 seulem
 
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
+
+20/08/2026 = Avancement d.3 — étape d.3.9 : revue finale de la documentation et des commentaires ; clôture de d.3.
+Réalisation : audit des README, du guide de migration, de l'architecture, des chemins documentés et des commentaires du frontend et de GAS. Les mentions d'un frontend non publié et d'une arborescence encore à construire sont retirées. Le guide de migration reflète désormais la bascule D1 publiée, la synchronisation déployée et la comparaison réelle des neuf catégories : huit sont strictement identiques et BLUEPRINTS conserve les trois références supplémentaires déjà documentées côté D1. Création de 'gas/README.md' avec l'organisation des modules, les propriétés secrètes à ne pas versionner et la procédure clasp sûre qui clone et compare avant tout remplacement distant. Les commentaires décoratifs, purement syntaxiques ou ambigus des imports, du catalogue GAS et du catalogue frontend sont supprimés ou remplacés par les raisons métier, de compatibilité ou de quota. Trois tests documentaires vérifient les liens locaux, la présence des neuf étapes d.3 terminées et l'absence des anciens états de migration. La suite complète compte 90 tests réussis. La demande d.3 est clôturée ; les demandes suivantes restent indépendantes.
 
 20/08/2026 = Correctif post-d.3.8 — route GAS 'categories' du projet autonome.
 Réalisation : remplacement de 'SpreadsheetApp.getActiveSpreadsheet()', qui retourne 'null' dans cette Web App autonome, par l'ouverture explicite du classeur BDD_APP avec 'SpreadsheetApp.openById()'. L'identifiant déjà utilisé par la lecture détaillée du catalogue est centralisé dans 'FRJ_APP_SPREADSHEET_ID' au début de 'gas/Catalog.gs'. Un test de non-régression interdit le retour à un classeur actif implicite et vérifie l'ouverture explicite dans 'getAvailableCategories'.

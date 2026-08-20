@@ -13,14 +13,14 @@ function processMU(csv) {
 
   const now = new Date();
 
-  // 🔎 index CSV
+  // Résoudre les colonnes par leur nom rend l'import indépendant de leur position.
   const colIndex = {};
   headers.forEach((h, i) => colIndex[h.trim()] = i);
 
-  // 🔥 map items existants
+  // Indexer les articles existants évite une recherche complète pour chaque ligne importée.
   const itemMap = {};
 
-  // 🔥 liste des lignes libres (col B vide)
+  // Réutiliser les lignes libres préserve les formules et la structure de la feuille.
   const freeRows = [];
 
   for (let i = 1; i < sheetData.length; i++) {
@@ -58,13 +58,13 @@ function processMU(csv) {
       row[colIndex["Decade Sales"]],
     ];
 
-    // ✅ UPDATE
+    // Un article connu remplace sa ligne actuelle.
     if (itemMap[item]) {
       sheet.getRange(itemMap[item], 1, 1, newRow.length).setValues([newRow]);
       updates++;
     }
 
-    // ✅ INSERT dans une ligne libre EXISTANTE
+    // Un nouvel article utilise la première ligne libre existante.
     else {
 
       if (freeRows.length === 0) {
@@ -108,7 +108,7 @@ function processInventory(csv, avatar) {
   const numRows = data.length;
   const numCols = data[0].length;
 
-  // 🔥 resize sheet si besoin (évite erreurs silencieuses)
+  // Agrandir avant l'écriture évite une troncature lorsque l'import dépasse la feuille.
   if (sheet.getMaxRows() < numRows) {
     sheet.insertRowsAfter(sheet.getMaxRows(), numRows - sheet.getMaxRows());
   }
@@ -117,13 +117,13 @@ function processInventory(csv, avatar) {
     sheet.insertColumnsAfter(sheet.getMaxColumns(), numCols - sheet.getMaxColumns());
   }
 
-  // 🔥 clear uniquement zone utile (plus rapide que clear total)
+  // Effacer seulement les cellules de données conserve le format de la feuille.
   sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns()).clearContent();
 
-  // 🔥 batch write
+  // Écrire le tableau complet en une opération limite les appels Google Sheets.
   sheet.getRange(1, 1, numRows, numCols).setValues(data);
 
-  // 🔥 date formatée en B1
+  // B1 porte la date de référence affichée par la route inventoryDate.
   const cell = sheet.getRange("B1");
   cell.setValue(new Date());
   cell.setNumberFormat("dd/MM/yyyy - HH:mm:ss");

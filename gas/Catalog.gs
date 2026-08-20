@@ -1,6 +1,6 @@
 var FRJ_APP_SPREADSHEET_ID = "13r_PzIZE8dJiPFU8w7UXxtEednHhS-yijNgTiYLqYP0";
 
-// Fonction pour récupérer les données de la table BDD_APP
+// Lit BDD_APP en un seul lot, puis normalise les lignes exposées par l'API.
 function getBDDAppData(category = null) {
   const sheet = SpreadsheetApp.openById(FRJ_APP_SPREADSHEET_ID).getSheetByName("BDD_APP");
   if (!sheet) return [];
@@ -10,12 +10,12 @@ function getBDDAppData(category = null) {
 
   if (lastRow < 2) return [];
 
-  // 🔥 lecture en 1 seule fois
+  // Une lecture groupée limite les appels et les quotas Google Sheets.
   const data = sheet.getRange(1, 1, lastRow, lastCol).getValues();
 
   const headers = data[0];
 
-  // 🔥 index colonnes (ultra rapide)
+  // Les positions viennent des en-têtes afin de tolérer leur ordre dans la feuille.
   const idx = {};
   headers.forEach((h, i) => idx[h] = i);
 
@@ -35,7 +35,7 @@ function getBDDAppData(category = null) {
 
     const obj = {};
 
-    // 🔥 copie rapide (moins de logique)
+    // Conserver les colonnes source permet au frontend d'utiliser le même contrat historique.
     for (let j = 0; j < headers.length; j++) {
       let val = row[j];
 

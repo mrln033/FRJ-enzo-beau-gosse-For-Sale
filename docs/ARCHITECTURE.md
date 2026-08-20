@@ -29,7 +29,7 @@ Le booléen de session ne donne aucun droit supplémentaire. Les routes D1 `/adm
 
 `gas/SyncD1.gs` et les routes `/sync/*` du Worker échangent catalogue, MU, inventaires et demandes. Les détails opérationnels sont documentés dans `cloudflare/for-sale-api/README.md`.
 
-## Arborescence frontend cible
+## Organisation du frontend
 
 ```text
 js/
@@ -38,7 +38,7 @@ js/
 └── pages/        un fichier JavaScript par page HTML
 ```
 
-Cette arborescence sera mise en place progressivement. Les chemins actuels restent valides tant que la page concernée n'a pas été migrée et testée.
+Cette arborescence est en place. Les chemins des pages publiques restent stables pour préserver les liens clients, Discord et les favoris.
 
 ## Ordre de migration d.3
 
@@ -50,7 +50,7 @@ Cette arborescence sera mise en place progressivement. Les chemins actuels reste
 6. Rangement des feuilles de style. **Terminé (d.3.6).**
 7. Découpage interne du Worker D1, sans modifier son URL ni ses contrats HTTP. **Terminé (d.3.7).**
 8. Découpage des fichiers GAS, sans modifier `doGet` et `doPost`. **Terminé (d.3.8).**
-9. Revue finale de la documentation et des commentaires.
+9. Revue finale de la documentation et des commentaires. **Terminé (d.3.9).**
 
 Les pages d'import chargent désormais leur contrôleur homonyme depuis `js/pages/`.
 Le rendu partagé des bilans GAS/D1 se trouve dans `js/common/import-feedback.js`.

@@ -20,7 +20,7 @@ Les noms et emplacements de ces pages restent stables, car certains liens sont e
 - `js/` : code frontend partagé et scripts des pages.
 - `css/` : styles partagés, composants et feuilles propres aux pages.
 - `img/` : images publiques du catalogue ; conserver ce chemin stable.
-- `gas/` : backend et synchronisation Google Apps Script, rangés par catalogue, imports, demandes et synchronisation.
+- `gas/` : backend et synchronisation Google Apps Script, rangés par catalogue, imports, demandes et synchronisation ; voir son [guide de déploiement](gas/README.md).
 - `cloudflare/for-sale-api/` : Worker Cloudflare, schéma D1, tests et outils.
 - `docs/` : documentation fonctionnelle et technique.
 - `archive/legacy/` : anciennes copies conservées à titre historique, non utilisées par le site.
