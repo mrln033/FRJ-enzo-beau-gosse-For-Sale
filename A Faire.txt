@@ -64,6 +64,9 @@ Dans un premier temps, effectue ces changements/modifications du coté D1 seulem
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
 
+20/08/2026 = Avancement d.3 — étape d.3.3 : extraction du rapport de synchronisation.
+Réalisation : retrait de tout JavaScript intégré dans 'rapport-sync.html' et création de son contrôleur homonyme 'js/pages/rapport-sync.js'. Les comportements existants sont conservés : chargement protégé du rapport D1, rendu du résumé, des concordances GAS/D1 et des événements, audit immédiat, oubli du jeton, gestion des erreurs et actualisation automatique toutes les cinq minutes lorsque l'onglet est visible. Les commentaires précisent les choix importants, notamment l'affichage sécurisé des données d'audit avec 'textContent' et la suspension du minuteur en arrière-plan. Des tests vérifient la séparation HTML/JavaScript, le rendu du rapport, l'audit immédiat et le traitement des erreurs. La demande d.3 reste ouverte pour les extractions suivantes.
+
 20/08/2026 = Avancement d.3 — étape d.3.2 : extraction des scripts des pages d'import.
 Réalisation : retrait de tout JavaScript intégré dans 'maj_mu.html' et 'maj_inventaire-enzo.html'. Les contrôleurs des deux pages portent désormais le nom de leur page et se trouvent dans 'js/pages/'. Le formatage identique des bilans d'import GAS/D1 a été mutualisé dans 'js/common/import-feedback.js', afin d'éviter le doublon existant. Les gestionnaires de clic sont attachés depuis les scripts plutôt que par des attributs HTML. Les contrôles métier existants sont conservés : choix obligatoire de l'inventaire, vérification de la feuille ciblée par GAS, import indépendant vers GAS et D1, conservation du CSV en cas d'échec et remise à zéro après succès. Des tests couvrent la sélection d'inventaire et les différents bilans d'import. La demande d.3 reste ouverte pour les extractions suivantes.
 
