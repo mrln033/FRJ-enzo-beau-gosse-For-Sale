@@ -84,6 +84,7 @@ gas/
 ```
 
 Ce rangement ne change aucune fonction publique appelée par le frontend ou par les déclencheurs déjà installés.
+Il est publié dans le projet Apps Script de production sur la version 14 du déploiement Web App existant ; l'URL `/exec` reste inchangée.
 
 ## Organisation des styles
 
