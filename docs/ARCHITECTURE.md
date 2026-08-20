@@ -49,7 +49,7 @@ Cette arborescence sera mise en place progressivement. Les chemins actuels reste
 5. Extraction du catalogue principal. **Terminé (d.3.5).**
 6. Rangement des feuilles de style. **Terminé (d.3.6).**
 7. Découpage interne du Worker D1, sans modifier son URL ni ses contrats HTTP. **Terminé (d.3.7).**
-8. Découpage des fichiers GAS, sans modifier `doGet` et `doPost`.
+8. Découpage des fichiers GAS, sans modifier `doGet` et `doPost`. **Terminé (d.3.8).**
 9. Revue finale de la documentation et des commentaires.
 
 Les pages d'import chargent désormais leur contrôleur homonyme depuis `js/pages/`.
@@ -64,6 +64,26 @@ Le catalogue conserve `index.html` comme point d'entrée stable et charge sa log
 Le point d'entrée Cloudflare reste `cloudflare/for-sale-api/src/index.js`. Il se limite désormais au routage HTTP, à l'authentification, au contrôle des origines et à la conversion uniforme des erreurs.
 
 Les traitements applicatifs sont regroupés dans `application.js`. La configuration statique et les limites sont centralisées dans `config.js`, tandis que `http.js` porte les réponses, CORS, lecture bornée des corps, empreintes et comparaisons de jetons. Les modules métier existants `domain.js`, `orders.js`, `sync.js` et `discord.js` restent indépendants. Cette séparation ne change ni le nom du Worker, ni ses routes, ni ses formats de réponse.
+
+## Organisation du backend GAS
+
+Les points d'entrée restent stables : `doGet` et le répartiteur `frjMainDoPost_` sont dans `Code.gs`, tandis que `doPost` reste dans `WebApp.gs`. Apps Script charge tous les fichiers `.gs` du projet dans le même espace global.
+
+```text
+gas/
+├── Code.gs             entrées HTTP GAS
+├── Catalog.gs          lecture du catalogue et des catégories
+├── Imports.gs          imports MU et inventaires
+├── PurchaseOrders.gs   demandes, miroir et publication Discord
+├── SyncD1.gs           configuration, installation et déclencheurs
+├── SyncEngine.gs       planification, audit, fusion et orchestration
+├── SyncOrders.gs       transfert des demandes GAS ↔ D1
+├── SyncSheets.gs       lecture, écriture et empreintes des feuilles
+├── SyncTransport.gs    appels D1, jeton et utilitaires communs
+└── WebApp.gs           point d'entrée `doPost`
+```
+
+Ce rangement ne change aucune fonction publique appelée par le frontend ou par les déclencheurs déjà installés.
 
 ## Organisation des styles
 

@@ -43,7 +43,15 @@ const context = {
   }
 };
 vm.createContext(context);
-vm.runInContext(fs.readFileSync(new URL("../gas/SyncD1.gs", import.meta.url), "utf8"), context);
+[
+  "SyncD1.gs",
+  "SyncOrders.gs",
+  "SyncEngine.gs",
+  "SyncSheets.gs",
+  "SyncTransport.gs"
+].forEach((fileName) => {
+  vm.runInContext(fs.readFileSync(new URL(`../gas/${fileName}`, import.meta.url), "utf8"), context);
+});
 
 test("GAS et Worker calculent la même empreinte d'inventaire", async () => {
   const rows = [{
