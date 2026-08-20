@@ -1,3 +1,4 @@
+/* Panier, liste locale des demandes et aide intégrée. */
 .cart-launcher {
   position: fixed;
   top: 42px;
@@ -250,3 +251,4 @@
   .cart-help-options { grid-template-columns: 1fr; }
   .cart-help-statuses li { grid-template-columns: 1fr; gap: 2px; }
 }
+

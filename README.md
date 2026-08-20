@@ -18,6 +18,7 @@ Les noms et emplacements de ces pages restent stables, car certains liens sont e
 ## Organisation
 
 - `js/` : code frontend partagé et scripts des pages.
+- `css/` : styles partagés, composants et feuilles propres aux pages.
 - `img/` : images publiques du catalogue ; conserver ce chemin stable.
 - `gas/` : backend et synchronisation Google Apps Script.
 - `cloudflare/for-sale-api/` : Worker Cloudflare, schéma D1, tests et outils.

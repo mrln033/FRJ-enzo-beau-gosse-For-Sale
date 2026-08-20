@@ -1,3 +1,4 @@
+/* Styles partagés du catalogue et de la navigation Admin. */
 /* =========================
    GLOBAL
 ========================= */
@@ -712,3 +713,4 @@ html[data-frj-backend="d1"] .backend-status-dot {
     text-align: center;
   }
 }
+

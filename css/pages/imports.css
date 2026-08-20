@@ -1,0 +1,39 @@
+/* Pages administrateur d'import MU et inventaires. */
+body {
+		font-family: Arial;
+		padding: 20px;
+		background: #f5f5f5;
+	}
+
+	textarea {
+		width: 97%;
+		height: 350px;
+		font-family: monospace;
+		padding: 10px;
+	}
+
+	button {
+		margin-top: 10px;
+		padding: 10px 20px;
+		cursor: pointer;
+	}
+
+	.nav-admin {
+		position: static;
+		flex-wrap: wrap;
+		justify-content: center;
+		margin-bottom: 20px;
+	}
+
+	.nav-admin a {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		text-align: center;
+	}
+
+	.nav-admin .inventory-link {
+		display: block;
+		line-height: 1.25;
+	}
+

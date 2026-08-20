@@ -5,53 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <base target="_self">
   <link rel="icon" href="./favicon.ico">
-  <link rel="stylesheet" href="./style.css?v=20260814-6">
+  <link rel="stylesheet" href="./css/site.css?v=20260820-1">
   <script src="./js/admin-session.js?v=20260820-1"></script>
   <script src="./js/api-client.js?v=20260814-6"></script>
   <script defer src="./js/common/order-ui.js?v=20260820-1"></script>
   <script defer src="./js/admin-menu.js?v=20260820-1"></script>
   <script defer src="./js/pages/commandes.js?v=20260820-1"></script>
   <title>[FRJ] — Demandes d'achat</title>
-  <style>
-    body { max-width: 1250px; margin: 0 auto; padding: 78px 18px 40px; box-sizing: border-box; }
-    .orders-header { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
-    .orders-header button { padding: 8px 13px; cursor: pointer; }
-    .orders-summary { margin: 8px 0 20px; color: #5e5547; }
-    .orders-filters { display: flex; flex-wrap: wrap; gap: 7px 13px; margin: 8px 0 4px; padding: 10px 12px; border: 1px solid #d3c9b8; border-radius: 8px; background: rgba(255,253,247,.72); }
-    .orders-filters-label { flex-basis: 100%; color: #5e5547; font-size: .82rem; font-weight: 700; }
-    .orders-filter { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; font-size: .9rem; white-space: nowrap; }
-    .orders-filter input { margin: 0; }
-    .orders-list { display: grid; gap: 14px; }
-    .order-card { padding: 15px; border: 1px solid #c9bfae; border-radius: 9px; background: #fffdf7; box-shadow: 0 2px 7px rgba(0,0,0,.08); }
-    .order-card.awaiting-approval { border-color: #8b5cf6; box-shadow: 0 0 0 2px rgba(139,92,246,.12); }
-    .order-card header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
-    .order-card h2 { margin: 0 0 4px; font-size: 1.05rem; }
-    .order-meta { display: flex; flex-wrap: wrap; gap: 7px 15px; font-size: .88rem; color: #675e51; }
-    .order-card table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-    .order-card th, .order-card td { padding: 6px; border-bottom: 1px solid #e2dbcf; text-align: left; }
-    .order-card th:not(:first-child), .order-card td:not(:first-child) { text-align: right; }
-    .order-card tr.is-dirty td { background: #faf7ff; }
-    .order-total { margin: 10px 0 0; text-align: right; font-size: 1.05rem; }
-    .order-comment { margin: 10px 0 0; padding: 8px; background: #f1ece3; white-space: pre-wrap; }
-    .order-status { padding: 6px; border-radius: 5px; }
-    .line-editor { white-space: nowrap; }
-    .line-editor > * + * { margin-left: 5px; }
-    .line-editor input { width: 78px; padding: 5px; }
-    .line-editor select, .line-editor button { padding: 5px; }
-    .line-editor .markup-amount { width: 72px; }
-    .approval-hint { margin: 10px 0 0; padding: 8px 10px; border-radius: 6px; color: #563a87; background: #eee7ff; font-weight: 700; }
-    .order-save-row { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 12px; }
-    .order-save-row button { padding: 8px 13px; border: 1px solid #735117; border-radius: 6px; background: #d5aa54; cursor: pointer; font-weight: 800; }
-    .order-save-row button:disabled { opacity: .5; cursor: default; }
-    .order-dirty { color: #7045b2; font-size: .85rem; font-weight: 700; }
-    .order-save-row.is-locked { color: #756c60; font-size: .88rem; }
-    .orders-error { color: #a02323; white-space: pre-line; }
-    @media (max-width: 650px) {
-      body { padding-top: 125px; }
-      .order-card { overflow-x: auto; }
-      .orders-header { align-items: flex-start; }
-    }
-  </style>
+  <link rel="stylesheet" href="./css/pages/commandes.css?v=20260820-1">
 </head>
 <body>
   <section class="orders-header">

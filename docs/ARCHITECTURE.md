@@ -47,7 +47,7 @@ Cette arborescence sera mise en place progressivement. Les chemins actuels reste
 3. Extraction du rapport de synchronisation. **Terminé (d.3.3).**
 4. Extraction et mutualisation de la console des demandes et du suivi client. **Terminé (d.3.4).**
 5. Extraction du catalogue principal. **Terminé (d.3.5).**
-6. Rangement des feuilles de style.
+6. Rangement des feuilles de style. **Terminé (d.3.6).**
 7. Découpage interne du Worker D1, sans modifier son URL ni ses contrats HTTP.
 8. Découpage des fichiers GAS, sans modifier `doGet` et `doPost`.
 9. Revue finale de la documentation et des commentaires.
@@ -58,3 +58,19 @@ Le contrôleur du rapport D1 se trouve dans `js/pages/rapport-sync.js` ; la page
 Les contrôleurs des demandes sont `js/pages/commandes.js` et `js/pages/suivi-commande.js`.
 Leurs statuts, règles d'action et formats communs sont centralisés dans `js/common/order-ui.js` ; leurs textes et parcours propres restent séparés.
 Le catalogue conserve `index.html` comme point d'entrée stable et charge sa logique depuis `js/pages/index.js`, avant le composant panier.
+
+## Organisation des styles
+
+```text
+css/
+├── site.css             base partagée et navigation Admin
+├── components/
+│   └── cart.css         panier et aide
+└── pages/
+    ├── commandes.css
+    ├── imports.css
+    ├── suivi-commande.css
+    └── sync-report.css
+```
+
+Les pages HTML ne contiennent plus de bloc `<style>`. Chaque référence utilise un chemin relatif depuis la racine du site.
