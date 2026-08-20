@@ -42,8 +42,8 @@ Cette arborescence sera mise en place progressivement. Les chemins actuels reste
 
 ## Ordre de migration d.3
 
-1. Rangement documentaire et suppression des copies inutilisées.
-2. Extraction des scripts des pages d'import.
+1. Rangement documentaire et suppression des copies inutilisées. **Terminé (d.3.1).**
+2. Extraction des scripts des pages d'import. **Terminé (d.3.2).**
 3. Extraction du rapport de synchronisation.
 4. Extraction et mutualisation de la console des demandes et du suivi client.
 5. Extraction du catalogue principal.
@@ -51,3 +51,6 @@ Cette arborescence sera mise en place progressivement. Les chemins actuels reste
 7. Découpage interne du Worker D1, sans modifier son URL ni ses contrats HTTP.
 8. Découpage des fichiers GAS, sans modifier `doGet` et `doPost`.
 9. Revue finale de la documentation et des commentaires.
+
+Les pages d'import chargent désormais leur contrôleur homonyme depuis `js/pages/`.
+Le rendu partagé des bilans GAS/D1 se trouve dans `js/common/import-feedback.js`.

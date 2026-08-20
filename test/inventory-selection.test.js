@@ -3,10 +3,10 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
 
-const html = await readFile(new URL("../maj_inventaire-enzo.html", import.meta.url), "utf8");
-const script = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)]
-  .map((match) => match[1])
-  .find((source) => source.includes("renderInventorySelection"));
+const script = await readFile(
+  new URL("../js/pages/maj_inventaire-enzo.js", import.meta.url),
+  "utf8"
+);
 
 function loadPage(search) {
   const elements = new Map();
@@ -24,12 +24,31 @@ function loadPage(search) {
     return link;
   });
   for (const id of ["title", "subtitle", "csvInput", "sendButton"]) {
-    elements.set(id, { id, innerText: "", placeholder: "", value: "", disabled: false });
+    const listeners = new Map();
+    elements.set(id, {
+      id,
+      innerText: "",
+      placeholder: "",
+      value: "",
+      disabled: false,
+      addEventListener: (type, listener) => listeners.set(type, listener),
+      listeners
+    });
   }
 
   let replacedUrl = "";
+  const api = {
+    importToBoth: async () => ({
+      ok: true,
+      partial: false,
+      results: [{ backend: "gas", ok: true, message: "Import terminé" }]
+    }),
+    fetchGas: async () => new Response(JSON.stringify({}))
+  };
   const window = {
     FRJ_ADMIN: { active: true, require: () => true },
+    FRJ_API: api,
+    FRJ_IMPORTS: { formatOutcome: () => "Import terminé" },
     location: {
       search,
       href: `https://example.test/maj_inventaire-enzo.html${search}`
@@ -48,8 +67,7 @@ function loadPage(search) {
     document,
     URL,
     URLSearchParams,
-    alert: () => {},
-    FRJ_API: {}
+    alert: () => {}
   });
   vm.runInContext(script, context);
   return { context, document, elements, inventoryLinks, get replacedUrl() { return replacedUrl; } };
@@ -69,10 +87,12 @@ test("un avatar explicite sélectionne uniquement son bouton", () => {
   assert.equal(page.elements.get("btnINV-enzo").classList.contains("active"), false);
 });
 
-test("la remise à zéro retire l'avatar, la sélection et désactive l'envoi", () => {
+test("un import réussi retire l'avatar, la sélection et désactive l'envoi", async () => {
   const page = loadPage("?avatar=enzo");
-  vm.runInContext("resetInventorySelection()", page.context);
+  page.elements.get("csvInput").value = "csv valide";
+  await page.elements.get("sendButton").listeners.get("click")();
   assert.equal(page.replacedUrl, "/maj_inventaire-enzo.html");
+  assert.equal(page.elements.get("csvInput").value, "");
   assert.equal(page.elements.get("sendButton").disabled, true);
   assert.equal(page.inventoryLinks.some((link) => link.classList.contains("active")), false);
 });

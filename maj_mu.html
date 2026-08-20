@@ -7,7 +7,9 @@
 	<link rel="stylesheet" href="./maj_css.css?v=20260718-1">
 	<script src="./js/admin-session.js?v=20260820-1"></script>
 	<script src="./js/api-client.js?v=20260814-1"></script>
+	<script defer src="./js/common/import-feedback.js?v=20260820-1"></script>
 	<script defer src="./js/admin-menu.js?v=20260820-1"></script>
+	<script defer src="./js/pages/maj_mu.js?v=20260820-1"></script>
 	<meta charset="UTF-8">
 	<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 	<meta http-equiv="Pragma" content="no-cache">
@@ -31,68 +33,6 @@
 
 <textarea id="csvInput" placeholder="Colle ton CSV ici..."></textarea>
 <br>
-<button id="sendButton" onclick="sendData()">Envoi</button>
-
-<script>
-  // 🔐 Vérification admin
-  window.FRJ_ADMIN.require();
-
-
-
-async function sendData() {
-  const btn = document.getElementById("sendButton");
-  const csv = document.getElementById("csvInput").value;
-
-  if (!csv.trim()) {
-    alert("Vide !");
-    return;
-  }
-
-  btn.disabled = true;
-  btn.innerText = "Envoi en cours...";
-
-  try {
-    const outcome = await FRJ_API.importToBoth("?type=mu", {
-      method: "POST",
-      body: csv
-    }, {
-      dataset: "mu"
-    });
-    alert(formatImportOutcome(outcome));
-    if (outcome.ok) document.getElementById("csvInput").value = "";
-  } catch (err) {
-    alert("❌ " + err);
-  } finally {
-    btn.disabled = false;
-    btn.innerText = "Envoi";
-  }
-}
-
-function formatImportOutcome(outcome) {
-  const lines = outcome.results.map((result) => {
-    const label = result.backend === "gas" ? "GAS" : "D1";
-    const warning = result.warning ? `\n   ⚠️ ${result.warning}` : "";
-    return `${result.ok ? "✅" : "❌"} ${label} : ${result.message}${warning}`;
-  });
-  if (outcome.partial) {
-    lines.unshift("⚠️ Import partiel : la base disponible a été mise à jour.");
-    lines.push("La synchronisation contrôlera et réparera l'autre base dès qu'elle sera accessible.");
-  } else if (!outcome.ok) {
-    lines.unshift("❌ L'import a échoué sur les deux bases. Le CSV est conservé.");
-  }
-  return lines.join("\n");
-}
-
-</script>
-<script>
-  const path = window.location.pathname;
-
-  if (path.includes("maj_mu")) {
-    document.getElementById("btnMU").classList.add("active");
-  }
-
-  document.getElementById("subtitle").innerText += " — GAS + D1";
-
-</script>
+<button id="sendButton" type="button">Envoi</button>
 </body>
 </html>

@@ -7,7 +7,9 @@
 	<link rel="stylesheet" href="./maj_css.css?v=20260718-1">
 	<script src="./js/admin-session.js?v=20260820-1"></script>
 	<script src="./js/api-client.js?v=20260814-1"></script>
+	<script defer src="./js/common/import-feedback.js?v=20260820-1"></script>
 	<script defer src="./js/admin-menu.js?v=20260820-1"></script>
+	<script defer src="./js/pages/maj_inventaire-enzo.js?v=20260820-1"></script>
 	<meta charset="UTF-8">
 	<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 	<meta http-equiv="Pragma" content="no-cache">
@@ -30,126 +32,6 @@
 
 <textarea id="csvInput"></textarea>
 <br>
-<button id="sendButton" onclick="sendData()" disabled>Envoi</button>
-
-<script>
-  // 🔐 Vérification admin
-  window.FRJ_ADMIN.require();
-
-  const params = new URLSearchParams(window.location.search);
-
-  const inventories = {
-    enzo: { name: "enzo beau gosse", sheet: "Inventaire Enzo" },
-    arkaman: { name: "FRJ enzo ArkaMan", sheet: "Inventaire ArkaMan" },
-    kenza: { name: "kenza la belle", sheet: "Inventaire Kenza" },
-    nocturnal: { name: "Nocturnal enzo FRJ", sheet: "Inventaire Nocturnal" }
-  };
-
-  const requestedAvatar = params.get("avatar");
-  let avatar = Object.prototype.hasOwnProperty.call(inventories, requestedAvatar)
-    ? requestedAvatar
-    : null;
-  let avatarConfig = avatar ? inventories[avatar] : null;
-
-  renderInventorySelection();
-
-
-async function sendData() {
-  const btn = document.getElementById("sendButton");
-  const csv = document.getElementById("csvInput").value;
-
-  if (!avatar || !avatarConfig) {
-    alert("Choisis d'abord l'inventaire à mettre à jour.");
-    return;
-  }
-
-  if (!csv.trim()) {
-    alert("Vide !");
-    return;
-  }
-
-  btn.disabled = true;
-  btn.innerText = "Envoi en cours...";
-
-  try {
-    const cacheBust = Date.now();
-    const outcome = await FRJ_API.importToBoth(`?type=inventory&avatar=${encodeURIComponent(avatar)}&_=${cacheBust}`, {
-      method: "POST",
-      cache: "no-store",
-      body: csv
-    }, {
-      dataset: `inventory:${avatar}`,
-      beforeGas: async () => {
-        // Vérifie uniquement GAS : un échec de ce contrôle ne doit pas empêcher l'import D1.
-        const targetResponse = await FRJ_API.fetchGas(`?action=inventoryTarget&avatar=${encodeURIComponent(avatar)}&_=${cacheBust}`, {
-          cache: "no-store"
-        });
-        const target = await targetResponse.json();
-        if (target.avatar !== avatar || target.sheet !== avatarConfig.sheet) {
-          throw new Error(`Le script Google Apps Script ne cible pas ${avatarConfig.sheet}.`);
-        }
-      }
-    });
-    alert(formatImportOutcome(outcome));
-    if (outcome.ok) {
-      document.getElementById("csvInput").value = "";
-      resetInventorySelection();
-    }
-  } catch (err) {
-    alert("❌ " + err);
-  } finally {
-    btn.disabled = !avatar;
-    btn.innerText = "Envoi";
-  }
-}
-
-function renderInventorySelection() {
-  document.querySelectorAll(".inventory-link").forEach((link) => link.classList.remove("active"));
-  const textarea = document.getElementById("csvInput");
-  const btn = document.getElementById("sendButton");
-
-  if (!avatar || !avatarConfig) {
-    document.title = "MAJ Inventaire — choix requis";
-    document.getElementById("title").innerText = "Choisis l'inventaire à mettre à jour";
-    document.getElementById("subtitle").innerText = "Aucun inventaire sélectionné — GAS + D1";
-    textarea.placeholder = "Sélectionne d'abord l'un des quatre inventaires ci-dessus...";
-    btn.disabled = true;
-    return;
-  }
-
-  const avatarName = avatarConfig.name;
-  document.title = `MAJ Inventaire ${avatarName}`;
-  document.getElementById("title").innerText = `[${avatarName}] = A VENDRE`;
-  document.getElementById("subtitle").innerText = `MAJ Inventaire ${avatarName} (Admin) — GAS + D1`;
-  textarea.placeholder = `Colle ici le CSV de l'inventaire de : [${avatarName}] uniquement, issu du site de MA, non groupé par container...`;
-  document.getElementById(`btnINV-${avatar}`).classList.add("active");
-  btn.disabled = false;
-}
-
-function resetInventorySelection() {
-  avatar = null;
-  avatarConfig = null;
-  const url = new URL(window.location.href);
-  url.searchParams.delete("avatar");
-  window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
-  renderInventorySelection();
-}
-
-function formatImportOutcome(outcome) {
-  const lines = outcome.results.map((result) => {
-    const label = result.backend === "gas" ? "GAS" : "D1";
-    const warning = result.warning ? `\n   ⚠️ ${result.warning}` : "";
-    return `${result.ok ? "✅" : "❌"} ${label} : ${result.message}${warning}`;
-  });
-  if (outcome.partial) {
-    lines.unshift("⚠️ Import partiel : la base disponible a été mise à jour.");
-    lines.push("La synchronisation contrôlera et réparera l'autre base dès qu'elle sera accessible.");
-  } else if (!outcome.ok) {
-    lines.unshift("❌ L'import a échoué sur les deux bases. Le CSV est conservé.");
-  }
-  return lines.join("\n");
-}
-
-</script>
+<button id="sendButton" type="button" disabled>Envoi</button>
 </body>
 </html>
