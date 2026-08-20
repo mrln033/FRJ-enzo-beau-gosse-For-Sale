@@ -84,7 +84,7 @@ gas/
 ```
 
 Ce rangement ne change aucune fonction publique appelée par le frontend ou par les déclencheurs déjà installés.
-Il est publié dans le projet Apps Script de production sur la version 15 du déploiement Web App existant ; l'URL `/exec` reste inchangée.
+Il est publié dans le projet Apps Script de production sur la version 16 du déploiement Web App existant ; l'URL `/exec` reste inchangée.
 Comme ce projet GAS est autonome, les routes de catalogue ouvrent explicitement le classeur BDD_APP par son identifiant et ne dépendent pas de `SpreadsheetApp.getActiveSpreadsheet()`.
 
 ## Organisation des styles
