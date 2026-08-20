@@ -46,3 +46,8 @@ test("les points d'entrée GAS restent dans leurs fichiers stables", () => {
   assert.equal(Object.values(sources).join("\n").match(/^function doGet\(e\)/gm)?.length, 1);
   assert.equal(Object.values(sources).join("\n").match(/^function doPost\(e\)/gm)?.length, 1);
 });
+
+test("la route des catégories ouvre explicitement le classeur BDD_APP", () => {
+  assert.doesNotMatch(sources["Catalog.gs"], /SpreadsheetApp\.getActiveSpreadsheet\(\)/);
+  assert.match(sources["Catalog.gs"], /function getAvailableCategories\(\)[\s\S]*SpreadsheetApp\.openById\(FRJ_APP_SPREADSHEET_ID\)/);
+});

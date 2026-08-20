@@ -1,6 +1,8 @@
+var FRJ_APP_SPREADSHEET_ID = "13r_PzIZE8dJiPFU8w7UXxtEednHhS-yijNgTiYLqYP0";
+
 // Fonction pour récupérer les données de la table BDD_APP
 function getBDDAppData(category = null) {
-  const sheet = SpreadsheetApp.openById("13r_PzIZE8dJiPFU8w7UXxtEednHhS-yijNgTiYLqYP0").getSheetByName("BDD_APP");
+  const sheet = SpreadsheetApp.openById(FRJ_APP_SPREADSHEET_ID).getSheetByName("BDD_APP");
   if (!sheet) return [];
 
   const lastRow = sheet.getLastRow();
@@ -87,7 +89,8 @@ function getCachedData(category) {
 }
 
 function getAvailableCategories() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  // Une Web App autonome n'a pas de classeur actif : ouvrir explicitement BDD_APP.
+  const ss = SpreadsheetApp.openById(FRJ_APP_SPREADSHEET_ID);
   const sheet = ss.getSheetByName("BDD_APP");
 
   if (!sheet) return [];
