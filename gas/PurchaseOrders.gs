@@ -169,7 +169,9 @@ function normalizePurchaseOrderPayload_(payload) {
         observedMarkupValue: purchaseOptionalNumber_(item.markupValue)
       };
       if (!normalizedItem.itemName || !normalizedItem.storage || !normalizedItem.aisle) throw new Error("Article de panier incomplet");
-      if (!isFinite(quantity) || quantity <= 0 || quantity > 1000000) throw new Error("Quantité invalide pour " + normalizedItem.itemName);
+      if (!Number.isInteger(quantity) || quantity <= 0 || quantity > 1000000) {
+        throw new Error("La quantité de " + normalizedItem.itemName + " doit être entière et positive");
+      }
       return normalizedItem;
     })
   };
@@ -220,11 +222,7 @@ function pricePurchaseOrderFromSheet_(submission) {
     }
     if (submission.frjMember && markup.kind === "percent") markup.value = 1 + ((markup.value - 1) / 2);
     if (submission.frjMember && markup.kind === "ped") markup.value = markup.value / 2;
-    var unitSale = unitTt;
-    if (markup.kind === "percent") unitSale = unitTt * markup.value;
-    if (markup.kind === "ped") unitSale = unitTt + markup.value;
-    var lineTt = purchaseRound_(unitTt * requested.quantity);
-    var lineSale = purchaseRound_(unitSale * requested.quantity);
+    var prices = purchasePriceOrderLine_(unitTt, requested.quantity, markup.kind, markup.value);
     lines.push({
       lineNo: index + 1,
       itemName: String(current.ITEM),
@@ -238,9 +236,9 @@ function pricePurchaseOrderFromSheet_(submission) {
       markupDisplay: markup.kind === "percent"
         ? (markup.value * 100).toFixed(2).replace(".", ",") + " %"
         : (markup.kind === "ped" ? markup.value.toFixed(2).replace(".", ",") + " PED" : null),
-      unitSalePed: purchaseRound_(unitSale),
-      lineTtPed: lineTt,
-      lineSalePed: lineSale,
+      unitSalePed: prices.unitSalePed,
+      lineTtPed: prices.lineTtPed,
+      lineSalePed: prices.lineSalePed,
       priceStatus: markup.kind === "none" ? "to-confirm" : "estimated"
     });
   });
@@ -475,6 +473,17 @@ function purchaseSameNumber_(left, right) {
   return Math.abs(left - right) <= 0.0001;
 }
 
+function purchasePriceOrderLine_(unitTt, quantity, markupKind, markupValue) {
+  var unitSale = unitTt;
+  if (markupKind === "percent") unitSale = unitTt * markupValue;
+  if (markupKind === "ped") unitSale = unitTt + markupValue;
+  return {
+    unitSalePed: purchaseRound_(unitSale, 6),
+    lineTtPed: purchaseRound_(unitTt * quantity),
+    lineSalePed: purchaseRound_(unitSale * quantity)
+  };
+}
+
 function purchaseItemKey_(item, storage, aisle) {
   return [item, storage, aisle].map(function(value) { return String(value || "").trim().toLowerCase(); }).join("\u001f");
 }
@@ -493,8 +502,10 @@ function purchaseIsoDate_(value) {
   return isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-function purchaseRound_(value) {
-  return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+function purchaseRound_(value, decimals) {
+  var precision = decimals === undefined ? 2 : decimals;
+  var factor = Math.pow(10, precision);
+  return Math.round((Number(value) + Number.EPSILON) * factor) / factor;
 }
 
 function purchaseJsonOutput_(data) {

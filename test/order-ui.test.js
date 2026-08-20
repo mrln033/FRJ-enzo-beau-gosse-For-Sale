@@ -32,6 +32,7 @@ test("les formats PED et quantité respectent la langue", () => {
   const ui = loadOrderUi();
   assert.match(ui.formatPed(1234.5, "FR"), /1.234,50/u);
   assert.match(ui.formatPed(1234.5, "EN"), /1,234\.50/);
-  assert.equal(ui.formatQuantity(1.23456, "EN"), "1.2346");
+  assert.equal(ui.formatQuantity(1234, "FR"), "1 234");
+  assert.equal(ui.formatQuantity(1.6, "EN"), "2");
   assert.equal(ui.roundPed(1.005), 1.01);
 });

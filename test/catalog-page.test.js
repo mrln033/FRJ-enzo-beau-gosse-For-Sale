@@ -5,6 +5,7 @@ import vm from "node:vm";
 
 const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
 const source = await readFile(new URL("../js/pages/index.js", import.meta.url), "utf8");
+const cartSource = await readFile(new URL("../js/cart.js", import.meta.url), "utf8");
 const languagesSource = await readFile(new URL("../js/langues.js", import.meta.url), "utf8");
 
 test("index.html charge le contrôleur avant le panier et sans gestionnaire inline", () => {
@@ -61,6 +62,14 @@ test("le démarrage du catalogue reste attaché à DOMContentLoaded", () => {
   const { documentListeners } = loadCatalogController();
   assert.equal(typeof documentListeners.get("DOMContentLoaded"), "function");
   assert.equal(typeof documentListeners.get("click"), "function");
+});
+
+test("le calculateur et le panier utilisent uniquement des quantités entières", () => {
+  assert.match(source, /min="1"[^>]+step="1"/);
+  assert.match(source, /Math\.floor\(Number\(item\.QUANTITE\)/);
+  assert.match(cartSource, /min="1"[^>]+step="1"/);
+  assert.match(cartSource, /Math\.floor\(quantity\)/);
+  assert.match(cartSource, /maximumFractionDigits: 0/);
 });
 
 test("le catalogue démarre avec les traductions et les catégories disponibles", async () => {

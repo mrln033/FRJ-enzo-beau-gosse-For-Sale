@@ -47,14 +47,12 @@ export function normalizeOrderSubmission(payload) {
     const aisle = cleanText(item?.aisle, 120).toUpperCase();
     const quantity = Number(item?.quantity);
     if (!itemName || !storage || !aisle) throw new Error("Article de panier incomplet");
-    if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 1_000_000) {
-      throw new Error(`Quantité invalide pour ${itemName}`);
-    }
+    validateOrderQuantity(quantity, itemName);
     const observedUnitTtPed = optionalNumber(item?.unitTtPed);
     const observedMarkupKind = normalizeMarkupKind(item?.markupKind);
     const observedMarkupValue = observedMarkupKind === "none" ? null : optionalNumber(item?.markupValue);
     return {
-      itemName, storage, aisle, quantity: roundPed(quantity, 4),
+      itemName, storage, aisle, quantity,
       observedUnitTtPed,
       observedMarkupKind,
       observedMarkupValue
@@ -125,9 +123,7 @@ export function priceOrderLines(requestedItems, catalogRows, options = {}) {
       return;
     }
     const effectiveMarkup = applyMemberDiscount(currentMarkupKind, currentMarkupValue, frjMember);
-    const unitSale = saleUnitPrice(unitTt, effectiveMarkup.kind, effectiveMarkup.value);
-    const lineTt = roundPed(unitTt * requested.quantity);
-    const lineSale = roundPed(unitSale * requested.quantity);
+    const prices = priceOrderLine(unitTt, requested.quantity, effectiveMarkup.kind, effectiveMarkup.value);
     lines.push({
       lineNo: index + 1,
       itemName: String(current.itemName || requested.itemName),
@@ -139,9 +135,9 @@ export function priceOrderLines(requestedItems, catalogRows, options = {}) {
       markupKind: effectiveMarkup.kind,
       markupValue: effectiveMarkup.value,
       markupDisplay: formatMarkup(effectiveMarkup.kind, effectiveMarkup.value),
-      unitSalePed: roundPed(unitSale),
-      lineTtPed: lineTt,
-      lineSalePed: lineSale,
+      unitSalePed: prices.unitSalePed,
+      lineTtPed: prices.lineTtPed,
+      lineSalePed: prices.lineSalePed,
       priceStatus: effectiveMarkup.kind === "none" ? "to-confirm" : "estimated"
     });
   });
@@ -165,9 +161,7 @@ export function reviseOrderLine(existingLine, payload, availableStock) {
   const itemName = String(existingLine?.itemName || existingLine?.item_name || "Article");
   const quantity = Number(payload?.quantity);
   const stock = Math.max(0, Number(availableStock) || 0);
-  if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 1_000_000) {
-    throw new Error(`Quantité invalide pour ${itemName}`);
-  }
+  validateOrderQuantity(quantity, itemName);
   if (quantity > stock) {
     throw new Error(`Stock insuffisant pour ${itemName} (${stock} disponible)`);
   }
@@ -177,22 +171,41 @@ export function reviseOrderLine(existingLine, payload, availableStock) {
   if (markupKind !== "none" && (!Number.isFinite(rawAmount) || rawAmount < 0 || rawAmount > 1_000_000)) {
     throw new Error(`MU invalide pour ${itemName}`);
   }
-  const markupValue = markupKind === "percent" ? roundPed(rawAmount / 100, 4) : rawAmount;
+  if (markupKind !== "none" && !hasAtMostDecimals(rawAmount, 6)) {
+    throw new Error(`La MU de ${itemName} est limitée à 6 décimales`);
+  }
+  // Une saisie en pourcentage à 6 décimales nécessite 8 décimales une fois
+  // convertie en coefficient (115,123456 % devient 1,15123456).
+  const markupValue = markupKind === "percent"
+    ? roundPed(rawAmount / 100, 8)
+    : (markupKind === "ped" ? roundPed(rawAmount, 6) : null);
   const unitTtPed = Math.max(0, Number(existingLine?.unitTtPed ?? existingLine?.unit_tt_ped) || 0);
-  const unitSalePed = roundPed(saleUnitPrice(unitTtPed, markupKind, markupValue));
-  const roundedQuantity = roundPed(quantity, 4);
+  const prices = priceOrderLine(unitTtPed, quantity, markupKind, markupValue);
 
   return {
-    quantity: roundedQuantity,
+    quantity,
     stockAtSubmission: stock,
     markupKind,
     markupValue,
     markupDisplay: formatMarkup(markupKind, markupValue),
-    unitSalePed,
-    lineTtPed: roundPed(unitTtPed * roundedQuantity),
-    lineSalePed: roundPed(unitSalePed * roundedQuantity),
+    unitSalePed: prices.unitSalePed,
+    lineTtPed: prices.lineTtPed,
+    lineSalePed: prices.lineSalePed,
     priceStatus: markupKind === "none" ? "to-confirm" : "estimated"
   };
+}
+
+export function hasSameOrderTerms(existingLine, revisedLine) {
+  const existingMarkup = existingLine?.markup_value ?? existingLine?.markupValue;
+  const revisedMarkup = revisedLine?.markupValue ?? revisedLine?.markup_value;
+  const sameMarkupValue = revisedMarkup === null || revisedMarkup === undefined
+    ? existingMarkup === null || existingMarkup === undefined
+    : existingMarkup !== null && existingMarkup !== undefined
+      && Math.abs(Number(existingMarkup) - Number(revisedMarkup)) <= 1e-9;
+  return Number(existingLine?.quantity) === Number(revisedLine?.quantity)
+    && String(existingLine?.markup_kind ?? existingLine?.markupKind ?? "none")
+      === String(revisedLine?.markupKind ?? revisedLine?.markup_kind ?? "none")
+    && sameMarkupValue;
 }
 
 export function orderItemKey(row) {
@@ -236,6 +249,27 @@ function saleUnitPrice(unitTt, kind, value) {
   if (kind === "percent") return unitTt * value;
   if (kind === "ped") return unitTt + value;
   return unitTt;
+}
+
+function priceOrderLine(unitTt, quantity, markupKind, markupValue) {
+  const unitSale = saleUnitPrice(unitTt, markupKind, markupValue);
+  return {
+    // La précision de travail est conservée en base pour les petits prix.
+    // Les montants de ligne restent des montants monétaires à 2 décimales.
+    unitSalePed: roundPed(unitSale, 6),
+    lineTtPed: roundPed(unitTt * quantity),
+    lineSalePed: roundPed(unitSale * quantity)
+  };
+}
+
+function validateOrderQuantity(quantity, itemName) {
+  if (!Number.isInteger(quantity) || quantity <= 0 || quantity > 1_000_000) {
+    throw new Error(`La quantité de ${itemName} doit être entière et positive`);
+  }
+}
+
+function hasAtMostDecimals(value, decimals) {
+  return Math.abs(Number(value) - roundPed(value, decimals)) <= 1e-9;
 }
 
 function formatMarkup(kind, value) {

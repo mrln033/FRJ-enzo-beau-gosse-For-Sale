@@ -304,7 +304,7 @@
         <small>${escapeHtml(item.storage)} · ${escapeHtml(item.aisle)}</small>
       </div>
       <label>${escapeHtml(label("quantity"))}
-        <input class="cart-quantity" type="number" min="0.0001" max="${item.stock}" step="any" value="${item.quantity}">
+        <input class="cart-quantity" type="number" min="1" max="${Math.floor(item.stock)}" step="1" value="${item.quantity}">
       </label>
       <div class="cart-line-prices">
         <span class="cart-line-price-detail">
@@ -582,7 +582,13 @@
   function readCart() {
     try {
       const parsed = JSON.parse(global.localStorage.getItem(STORAGE_KEY) || "{}");
-      return { version: 1, items: Array.isArray(parsed.items) ? parsed.items.slice(0, MAX_LINES) : [] };
+      const items = Array.isArray(parsed.items)
+        ? parsed.items.slice(0, MAX_LINES).map((item) => ({
+          ...item,
+          quantity: clampQuantity(item.quantity, item.stock)
+        })).filter((item) => item.quantity > 0)
+        : [];
+      return { version: 1, items };
     } catch {
       return { version: 1, items: [] };
     }
@@ -695,7 +701,7 @@
   function clampQuantity(value, stock) {
     const quantity = Number(value);
     if (!Number.isFinite(quantity) || quantity <= 0) return 0;
-    return Math.min(Math.round(quantity * 10_000) / 10_000, Math.max(0, Number(stock) || 0));
+    return Math.min(Math.floor(quantity), Math.max(0, Math.floor(Number(stock) || 0)));
   }
 
   function formatPed(value) {
@@ -703,7 +709,7 @@
   }
 
   function formatQuantity(value) {
-    return Number(value || 0).toLocaleString(language() === "FR" ? "fr-FR" : "en-GB", { maximumFractionDigits: 4 });
+    return Number(value || 0).toLocaleString(language() === "FR" ? "fr-FR" : "en-GB", { maximumFractionDigits: 0 });
   }
 
   function roundPed(value) {

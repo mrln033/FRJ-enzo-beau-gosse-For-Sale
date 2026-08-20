@@ -1,6 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { canClientCancelOrder, canReviseOrder, normalizeOrderSubmission, priceOrderLines, reviseOrderLine, validateOrderStatus } from "../src/orders.js";
+import {
+  canClientCancelOrder,
+  canReviseOrder,
+  hasSameOrderTerms,
+  normalizeOrderSubmission,
+  priceOrderLines,
+  reviseOrderLine,
+  validateOrderStatus
+} from "../src/orders.js";
 
 const validPayload = {
   id: "123e4567-e89b-42d3-a456-426614174000",
@@ -99,6 +107,17 @@ test("valide uniquement les statuts connus", () => {
   assert.throws(() => validateOrderStatus("deleted"), /invalide/);
 });
 
+test("accepte uniquement des quantités entières", () => {
+  assert.equal(normalizeOrderSubmission(validPayload).items[0].quantity, 2);
+  assert.throws(
+    () => normalizeOrderSubmission({
+      ...validPayload,
+      items: [{ ...validPayload.items[0], quantity: 1.5 }]
+    }),
+    /entière/
+  );
+});
+
 test("autorise les propositions uniquement avant la préparation", () => {
   assert.equal(canReviseOrder("submitted"), true);
   assert.equal(canReviseOrder("viewed"), true);
@@ -143,4 +162,63 @@ test("recalcule une proposition ponctuelle en PED et contrôle le stock", () => 
     quantity: 3,
     markupKind: "none"
   }, 2), /Stock insuffisant/);
+});
+
+test("calcule les petites valeurs avant l'arrondi monétaire final", () => {
+  const revised = reviseOrderLine({ itemName: "Item A", unitTtPed: 0.01 }, {
+    quantity: 1000,
+    markupKind: "percent",
+    markupAmount: 110
+  }, 1000);
+  assert.equal(revised.unitSalePed, 0.011);
+  assert.equal(revised.lineSalePed, 11);
+});
+
+test("conserve aussi la précision d'une petite valeur à la création", () => {
+  const requested = normalizeOrderSubmission({
+    ...validPayload,
+    items: [{
+      ...validPayload.items[0], quantity: 1000, unitTtPed: 0.01,
+      markupKind: "percent", markupValue: 1.1
+    }]
+  }).items;
+  const priced = priceOrderLines(requested, [{
+    itemName: "Item A", storage: "ARMORS", aisle: "PARTS", stock: 1000,
+    unitTtPed: 0.01, markupKind: "percent", markupValue: 1.1
+  }]);
+  assert.equal(priced.lines[0].unitSalePed, 0.011);
+  assert.equal(priced.lines[0].lineSalePed, 11);
+  assert.equal(priced.totalSalePed, 11);
+});
+
+test("conserve une MU saisie avec jusqu'à six décimales", () => {
+  const revised = reviseOrderLine({ itemName: "Item A", unitTtPed: 0.01 }, {
+    quantity: 1000,
+    markupKind: "percent",
+    markupAmount: 115.123456
+  }, 1000);
+  assert.equal(revised.markupValue, 1.15123456);
+  assert.equal(revised.markupDisplay, "115,12 %");
+  assert.equal(revised.unitSalePed, 0.011512);
+  assert.equal(revised.lineSalePed, 11.51);
+
+  assert.throws(() => reviseOrderLine({ itemName: "Item A", unitTtPed: 1 }, {
+    quantity: 1,
+    markupKind: "ped",
+    markupAmount: 0.1234567
+  }, 1), /6 décimales/);
+});
+
+test("détecte une modification portant sur la sixième décimale de MU", () => {
+  const existing = { quantity: 2, markup_kind: "percent", markup_value: 1.15123455 };
+  const revised = { quantity: 2, markupKind: "percent", markupValue: 1.15123456 };
+  assert.equal(hasSameOrderTerms(existing, revised), false);
+  assert.equal(hasSameOrderTerms(existing, { ...revised, markupValue: 1.15123455 }), true);
+});
+
+test("refuse une quantité décimale dans une proposition Admin", () => {
+  assert.throws(() => reviseOrderLine({ itemName: "Item A", unitTtPed: 1 }, {
+    quantity: 1.5,
+    markupKind: "none"
+  }, 5), /entière/);
 });

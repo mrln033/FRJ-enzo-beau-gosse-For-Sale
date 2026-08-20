@@ -740,7 +740,8 @@ function openCalculator(event, iconEl, item) {
   const mu = getEffectiveMU(item.MU || "");
   const muParsed = parseMU(mu);
   const muLabel = currentLang === "FR" && isFRJMember() ? "MU FRJ" : "MU";
-  const defaultQty = (muParsed.type === "ped") ? 1 : item.QUANTITE;
+  const availableQuantity = Math.max(0, Math.floor(Number(item.QUANTITE) || 0));
+  const defaultQty = (muParsed.type === "ped") ? Math.min(1, availableQuantity) : availableQuantity;
 
   back.innerHTML = `
     <div class="back-header">
@@ -750,7 +751,7 @@ function openCalculator(event, iconEl, item) {
     <div class="back-content">
       <div class="qty-row">
         <span>${t("quantity")}</span>
-        <input type="number" id="calcQty" value="${defaultQty}" min="0.0001" max="${item.QUANTITE}" step="any">
+        <input type="number" id="calcQty" value="${defaultQty}" min="1" max="${availableQuantity}" step="1">
       </div>
 
       <p>${t("unitPrice")}: ${prix.toFixed(2)} peds</p>
@@ -782,7 +783,7 @@ function openCalculator(event, iconEl, item) {
         <path d="M12 8V3m-2 2 2-2 2 2"/>
       </svg>`;
     cartButton.addEventListener("click", () => {
-      const quantity = Number(back.querySelector("#calcQty")?.value) || 0;
+      const quantity = Math.floor(Number(back.querySelector("#calcQty")?.value) || 0);
       window.FRJ_CART.addItem(item, { quantity });
     });
     back.appendChild(cartButton);
@@ -800,7 +801,7 @@ function openCalculator(event, iconEl, item) {
   }, 0);
 }
 function updateCalc(card, prix, muStr, muLabel = "MU") {
-  const qty = parseFloat(card.querySelector("#calcQty").value) || 0;
+  const qty = Math.max(0, Math.floor(Number(card.querySelector("#calcQty").value) || 0));
 
   const tt = qty * prix;
   card.querySelector("#calcTT").innerText = tt.toFixed(2);

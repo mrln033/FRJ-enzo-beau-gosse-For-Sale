@@ -16,6 +16,7 @@ import {
 import {
   canClientCancelOrder,
   canReviseOrder,
+  hasSameOrderTerms,
   normalizeOrderSubmission,
   priceOrderLines,
   reviseOrderLine,
@@ -1304,12 +1305,7 @@ async function updateOrderProposal(env, orderId, requestedItems) {
     const existing = existingByLine.get(Number(requested.lineNo));
     const stock = stocks.get(String(existing.item_name).toLocaleLowerCase("en-US")) || 0;
     const revised = parseOrderValue(() => reviseOrderLine(existing, requested, stock));
-    const sameMarkupValue = revised.markupValue === null
-      ? existing.markup_value === null || existing.markup_value === undefined
-      : Math.abs(Number(existing.markup_value) - revised.markupValue) <= 0.0001;
-    const noChange = Math.abs(Number(existing.quantity) - revised.quantity) <= 0.0001
-      && String(existing.markup_kind || "none") === revised.markupKind
-      && sameMarkupValue;
+    const noChange = hasSameOrderTerms(existing, revised);
     if (!noChange) changed.push({ existing, revised });
   });
 
@@ -1338,8 +1334,8 @@ async function updateOrderProposal(env, orderId, requestedItems) {
       UPDATE purchase_orders
       SET status = 'submitted', approval_required = 1,
           proposal_version = proposal_version + 1,
-          total_tt_ped = (SELECT COALESCE(SUM(line_tt_ped), 0) FROM purchase_order_items WHERE order_id = ?),
-          total_sale_ped = (SELECT COALESCE(SUM(line_sale_ped), 0) FROM purchase_order_items WHERE order_id = ?),
+          total_tt_ped = (SELECT ROUND(COALESCE(SUM(line_tt_ped), 0), 2) FROM purchase_order_items WHERE order_id = ?),
+          total_sale_ped = (SELECT ROUND(COALESCE(SUM(line_sale_ped), 0), 2) FROM purchase_order_items WHERE order_id = ?),
           pricing_status = CASE WHEN EXISTS (
             SELECT 1 FROM purchase_order_items WHERE order_id = ? AND price_status = 'to-confirm'
           ) THEN 'to-confirm' ELSE 'estimated' END,
@@ -1405,14 +1401,7 @@ export async function handleAdminPost(request, url, env) {
         AND ${SALEABLE_CONTAINER_SQL}
     `).bind(existing.item_name).first();
     const revised = parseOrderValue(() => reviseOrderLine(existing, payload, Number(stockRow?.stock || 0)));
-    const sameMarkupValue = revised.markupValue === null
-      ? existing.markup_value === null || existing.markup_value === undefined
-      : Math.abs(Number(existing.markup_value) - revised.markupValue) <= 0.0001;
-    if (
-      Math.abs(Number(existing.quantity) - revised.quantity) <= 0.0001
-      && String(existing.markup_kind || "none") === revised.markupKind
-      && sameMarkupValue
-    ) {
+    if (hasSameOrderTerms(existing, revised)) {
       return json({ ok: true, noChange: true });
     }
     await env.DB.batch([
@@ -1430,8 +1419,8 @@ export async function handleAdminPost(request, url, env) {
         UPDATE purchase_orders
         SET status = 'submitted', approval_required = 1,
             proposal_version = proposal_version + 1,
-            total_tt_ped = (SELECT COALESCE(SUM(line_tt_ped), 0) FROM purchase_order_items WHERE order_id = ?),
-            total_sale_ped = (SELECT COALESCE(SUM(line_sale_ped), 0) FROM purchase_order_items WHERE order_id = ?),
+            total_tt_ped = (SELECT ROUND(COALESCE(SUM(line_tt_ped), 0), 2) FROM purchase_order_items WHERE order_id = ?),
+            total_sale_ped = (SELECT ROUND(COALESCE(SUM(line_sale_ped), 0), 2) FROM purchase_order_items WHERE order_id = ?),
             pricing_status = CASE WHEN EXISTS (
               SELECT 1 FROM purchase_order_items WHERE order_id = ? AND price_status = 'to-confirm'
             ) THEN 'to-confirm' ELSE 'estimated' END,

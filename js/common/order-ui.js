@@ -34,7 +34,7 @@
 
   function formatQuantity(value, language = "FR") {
     return Number(value || 0).toLocaleString(normalizeLanguage(language) === "FR" ? "fr-FR" : "en-GB", {
-      maximumFractionDigits: 4
+      maximumFractionDigits: 0
     });
   }
 

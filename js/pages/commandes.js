@@ -8,6 +8,19 @@
   const STATUS_KEYS = ui.statusKeys;
   let selectedStatuses = readSelectedStatuses();
 
+  function hasAtMostDecimals(value, decimals) {
+    const factor = 10 ** decimals;
+    return Math.abs(Number(value) - (Math.round(Number(value) * factor) / factor)) <= 1e-9;
+  }
+
+  function editableMarkupAmount(item) {
+    if (item.markupKind === "none") return "";
+    const amount = item.markupKind === "percent"
+      ? Number(item.markupValue || 0) * 100
+      : Number(item.markupValue || 0);
+    return amount.toFixed(6).replace(/\.?0+$/, "");
+  }
+
   function readSelectedStatuses() {
     try {
       const raw = global.localStorage.getItem(STATUS_FILTER_KEY);
@@ -152,9 +165,9 @@
       const quantityCell = document.createElement("td");
       const quantity = document.createElement("input");
       quantity.type = "number";
-      quantity.min = "0.0001";
+      quantity.min = "1";
       quantity.max = "1000000";
-      quantity.step = "0.0001";
+      quantity.step = "1";
       quantity.value = item.quantity;
       quantity.disabled = !proposalEditable;
       quantity.setAttribute("aria-label", `Quantité ${item.itemName}`);
@@ -179,10 +192,9 @@
       amount.className = "markup-amount";
       amount.type = "number";
       amount.min = "0";
-      amount.step = "0.01";
-      amount.value = item.markupKind === "percent"
-        ? Number(item.markupValue || 0) * 100
-        : (item.markupKind === "ped" ? Number(item.markupValue || 0) : "");
+      amount.max = "1000000";
+      amount.step = "0.000001";
+      amount.value = editableMarkupAmount(item);
       amount.disabled = !proposalEditable || item.markupKind === "none";
       amount.setAttribute("aria-label", `Valeur du MU ${item.itemName}`);
       kind.addEventListener("change", () => {
@@ -226,8 +238,11 @@
       const markupKind = editor.kind.value;
       const markupAmount = markupKind === "none" ? null : Number(editor.amount.value);
       const unitTt = Number(editor.item.unitTtPed || 0);
-      const valid = Number.isFinite(quantity) && quantity > 0
-        && (markupKind === "none" || (Number.isFinite(markupAmount) && markupAmount >= 0));
+      const valid = Number.isInteger(quantity) && quantity > 0 && quantity <= 1_000_000
+        && (markupKind === "none" || (
+          Number.isFinite(markupAmount) && markupAmount >= 0 && markupAmount <= 1_000_000
+          && hasAtMostDecimals(markupAmount, 6)
+        ));
       let unitSale = unitTt;
       if (valid && markupKind === "percent") unitSale = unitTt * (markupAmount / 100);
       if (valid && markupKind === "ped") unitSale = unitTt + markupAmount;
@@ -236,9 +251,9 @@
         ? Number(editor.item.markupValue || 0) * 100
         : (editor.item.markupKind === "ped" ? Number(editor.item.markupValue || 0) : null);
       const dirty = valid && (
-        Math.abs(quantity - Number(editor.item.quantity)) > 0.0001
+        quantity !== Number(editor.item.quantity)
         || markupKind !== editor.item.markupKind
-        || (markupKind !== "none" && Math.abs(markupAmount - originalAmount) > 0.0001)
+        || (markupKind !== "none" && Math.abs(markupAmount - originalAmount) > 1e-7)
       );
       return { lineNo: editor.item.lineNo, quantity, markupKind, markupAmount, lineSale, valid, dirty };
     };

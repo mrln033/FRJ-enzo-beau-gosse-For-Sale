@@ -75,6 +75,15 @@ test("les deux pages ne chargent plus que des scripts externes", () => {
   assert.doesNotMatch(trackingHtml, /<script(?![^>]*\bsrc=)/i);
 });
 
+test("la Console Admin applique les contraintes de saisie d.7", () => {
+  assert.match(adminSource, /quantity\.min = "1"/);
+  assert.match(adminSource, /quantity\.step = "1"/);
+  assert.match(adminSource, /amount\.step = "0\.000001"/);
+  assert.match(adminSource, /Number\.isInteger\(quantity\)/);
+  assert.match(adminSource, /hasAtMostDecimals\(markupAmount, 6\)/);
+  assert.match(adminSource, /await loadOrders\(\)/);
+});
+
 test("la console Admin charge et filtre une liste vide", async () => {
   const ids = ["ordersList", "ordersSummary", "ordersError", "ordersFilters", "refreshOrders"];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id)]));
@@ -104,6 +113,75 @@ test("la console Admin charge et filtre une liste vide", async () => {
   assert.match(elements.get("ordersSummary").textContent, /0 demande\(s\) affichée\(s\) sur 0/);
   assert.equal(elements.get("ordersList").children[0].textContent, "Aucune demande transmise.");
   assert.equal(elements.get("ordersError").hidden, true);
+});
+
+test("la Console Admin enregistre la précision autorisée puis recharge D1", async () => {
+  const ids = ["ordersList", "ordersSummary", "ordersError", "ordersFilters", "refreshOrders"];
+  const elements = new Map(ids.map((id) => [id, new FakeElement(id)]));
+  const created = [];
+  const requests = [];
+  const order = {
+    id: "123e4567-e89b-42d3-a456-426614174000",
+    publicReference: "FRJ-20260820-ABC123",
+    buyerAvatar: "Test Player",
+    status: "submitted",
+    approvalRequired: false,
+    proposalVersion: 0,
+    createdAt: "2026-08-20T10:00:00Z",
+    updatedAt: "2026-08-20T10:00:00Z",
+    totalSalePed: 11.51,
+    items: [{
+      lineNo: 1,
+      itemName: "Item A",
+      storage: "ARMORS",
+      aisle: "PARTS",
+      quantity: 1000,
+      unitTtPed: 0.01,
+      markupKind: "percent",
+      markupValue: 1.15123456,
+      lineSalePed: 11.51
+    }]
+  };
+  const document = {
+    getElementById: (id) => elements.get(id),
+    createElement: () => {
+      const element = new FakeElement();
+      created.push(element);
+      return element;
+    }
+  };
+  const window = {
+    FRJ_ADMIN: { require: () => true },
+    FRJ_API: {
+      fetchD1Admin: async (path, options) => {
+        requests.push({ path, options });
+        if (options?.method === "POST") return { json: async () => ({ ok: true }) };
+        return { json: async () => ({ orders: [order], enabled: true, generatedAt: order.updatedAt }) };
+      }
+    },
+    localStorage: createStorage(),
+    alert: () => {}
+  };
+  const context = vm.createContext({ window, document, console });
+  vm.runInContext(commonSource, context);
+  vm.runInContext(adminSource, context);
+  await settle();
+
+  const quantity = created.find((element) => element.attributes.get("aria-label") === "Quantité Item A");
+  const amount = created.find((element) => element.attributes.get("aria-label") === "Valeur du MU Item A");
+  const save = created.find((element) => element.textContent === "Enregistrer les modifications");
+  assert.equal(quantity.step, "1");
+  assert.equal(amount.step, "0.000001");
+  assert.equal(amount.value, "115.123456");
+
+  amount.value = "115.123455";
+  amount.listeners.get("input")();
+  await save.listeners.get("click")();
+  await settle();
+
+  const post = requests.find((request) => request.options?.method === "POST");
+  assert.equal(JSON.parse(post.options.body).items[0].markupAmount, 115.123455);
+  assert.equal(requests.filter((request) => request.path === "/admin/orders").length, 2);
 });
 
 test("le suivi public rend une demande et la mémorise localement", async () => {
