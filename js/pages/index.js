@@ -42,23 +42,20 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         };
 
-        img.onclick = () => {
+		img.onclick = () => {
 
-          if (selectedCategory === cat) {
-            selectedCategory = null;
-            resetCategories();
+		  if (selectedCategory === cat) {
+			selectedCategory = null;
+			updateCategoryUrl("");
+			resetCategories();
             resetRayonFilter();
             updateFilterVisibility();
             renderCards([]);
             return;
           }
 
-          selectedCategory = cat;
-          updateCategoryImages();
-          updateFilterVisibility();
-
-          loadCategoryData(cat); // 🔥 fetch items
-        };
+		  selectCategory(cat);
+		};
 
         container.appendChild(img);
       });
@@ -67,6 +64,11 @@ document.addEventListener("DOMContentLoaded", () => {
 	  document.getElementById("loadingState").style.display = "none";
 
 	  renderCards([]);
+
+	  const requestedCategory = getCategoryFromUrl();
+	  if (requestedCategory && categories.includes(requestedCategory)) {
+		selectCategory(requestedCategory, false);
+	  }
     })
     .catch(err => {
       console.error("Erreur chargement catégories:", err);
@@ -143,6 +145,30 @@ document.addEventListener("DOMContentLoaded", () => {
 			selected: "storage/11_Miscellaneous_Select.png"
 		}
 	};
+
+	function getCategoryFromUrl() {
+		const params = new URLSearchParams(window.location.search);
+		const category = String(params.get("category") || "").trim().toUpperCase();
+		return Object.prototype.hasOwnProperty.call(CATEGORY_IMAGES, category) ? category : "";
+	}
+
+	function updateCategoryUrl(category) {
+		const url = new URL(window.location.href);
+		if (category) {
+			url.searchParams.set("category", category);
+		} else {
+			url.searchParams.delete("category");
+		}
+		window.history.replaceState(null, "", url);
+	}
+
+	function selectCategory(category, updateUrl = true) {
+		selectedCategory = category;
+		updateCategoryImages();
+		updateFilterVisibility();
+		if (updateUrl) updateCategoryUrl(category);
+		loadCategoryData(category);
+	}
 	
 	
 	// En-tête et préférences visibles du catalogue.

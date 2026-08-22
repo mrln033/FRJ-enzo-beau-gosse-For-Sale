@@ -32,6 +32,10 @@ Voir [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) pour les flux et les règles d
 
 Le paramètre d'entrée `?admin=1` active le menu Admin dans l'onglet courant, puis disparaît immédiatement de l'URL. Les liens internes ne le propagent pas. Cette session d'affichage n'est pas un mécanisme de sécurité : les opérations sensibles restent protégées par le jeton administrateur D1.
 
+## Liens directs du catalogue
+
+Le paramètre public `category` ouvre directement une catégorie du catalogue. Il peut être combiné avec `backend=d1` ou `backend=gas`, par exemple `?backend=d1&category=WEAPONS`. Lorsqu'un visiteur change de catégorie, l'URL est mise à jour afin de pouvoir être copiée et partagée.
+
 ## Vérifications locales
 
 Depuis la racine du dépôt :

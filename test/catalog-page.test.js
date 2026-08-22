@@ -18,7 +18,7 @@ test("index.html charge le contrôleur avant le panier et sans gestionnaire inli
   assert.doesNotMatch(source, /\son(?:click|change|input)=/i);
 });
 
-function loadCatalogController() {
+function loadCatalogController(search = "") {
   const documentListeners = new Map();
   const windowListeners = new Map();
   const logo = { style: {} };
@@ -28,7 +28,9 @@ function loadCatalogController() {
     querySelector: () => null
   };
   const window = {
-    addEventListener: (type, listener) => windowListeners.set(type, listener)
+    addEventListener: (type, listener) => windowListeners.set(type, listener),
+    location: { search, href: `https://example.test/${search}` },
+    history: { replaceState: () => {} }
   };
   window.self = window;
   window.top = window;
@@ -39,7 +41,9 @@ function loadCatalogController() {
     localStorage: { getItem: () => null, setItem: () => {} },
     navigator: {},
     setTimeout: () => 1,
-    CustomEvent: class CustomEvent {}
+    CustomEvent: class CustomEvent {},
+    URL,
+    URLSearchParams
   });
   vm.runInContext(source, context);
   return { context, documentListeners };
@@ -56,6 +60,14 @@ test("le contrôleur expose les règles de calcul historiques après extraction"
   assert.equal(ped.value, 2.5);
   assert.equal(vm.runInContext('formatNumber("12.5")', context), "12.50");
   assert.equal(vm.runInContext('formatRayon("NEW OXFORD")', context), "New Oxford");
+});
+
+test("un lien public peut sélectionner directement une catégorie", () => {
+  const { context } = loadCatalogController("?backend=d1&category=weapons");
+  assert.equal(vm.runInContext("getCategoryFromUrl()", context), "WEAPONS");
+
+  context.window.location.search = "?backend=d1&category=inconnue";
+  assert.equal(vm.runInContext("getCategoryFromUrl()", context), "");
 });
 
 test("le démarrage du catalogue reste attaché à DOMContentLoaded", () => {
@@ -129,7 +141,9 @@ test("le catalogue démarre avec les traductions et les catégories disponibles"
     FRJ_API,
     addEventListener: (type, listener) => windowListeners.set(type, listener),
     dispatchEvent: () => {},
-    isSecureContext: true
+    isSecureContext: true,
+    location: { search: "", href: "https://example.test/" },
+    history: { replaceState: () => {} }
   };
   window.self = window;
   window.top = window;
@@ -141,7 +155,9 @@ test("le catalogue démarre avec les traductions et les catégories disponibles"
     navigator: { clipboard: { writeText: async () => {} } },
     console,
     setTimeout: () => 1,
-    CustomEvent: class CustomEvent {}
+    CustomEvent: class CustomEvent {},
+    URL,
+    URLSearchParams
   });
   vm.runInContext(languagesSource, context);
   vm.runInContext(source, context);
