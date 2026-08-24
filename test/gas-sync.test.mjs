@@ -5,6 +5,7 @@ import fs from "node:fs";
 import vm from "node:vm";
 import {
   catalogContentHash,
+  containerContentHash,
   inventoryContentHash,
   marketContentHash
 } from "../cloudflare/for-sale-api/src/sync.js";
@@ -44,6 +45,7 @@ const context = {
 };
 vm.createContext(context);
 [
+  "Containers.gs",
   "SyncD1.gs",
   "SyncOrders.gs",
   "SyncEngine.gs",
@@ -88,6 +90,14 @@ test("GAS et Worker calculent la même empreinte catalogue", async () => {
   assert.equal(context.frjHashCatalog_(rows), await catalogContentHash(rows));
 });
 
+test("GAS et Worker calculent la même empreinte de conteneurs", async () => {
+  const rows = [
+    { avatar: "enzo", containerKey: "carried", container: "CARRIED", enabled: true },
+    { avatar: "kenza", containerKey: "storage", container: "Storage", enabled: false }
+  ];
+  assert.equal(context.frjHashContainerConfig_(rows), await containerContentHash(rows));
+});
+
 test("la fusion à trois voies conserve les changements indépendants", () => {
   const base = [
     { sourceId: "1", itemName: "A", quantity: 1 },
@@ -121,6 +131,23 @@ test("la fusion propage une suppression si l'autre côté n'a pas modifié la li
   const merged = context.frjThreeWayMerge_("inventory:enzo", base, local, remote, "remote");
   assert.equal(merged.some((row) => row.sourceId === "1"), false);
   assert.equal(merged.find((row) => row.sourceId === "2").quantity, 4);
+});
+
+test("la fusion des conteneurs conserve les lignes absentes d'un seul côté", () => {
+  const base = [{ avatar: "enzo", containerKey: "carried", container: "CARRIED", enabled: true }];
+  const local = [];
+  const remote = [
+    ...base,
+    { avatar: "enzo", containerKey: "storage", container: "Storage", enabled: false }
+  ];
+  const merged = context.frjThreeWayMerge_("containers", base, local, remote, "remote");
+  assert.equal(merged.length, 2);
+  assert.equal(merged.some((row) => row.containerKey === "carried"), true);
+  assert.equal(merged.some((row) => row.containerKey === "storage"), true);
+});
+
+test("le moteur GAS suit la configuration des conteneurs", () => {
+  assert.equal(context.frjDatasetKeys_().includes("containers"), true);
 });
 
 test("une modification récente programme la synchronisation cinq minutes plus tard", () => {

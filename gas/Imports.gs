@@ -128,5 +128,8 @@ function processInventory(csv, avatar) {
   cell.setValue(new Date());
   cell.setNumberFormat("dd/MM/yyyy - HH:mm:ss");
 
+  // La configuration évolue uniquement par ajout ; les choix existants restent intacts.
+  frjRefreshContainerConfigurationAfterInventory_(inventoryId);
+
   return `✅ Import inventaire OK dans ${SHEET_NAME} (${numRows} lignes)`;
 }

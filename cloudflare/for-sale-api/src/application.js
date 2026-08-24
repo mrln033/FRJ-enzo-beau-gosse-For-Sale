@@ -2,9 +2,11 @@ import { computeWeightedMarkup, normalizeInventoryRows, normalizeMarketRows } fr
 import {
   catalogContentHash,
   catalogRowsWithKeys,
+  containerContentHash,
   inventoryContentHash,
   inventoryRowsWithKeys,
   mapCatalogDbRow,
+  mapContainerSyncDbRow,
   mapInventoryDbRow,
   mapMarketDbRow,
   marketRowKey,
@@ -157,6 +159,10 @@ export async function handleAdminGet(url, env) {
   if (url.pathname !== "/admin/sync-report") {
     return json({ error: "Endpoint administrateur inconnu" }, 404);
   }
+
+  // Garantit la présence du référentiel dans le rapport dès le premier
+  // affichage, y compris avant la toute première synchronisation GAS.
+  await readContainerSnapshot(env);
 
   const requestedLimit = Number(url.searchParams.get("limit") || 100);
   const limit = Math.min(Math.max(Number.isFinite(requestedLimit) ? Math.trunc(requestedLimit) : 100, 20), 200);
@@ -421,6 +427,12 @@ export async function handleSyncGet(url, env) {
     return json(snapshot);
   }
 
+  if (url.pathname === "/sync/containers") {
+    const snapshot = await readContainerSnapshot(env, url.searchParams.get("hash"));
+    if (!snapshot.state) throw new ApiError(404, "Snapshot des conteneurs introuvable");
+    return json(snapshot);
+  }
+
   return json({ error: "Endpoint de synchronisation inconnu" }, 404);
 }
 
@@ -513,6 +525,28 @@ export async function handleSyncPost(request, url, env) {
     }
 
     const result = await storeCatalogSnapshot(env, {
+      rows,
+      sourceOrigin: "gas",
+      sourceUpdatedAt,
+      contentHash
+    });
+    return json({ ok: true, noChange: false, state: result.state, rowsWritten: result.rowsWritten });
+  }
+
+  if (url.pathname === "/sync/containers") {
+    const datasetKey = "containers";
+    await assertExpectedHash(env, datasetKey, expectedHash);
+    const rows = normalizeSyncedContainerRows(payload.rows);
+    if (rows.length === 0) throw new ApiError(400, "Configuration des conteneurs vide");
+
+    const sourceUpdatedAt = normalizeSyncTimestamp(payload.updatedAt);
+    const contentHash = await containerContentHash(rows);
+    const currentState = await readSyncState(env, datasetKey);
+    if (currentState?.hash === contentHash) {
+      return json({ ok: true, noChange: true, state: currentState });
+    }
+
+    const result = await storeContainerSnapshot(env, {
       rows,
       sourceOrigin: "gas",
       sourceUpdatedAt,
@@ -897,6 +931,82 @@ async function storeCatalogSnapshot(env, options) {
   };
 }
 
+async function storeContainerSnapshot(env, options) {
+  const importedAt = new Date().toISOString();
+  const importId = crypto.randomUUID();
+  const sourceUpdatedAt = normalizeSyncTimestamp(options.sourceUpdatedAt, importedAt);
+  const payload = JSON.stringify(options.rows);
+
+  const dataResults = await env.DB.batch([
+    env.DB.prepare(`
+      INSERT INTO container_config (
+        avatar_id, container_key, container, enabled, discovered_at, updated_at
+      )
+      SELECT
+        lower(trim(json_extract(value, '$.avatar'))),
+        lower(trim(json_extract(value, '$.containerKey'))),
+        trim(json_extract(value, '$.container')),
+        CAST(json_extract(value, '$.enabled') AS INTEGER),
+        CURRENT_TIMESTAMP,
+        CURRENT_TIMESTAMP
+      FROM json_each(?)
+      WHERE trim(json_extract(value, '$.container')) <> ''
+      ON CONFLICT (avatar_id, container_key) DO UPDATE SET
+        container = excluded.container,
+        enabled = excluded.enabled,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE container_config.container IS NOT excluded.container
+         OR container_config.enabled IS NOT excluded.enabled
+    `).bind(payload)
+  ]);
+
+  // La règle métier interdit les suppressions : les anciennes lignes D1
+  // absentes du snapshot reçu restent dans le référentiel canonique.
+  const currentResult = await env.DB.prepare(`
+    SELECT avatar_id, container_key, container, enabled
+    FROM container_config
+    ORDER BY avatar_id, container_key
+  `).all();
+  const rows = currentResult.results.map(mapContainerSyncDbRow);
+  const contentHash = await containerContentHash(rows);
+  const state = {
+    datasetKey: "containers",
+    hash: contentHash,
+    updatedAt: sourceUpdatedAt,
+    origin: options.sourceOrigin,
+    importId,
+    rowCount: rows.length
+  };
+  const stateResults = await env.DB.batch([
+    syncStateStatement(env, state),
+    env.DB.prepare(`
+      INSERT INTO sync_audit (
+        dataset_key, direction, action, source_checksum, target_checksum, details
+      ) VALUES ('containers', ?, 'current-updated', ?, ?, ?)
+    `).bind(
+      options.sourceOrigin === "gas" ? "gas-to-d1" : "d1-local",
+      contentHash,
+      contentHash,
+      JSON.stringify({ importId, rows: rows.length, rowsWritten: sumRowsWritten(dataResults) })
+    ),
+    syncAuditRetentionStatement(env, "containers")
+  ]);
+
+  return {
+    importId,
+    state: {
+      dataset: "containers",
+      hash: contentHash,
+      updatedAt: sourceUpdatedAt,
+      origin: options.sourceOrigin,
+      importId,
+      rowCount: rows.length
+    },
+    rows,
+    rowsWritten: sumRowsWritten(dataResults) + sumRowsWritten(stateResults)
+  };
+}
+
 async function readInventorySnapshot(env, avatar, requestedHash = null) {
   const datasetKey = inventoryDatasetKey(avatar);
   if (requestedHash) return readBaselineSnapshot(env, datasetKey, requestedHash);
@@ -973,6 +1083,47 @@ async function readCatalogSnapshot(env, requestedHash = null) {
   return { state, rows };
 }
 
+async function readContainerSnapshot(env, requestedHash = null) {
+  if (requestedHash) return readBaselineSnapshot(env, "containers", requestedHash);
+  let state = await readStoredSyncState(env, "containers");
+  const rowsResult = await env.DB.prepare(`
+    SELECT avatar_id, container_key, container, enabled, updated_at
+    FROM container_config
+    ORDER BY avatar_id, container_key
+  `).all();
+  const rows = rowsResult.results.map(mapContainerSyncDbRow);
+  if (!rows.length) return { state: null, rows: [] };
+
+  const actualHash = await containerContentHash(rows);
+  const updatedAt = rowsResult.results.reduce(
+    (latest, row) => frjLaterTimestamp(latest, normalizeSyncTimestamp(row.updated_at)),
+    ""
+  );
+  if (!state) {
+    state = await bootstrapCurrentState(env, "containers", rows, actualHash, "d1-seed", updatedAt);
+  } else if (state.hash !== actualHash || state.rowCount !== rows.length) {
+    // Les triggers liés aux inventaires découvrent des conteneurs sans requête
+    // HTTP ; leur ajout doit donc également faire évoluer l'état de sync.
+    state = {
+      dataset: "containers",
+      hash: actualHash,
+      updatedAt,
+      origin: "d1",
+      importId: `current:${crypto.randomUUID()}`,
+      rowCount: rows.length
+    };
+    await syncStateStatement(env, {
+      datasetKey: state.dataset,
+      hash: state.hash,
+      updatedAt: state.updatedAt,
+      origin: state.origin,
+      importId: state.importId,
+      rowCount: state.rowCount
+    }).run();
+  }
+  return { state, rows };
+}
+
 async function bootstrapCurrentState(env, datasetKey, rows, hash, origin, updatedAt = new Date().toISOString()) {
   const state = {
     dataset: datasetKey,
@@ -1029,6 +1180,7 @@ async function readBaselineSnapshot(env, datasetKey, requestedHash) {
 async function readCurrentDatasetSnapshot(env, datasetKey) {
   if (datasetKey === "catalog") return readCatalogSnapshot(env);
   if (datasetKey === "mu") return readMarketSnapshot(env);
+  if (datasetKey === "containers") return readContainerSnapshot(env);
   return readInventorySnapshot(env, datasetKey.slice("inventory:".length));
 }
 
@@ -1069,10 +1221,16 @@ async function readAllSyncStates(env) {
     if (snapshot.state) states.catalog = snapshot.state;
   }
 
+  // Toujours relire ce dataset : un trigger D1 peut l'avoir enrichi depuis la
+  // dernière écriture de sync_state.
+  const containerSnapshot = await readContainerSnapshot(env);
+  if (containerSnapshot.state) states.containers = containerSnapshot.state;
+
   return states;
 }
 
 async function readSyncState(env, datasetKey) {
+  if (datasetKey === "containers") return (await readContainerSnapshot(env)).state;
   const state = await readStoredSyncState(env, datasetKey);
   if (state) return state;
 
@@ -1232,6 +1390,23 @@ function normalizeSyncedCatalogRows(rows) {
     wikiUrl: cleanNullableText(row?.wikiUrl),
     enabled: Number(row?.enabled) === 0 ? 0 : 1
   })).filter((row) => row.itemName);
+}
+
+function normalizeSyncedContainerRows(rows) {
+  if (!Array.isArray(rows)) throw new ApiError(400, "Lignes de conteneurs invalides");
+  const seen = new Set();
+  return rows.map((row) => {
+    const avatar = String(row?.avatar || "").trim().toLowerCase();
+    const container = String(row?.container || "").trim();
+    const containerKey = String(row?.containerKey || container).trim().toLowerCase();
+    if (!AVATAR_SHEETS[avatar]) throw new ApiError(400, `Avatar inconnu : ${avatar || "absent"}`);
+    if (!container || !containerKey) throw new ApiError(400, "Conteneur synchronisé invalide");
+    if (typeof row?.enabled !== "boolean") throw new ApiError(400, `État invalide : ${avatar}/${containerKey}`);
+    const stableKey = `${avatar}\u001f${containerKey}`;
+    if (seen.has(stableKey)) throw new ApiError(400, `Conteneur synchronisé dupliqué : ${avatar}/${containerKey}`);
+    seen.add(stableKey);
+    return { avatar, containerKey, container, enabled: row.enabled };
+  });
 }
 
 function parseJsonBody(body) {
@@ -1542,35 +1717,38 @@ async function updateContainerConfig(env, payload) {
     throw new ApiError(400, error instanceof Error ? error.message : "Configuration de conteneurs invalide");
   }
 
-  const keys = normalized.changes.map((entry) => entry.containerKey);
-  const existingResult = await env.DB.prepare(`
-    SELECT container_key, enabled
-    FROM container_config
-    WHERE avatar_id = ?
-      AND container_key IN (SELECT CAST(value AS TEXT) FROM json_each(?))
-  `).bind(normalized.avatar, JSON.stringify(keys)).all();
-  const { changed, missing } = diffContainerConfig(normalized.changes, existingResult.results);
+  const current = await readContainerSnapshot(env);
+  if (!current.state) throw new ApiError(409, "Configuration des conteneurs introuvable");
+  const selectedRows = current.rows
+    .filter((row) => row.avatar === normalized.avatar)
+    .map((row) => ({ container_key: row.containerKey, enabled: row.enabled ? 1 : 0 }));
+  const { changed, missing } = diffContainerConfig(normalized.changes, selectedRows);
   if (missing.length) {
     throw new ApiError(409, "La liste des conteneurs a changé ; rechargez-la avant d'enregistrer");
   }
 
   if (!changed.length) return { ok: true, avatar: normalized.avatar, changed: 0, noChange: true };
 
-  const statement = env.DB.prepare(`
-    UPDATE container_config
-    SET enabled = ?, updated_at = CURRENT_TIMESTAMP
-    WHERE avatar_id = ? AND container_key = ? AND enabled <> ?
-  `);
-  const results = await env.DB.batch(changed.map((entry) => {
-    const enabled = entry.enabled ? 1 : 0;
-    return statement.bind(enabled, normalized.avatar, entry.containerKey, enabled);
+  const changesByKey = new Map(changed.map((entry) => [entry.containerKey, entry.enabled]));
+  const rows = current.rows.map((row) => ({
+    ...row,
+    enabled: row.avatar === normalized.avatar && changesByKey.has(row.containerKey)
+      ? changesByKey.get(row.containerKey)
+      : row.enabled
   }));
-  const rowsChanged = results.reduce((total, result) => total + Number(result.meta?.changes || 0), 0);
+  const stored = await storeContainerSnapshot(env, {
+    rows,
+    sourceOrigin: "d1",
+    sourceUpdatedAt: new Date().toISOString()
+  });
+  const signal = await notifyGasDataChanged(env, "containers", "modification-d1-containers");
   return {
     ok: true,
     avatar: normalized.avatar,
-    changed: rowsChanged,
-    noChange: rowsChanged === 0
+    changed: changed.length,
+    noChange: false,
+    state: stored.state,
+    signal
   };
 }
 

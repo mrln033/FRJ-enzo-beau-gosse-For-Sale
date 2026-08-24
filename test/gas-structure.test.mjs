@@ -7,6 +7,7 @@ const gasDirectory = new URL("../gas/", import.meta.url);
 const expectedFiles = [
   "Catalog.gs",
   "Code.gs",
+  "Containers.gs",
   "Imports.gs",
   "PurchaseOrders.gs",
   "SyncD1.gs",
@@ -50,4 +51,13 @@ test("les points d'entrée GAS restent dans leurs fichiers stables", () => {
 test("la route des catégories ouvre explicitement le classeur BDD_APP", () => {
   assert.doesNotMatch(sources["Catalog.gs"], /SpreadsheetApp\.getActiveSpreadsheet\(\)/);
   assert.match(sources["Catalog.gs"], /function getAvailableCategories\(\)[\s\S]*SpreadsheetApp\.openById\(FRJ_APP_SPREADSHEET_ID\)/);
+});
+
+test("d.8.5 conserve les choix GAS et découvre uniquement par ajout", () => {
+  const source = sources["Containers.gs"];
+  assert.match(source, /insertColumnBefore\(1\)/);
+  assert.match(source, /additions\.push\(\[avatar, container, false\]\)/);
+  assert.doesNotMatch(source, /deleteRow|deleteRows|clearContent/);
+  assert.match(sources["Imports.gs"], /frjRefreshContainerConfigurationAfterInventory_\(inventoryId\)/);
+  assert.match(sources["SyncSheets.gs"], /frjRefreshContainerConfigurationAfterInventoryUnlocked_\(avatar\)/);
 });

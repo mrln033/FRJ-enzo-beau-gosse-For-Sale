@@ -19,5 +19,6 @@ export const AVATAR_SHEETS = {
 export const SYNC_DATASETS = new Set([
   "catalog",
   "mu",
+  "containers",
   ...Object.keys(AVATAR_SHEETS).map((avatar) => `inventory:${avatar}`)
 ]);

@@ -86,8 +86,8 @@ révisions de demandes utilisent tous les mêmes choix, sans liste de conteneurs
 Depuis d.8.3, `GET /admin/containers?avatar=enzo` retourne les conteneurs configurés et les quatre avatars
 disponibles. `POST /admin/containers` accepte un avatar et une liste de `{ containerKey, enabled }`. Ces deux
 routes exigent `ADMIN_TOKEN`. L'écriture refuse les clés inconnues ou dupliquées, n'accepte que des booléens et
-regroupe les seules modifications effectives dans un lot D1 transactionnel. L'interface dédiée est traitée
-séparément à l'étape suivante.
+regroupe les seules modifications effectives dans un lot D1 transactionnel. Depuis d.8.6, toute modification
+effective signale aussi le dataset `containers` au moteur bidirectionnel.
 
 Une seule base commune par dataset remplace les anciens snapshots pour la fusion GAS ↔ D1. Le journal de
 synchronisation conserve les 500 dernières opérations par dataset et indique le nombre réel de lignes D1
@@ -96,7 +96,8 @@ arrière du code ; D1 Time Travel reste disponible pour une restauration de la b
 
 ## Synchronisation GAS ↔ D1
 
-Les modules `../../gas/Sync*.gs` synchronisent six datasets : catalogue, MU et les quatre inventaires.
+Les modules `../../gas/Sync*.gs` synchronisent sept datasets : catalogue, MU, configuration des conteneurs et
+les quatre inventaires.
 Une modification demande une synchronisation dans un délai maximal de cinq minutes. Toute synchronisation
 ayant corrigé des données programme un audit d’intégrité 30 minutes plus tard. Un audit quotidien est aussi
 exécuté vers 02 h 00, et le signal D1 est contrôlé toutes les cinq minutes.
@@ -105,6 +106,11 @@ Les inventaires et les MU sont bidirectionnels. Une modification indépendante d
 à partir de la dernière base commune ; une suppression fait partie de l’état courant et est donc
 propagée. En cas de modification concurrente pendant le transfert, l’écriture est refusée puis retentée après
 relecture.
+
+La configuration des conteneurs est également bidirectionnelle. Les cases peuvent être modifiées directement
+dans `CONFIG_CONTAINER` ou via l'interface D1. Les changements indépendants sont fusionnés par couple
+avatar/conteneur et une ligne absente d'un seul côté est conservée, conformément à la règle sans suppression.
+Lors du premier raccordement, les choix historiques de Google Sheets initialisent la base commune.
 
 Le catalogue est inclus afin de garantir la même liste d’articles vendables, mais `BDD_APP` reste
 provisoirement sa source maîtresse : les colonnes prix/image/wiki dépendent encore de formules
@@ -117,7 +123,7 @@ Cloudflare et les propriétés du script, puis exécuter `installFrjBidirectiona
 
 L'entrée discrète `?admin=1` active le menu commun dans `sessionStorage` pour l'onglet courant, puis le paramètre
 est immédiatement retiré de l'URL. Le menu permet d’ouvrir explicitement les catalogues et les pages d’import
-GAS ou D1 sans propager ce paramètre. La page `rapport-sync.html` affiche l’état des six datasets et les 100
+GAS ou D1 sans propager ce paramètre. La page `rapport-sync.html` affiche l’état des sept datasets et les 100
 derniers événements du journal croisé GAS ↔ D1 lorsque la session Admin est active.
 
 Le bouton « Auditer maintenant » appelle `POST /admin/sync-audit-now`. Le Worker authentifie le jeton

@@ -48,6 +48,7 @@
     const labels = {
       catalog: "Catalogue",
       mu: "MU",
+      containers: "Configuration des conteneurs",
       "inventory:enzo": "Inventaire Enzo",
       "inventory:arkaman": "Inventaire ArkaMan",
       "inventory:kenza": "Inventaire Kenza",

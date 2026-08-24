@@ -29,7 +29,7 @@ Le booléen de session ne donne aucun droit supplémentaire. Les routes D1 `/adm
 
 ### Synchronisation GAS ↔ D1
 
-`gas/SyncD1.gs` et les routes `/sync/*` du Worker échangent catalogue, MU, inventaires et demandes. Les détails opérationnels sont documentés dans `cloudflare/for-sale-api/README.md`.
+`gas/SyncD1.gs` et les routes `/sync/*` du Worker échangent catalogue, MU, configuration des conteneurs, inventaires et demandes. `CONFIG_CONTAINER` et l'interface D1 modifient le même dataset bidirectionnel `containers`, également visible dans le Rapport de synchronisation. Les détails opérationnels sont documentés dans `cloudflare/for-sale-api/README.md`.
 
 ## Organisation du frontend
 

@@ -79,6 +79,8 @@ function frjWriteLocalInventory_(avatar, snapshot) {
   sheet.getRange(1, 1, data.length, 6).setValues(data);
   sheet.getRange("B1").setNumberFormat("dd/MM/yyyy - HH:mm:ss");
   SpreadsheetApp.flush();
+  // frjRunSync_ détient déjà le verrou global pendant cette écriture.
+  frjRefreshContainerConfigurationAfterInventoryUnlocked_(avatar);
 }
 
 function frjReadLocalMarket_() {
@@ -145,6 +147,7 @@ function frjWriteLocalMarket_(snapshot) {
 
 function frjHashDataset_(dataset, rows) {
   if (dataset === "catalog") return frjHashCatalog_(rows);
+  if (dataset === "containers") return frjHashContainerConfig_(rows);
   return dataset === "mu" ? frjHashMarket_(rows) : frjHashInventory_(rows);
 }
 

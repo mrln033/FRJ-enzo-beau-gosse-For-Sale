@@ -7,12 +7,26 @@ Ce dossier contient la totalité du projet Apps Script autonome. Apps Script cha
 - `Code.gs` : `doGet` et répartition des écritures ;
 - `WebApp.gs` : `doPost` ;
 - `Catalog.gs` : catalogue, catégories et date d'inventaire ;
+- `Containers.gs` : configuration multi-avatar des conteneurs et formules de quantité ;
 - `Imports.gs` : imports MU et inventaires ;
 - `PurchaseOrders.gs` : demandes de secours et Discord ;
 - `SyncD1.gs` : configuration, installation et déclencheurs ;
 - `SyncEngine.gs`, `SyncOrders.gs`, `SyncSheets.gs`, `SyncTransport.gs` : orchestration, demandes, feuilles et transport D1.
 
 Les secrets `FRJ_D1_SYNC_TOKEN`, `FRJ_DISCORD_ORDER_WEBHOOK_URL` et les options comme `FRJ_CART_ENABLED` restent dans les propriétés du script. Ils ne doivent jamais être ajoutés au dépôt.
+
+## Migration d.8.5 des conteneurs
+
+Après la première publication de `Containers.gs`, exécuter manuellement `prepareFrjContainerConfiguration` une seule fois depuis l'éditeur Apps Script. Cette fonction :
+
+- transforme sans remise à zéro `CONFIG_CONTAINER` de `Container | Enabled` vers `Avatar | Container | Enabled` ;
+- conserve les choix Enzo existants, y compris les anciens conteneurs absents de l'inventaire courant ;
+- ajoute les conteneurs inconnus des quatre inventaires avec `Enabled = FALSE` ;
+- remplace les formules de `BDD_APP!QUANTITE` par un calcul piloté par les choix Enzo de `CONFIG_CONTAINER`.
+
+Les imports suivants entretiennent automatiquement la liste uniquement par ajout. La variante appelée depuis le moteur de synchronisation réutilise son verrou global afin d'éviter un verrou imbriqué.
+
+Le dataset `containers` fait ensuite partie de la synchronisation bidirectionnelle ordinaire. Une modification manuelle des cases dans Google Sheets est détectée par les triggers existants ; une modification effectuée dans l'interface D1 est signalée au prochain contrôle. Les lignes ajoutées indépendamment de chaque côté sont réunies et ne sont jamais supprimées par la fusion.
 
 ## Publication avec clasp
 
@@ -24,4 +38,4 @@ Les secrets `FRJ_D1_SYNC_TOKEN`, `FRJ_DISCORD_ORDER_WEBHOOK_URL` et les options 
 6. Mettre à jour le déploiement Web App existant avec son `deploymentId`, afin de conserver la même URL `/exec`.
 7. Cloner à nouveau le projet et comparer les empreintes des fichiers, puis tester les routes publiques sans écriture métier.
 
-Le déploiement de production actuel est la version 16. Son URL est référencée par `js/api-client.js` pour le secours des demandes et par le Worker pour la synchronisation ; elle doit rester stable.
+Le déploiement de production actuel est la version 17. Son URL est référencée par `js/api-client.js` pour le secours des demandes et par le Worker pour la synchronisation ; elle doit rester stable.

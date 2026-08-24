@@ -39,7 +39,7 @@ function frjRequestSynchronization_(reason, dataset, changedAt, skipRemoteEvent)
 function frjDatasetKeys_() {
   return Object.keys(FRJ_SYNC_CONFIG.inventorySheets).map(function(avatar) {
     return "inventory:" + avatar;
-  }).concat(["mu", "catalog"]);
+  }).concat(["mu", "catalog", "containers"]);
 }
 
 function frjReadGasOutbox_() {
@@ -268,6 +268,7 @@ function frjRunSync_(forceAudit) {
       });
       summary.push(frjSynchronizeDataset_("mu", remoteStates.mu, forceAudit, 0));
       summary.push(frjSynchronizeDataset_("catalog", remoteStates.catalog, forceAudit, 0));
+      summary.push(frjSynchronizeDataset_("containers", remoteStates.containers, forceAudit, 0));
 
       var completedAt = new Date().toISOString();
       frjPublishSyncSummary_(summary, completedAt);
@@ -328,6 +329,10 @@ function frjSynchronizeDataset_(dataset, remoteState, forceAudit, retryCount) {
   if (dataset === "catalog") {
     // BDD_APP reste pour l'instant le référentiel maître : ses colonnes E:G sont des formules IMPORTRANGE.
     direction = "gas-to-d1";
+  } else if (dataset === "containers" && !baseHash) {
+    // Premier raccordement : la feuille CONFIG_CONTAINER contient les choix
+    // historiques explicites (18 activés) et initialise la base commune.
+    direction = "gas-to-d1";
   } else if (localChanged && !remoteChanged) {
     direction = "gas-to-d1";
   } else if (remoteChanged && !localChanged) {
@@ -372,7 +377,16 @@ function frjSynchronizeDataset_(dataset, remoteState, forceAudit, retryCount) {
         return frjRetryDatasetAfterConcurrentChange_(dataset, forceAudit, retryCount);
       }
       var pushed = frjPushDataset_(dataset, local, remoteState.hash);
-      frjSetBaseHash_(dataset, pushed.state.hash);
+      if (dataset === "containers" && pushed.state.hash !== local.hash) {
+        // D1 conserve lui aussi les anciennes lignes : récupérer l'éventuelle
+        // union retournée avant d'enregistrer la nouvelle base commune.
+        remoteSnapshot = frjReadRemoteDataset_(dataset);
+        frjWriteLocalDataset_(dataset, remoteSnapshot);
+        var unitedLocal = frjReadLocalDataset_(dataset);
+        frjSetBaseHash_(dataset, unitedLocal.hash);
+      } else {
+        frjSetBaseHash_(dataset, pushed.state.hash);
+      }
     } else {
       remoteSnapshot = remoteSnapshot || frjReadRemoteDataset_(dataset);
       if (frjReadLocalDataset_(dataset).hash !== local.hash) {
@@ -427,18 +441,21 @@ function frjRetryDatasetAfterConcurrentChange_(dataset, forceAudit, retryCount) 
 function frjReadLocalDataset_(dataset) {
   if (dataset === "catalog") return frjReadLocalCatalog_();
   if (dataset === "mu") return frjReadLocalMarket_();
+  if (dataset === "containers") return frjReadLocalContainerConfig_();
   return frjReadLocalInventory_(dataset.slice("inventory:".length));
 }
 
 function frjReadRemoteDataset_(dataset) {
   if (dataset === "catalog") return frjD1Request_("/sync/catalog");
   if (dataset === "mu") return frjD1Request_("/sync/mu");
+  if (dataset === "containers") return frjD1Request_("/sync/containers");
   return frjD1Request_("/sync/inventory?avatar=" + encodeURIComponent(dataset.slice("inventory:".length)));
 }
 
 function frjReadRemoteDatasetByHash_(dataset, hash) {
   if (dataset === "catalog") return frjD1Request_("/sync/catalog?hash=" + encodeURIComponent(hash));
   if (dataset === "mu") return frjD1Request_("/sync/mu?hash=" + encodeURIComponent(hash));
+  if (dataset === "containers") return frjD1Request_("/sync/containers?hash=" + encodeURIComponent(hash));
   return frjD1Request_(
     "/sync/inventory?avatar=" + encodeURIComponent(dataset.slice("inventory:".length)) +
     "&hash=" + encodeURIComponent(hash)
@@ -448,6 +465,7 @@ function frjReadRemoteDatasetByHash_(dataset, hash) {
 function frjWriteLocalDataset_(dataset, snapshot) {
   if (dataset === "catalog") throw new Error("BDD_APP est actuellement le référentiel maître du catalogue");
   if (dataset === "mu") return frjWriteLocalMarket_(snapshot);
+  if (dataset === "containers") return frjWriteLocalContainerConfig_(snapshot);
   return frjWriteLocalInventory_(dataset.slice("inventory:".length), snapshot);
 }
 
@@ -456,7 +474,9 @@ function frjPushDataset_(dataset, local, expectedHash) {
     ? "/sync/catalog"
     : (dataset === "mu"
       ? "/sync/mu"
-      : "/sync/inventory?avatar=" + encodeURIComponent(dataset.slice("inventory:".length)));
+      : (dataset === "containers"
+        ? "/sync/containers"
+        : "/sync/inventory?avatar=" + encodeURIComponent(dataset.slice("inventory:".length))));
   return frjD1Request_(path, {
     method: "post",
     expectedHash: expectedHash,
@@ -478,6 +498,10 @@ function frjThreeWayMerge_(dataset, baseRows, localRows, remoteRows, conflictWin
     var baseSignature = frjRowSignature_(dataset, baseRow);
     var localSignature = frjRowSignature_(dataset, localRow);
     var remoteSignature = frjRowSignature_(dataset, remoteRow);
+
+    // Une absence n'est jamais une demande de suppression pour ce référentiel.
+    if (dataset === "containers" && !localRow) return remoteRow;
+    if (dataset === "containers" && !remoteRow) return localRow;
 
     if (localSignature === remoteSignature) {
       if (dataset.indexOf("inventory:") === 0 && !baseRow && localRow && remoteRow) {
@@ -528,6 +552,11 @@ function frjRowsByStableKey_(dataset, rows) {
         frjText_(row.storage).toLowerCase(),
         frjText_(row.aisle).toLowerCase()
       ].join("|");
+    } else if (dataset === "containers") {
+      baseKey = "container:" + [
+        frjText_(row.avatar).toLowerCase(),
+        frjText_(row.containerKey || row.container).toLowerCase()
+      ].join("\u001f");
     } else {
       baseKey = "inventory:" + [
         frjText_(row.itemName).toLowerCase(),
@@ -558,6 +587,14 @@ function frjRowSignature_(dataset, row) {
       frjText_(row.itemName), frjText_(row.storage).toUpperCase(), frjText_(row.aisle).toUpperCase(),
       frjNullableNumberText_(row.unitPricePed), frjText_(row.image), frjText_(row.wikiUrl),
       Number(row.enabled) === 0 ? "0" : "1"
+    ]);
+  }
+  if (dataset === "containers") {
+    return JSON.stringify([
+      frjText_(row.avatar).toLowerCase(),
+      frjText_(row.containerKey || row.container).toLowerCase(),
+      frjText_(row.container),
+      row.enabled === true || Number(row.enabled) === 1 ? "1" : "0"
     ]);
   }
   return JSON.stringify([

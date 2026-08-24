@@ -19,6 +19,10 @@ export async function catalogContentHash(rows) {
   return sha256(canonicalCatalogPayload(rows));
 }
 
+export async function containerContentHash(rows) {
+  return sha256(canonicalContainerPayload(rows));
+}
+
 export function shouldSignalSyncAfterImport(pairedBackend) {
   return String(pairedBackend || "").toLowerCase() !== "gas";
 }
@@ -69,6 +73,15 @@ export function mergeMarketRows(currentRows, incomingRows) {
       sensitivity: "base"
     }))
     .map((row, index) => ({ ...row, lineNo: index + 2 }));
+}
+
+export function canonicalContainerPayload(rows) {
+  return rows.map((row) => JSON.stringify([
+    cleanText(row.avatar).toLocaleLowerCase("en-US"),
+    cleanText(row.containerKey || row.container).toLocaleLowerCase("en-US"),
+    cleanText(row.container),
+    row.enabled === true || Number(row.enabled) === 1 ? "1" : "0"
+  ])).sort().join("\n");
 }
 
 export function aggregateInventoryRows(rows) {
@@ -203,6 +216,15 @@ function cleanNullableNumber(value) {
   if (value === null || value === undefined || String(value).trim() === "") return "";
   const number = Number(value);
   return Number.isFinite(number) ? String(number) : "";
+}
+
+export function mapContainerSyncDbRow(row) {
+  return {
+    avatar: String(row.avatar_id || "").trim().toLocaleLowerCase("en-US"),
+    containerKey: String(row.container_key || "").trim().toLocaleLowerCase("en-US"),
+    container: String(row.container || "").trim(),
+    enabled: Number(row.enabled || 0) === 1
+  };
 }
 
 function cleanOptionalNumber(value) {

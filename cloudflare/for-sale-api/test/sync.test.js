@@ -2,9 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   canonicalCatalogPayload,
+  canonicalContainerPayload,
   canonicalInventoryPayload,
   canonicalMarketPayload,
   aggregateInventoryRows,
+  containerContentHash,
   inventoryContentHash,
   mergeMarketRows,
   shouldSignalSyncAfterImport
@@ -15,6 +17,22 @@ test("un import jumelé GAS + D1 ne programme pas de synchronisation de propagat
   assert.equal(shouldSignalSyncAfterImport("GAS"), false);
   assert.equal(shouldSignalSyncAfterImport(""), true);
   assert.equal(shouldSignalSyncAfterImport(null), true);
+});
+
+test("l'empreinte des conteneurs couvre avatar, clé, libellé et état", async () => {
+  const rows = [
+    { avatar: "enzo", containerKey: "carried", container: "CARRIED", enabled: true },
+    { avatar: "kenza", containerKey: "storage", container: "Storage", enabled: false }
+  ];
+  assert.equal(
+    await containerContentHash(rows),
+    await containerContentHash([...rows].reverse())
+  );
+  assert.match(canonicalContainerPayload(rows), /carried/);
+  assert.notEqual(
+    await containerContentHash(rows),
+    await containerContentHash([{ ...rows[0], enabled: false }, rows[1]])
+  );
 });
 
 test("l'empreinte inventaire ignore l'ordre et les numéros de ligne", async () => {

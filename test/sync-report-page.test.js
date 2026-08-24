@@ -40,13 +40,22 @@ const sampleReport = {
   status: "ok",
   generatedAt: "2026-08-20T10:00:00Z",
   lastGasRunAt: "2026-08-20T09:55:00Z",
-  datasets: [{
-    dataset: "catalog",
-    gas: { rowCount: 10, updatedAt: "2026-08-20T09:00:00Z", hash: "abcdef1234567890" },
-    d1: { rowCount: 10, updatedAt: "2026-08-20T09:00:00Z", hash: "abcdef1234567890" },
-    concordance: "verified",
-    lastAudit: { createdAt: "2026-08-20T09:30:00Z" }
-  }],
+  datasets: [
+    {
+      dataset: "catalog",
+      gas: { rowCount: 10, updatedAt: "2026-08-20T09:00:00Z", hash: "abcdef1234567890" },
+      d1: { rowCount: 10, updatedAt: "2026-08-20T09:00:00Z", hash: "abcdef1234567890" },
+      concordance: "verified",
+      lastAudit: { createdAt: "2026-08-20T09:30:00Z" }
+    },
+    {
+      dataset: "containers",
+      gas: { rowCount: 89, updatedAt: "2026-08-20T09:00:00Z", hash: "containers123456" },
+      d1: { rowCount: 89, updatedAt: "2026-08-20T09:00:00Z", hash: "containers123456" },
+      concordance: "verified",
+      lastAudit: { createdAt: "2026-08-20T09:30:00Z" }
+    }
+  ],
   events: [{
     createdAt: "2026-08-20T09:30:00Z",
     dataset: "catalog",
@@ -129,6 +138,7 @@ test("le rapport D1 rend le résumé, les datasets et les événements", async (
   assert.equal(datasetRow.children[0].textContent, "Catalogue");
   assert.equal(datasetRow.children[3].textContent, "abcdef123456");
   assert.equal(datasetRow.children[7].textContent, "Identique — vérifié");
+  assert.equal(page.elements.get("datasetRows").children[1].children[0].textContent, "Configuration des conteneurs");
 
   const eventRow = page.elements.get("eventRows").children[0];
   assert.equal(eventRow.children[3].textContent, "Synchronisation terminée");
