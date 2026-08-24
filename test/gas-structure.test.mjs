@@ -61,3 +61,10 @@ test("d.8.5 conserve les choix GAS et découvre uniquement par ajout", () => {
   assert.match(sources["Imports.gs"], /frjRefreshContainerConfigurationAfterInventory_\(inventoryId\)/);
   assert.match(sources["SyncSheets.gs"], /frjRefreshContainerConfigurationAfterInventoryUnlocked_\(avatar\)/);
 });
+
+test("le correctif d.6.4 réinstalle automatiquement les formules au prochain poll", () => {
+  assert.match(
+    sources["SyncD1.gs"],
+    /function frjD1SignalPollTrigger\(\)[\s\S]*frjEnsureContainerConfigurationReady_\(\)/
+  );
+});

@@ -5,7 +5,7 @@ var FRJ_CONTAINER_CONFIG = Object.freeze({
   catalogQuantityHeader: "QUANTITE",
   avatars: ["enzo", "arkaman", "kenza", "nocturnal"],
   readinessProperty: "FRJ_CONTAINER_CONFIG_VERSION",
-  readinessVersion: "2026-08-24-v1"
+  readinessVersion: "2026-08-24-v2"
 });
 
 /**
@@ -275,6 +275,7 @@ function frjInstallContainerQuantityFormulas_() {
   var appSpreadsheet = SpreadsheetApp.openById(FRJ_SYNC_CONFIG.appSpreadsheetId);
   var sheet = appSpreadsheet.getSheetByName(FRJ_CONTAINER_CONFIG.catalogSheetName);
   if (!sheet) throw new Error("Feuille BDD_APP introuvable");
+  var argumentSeparator = frjFormulaArgumentSeparator_(appSpreadsheet.getSpreadsheetLocale());
 
   var lastColumn = sheet.getLastColumn();
   var headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(function(value) {
@@ -290,28 +291,33 @@ function frjInstallContainerQuantityFormulas_() {
   if (lastRow < 2) return 0;
   var formulas = [];
   for (var row = 2; row <= lastRow; row++) {
-    formulas.push([frjBuildContainerQuantityFormula_(row, itemColumn)]);
+    formulas.push([frjBuildContainerQuantityFormula_(row, itemColumn, argumentSeparator)]);
   }
   sheet.getRange(2, quantityColumn, formulas.length, 1).setFormulas(formulas);
   return formulas.length;
 }
 
-function frjBuildContainerQuantityFormula_(row, itemColumn) {
+function frjBuildContainerQuantityFormula_(row, itemColumn, argumentSeparator) {
   var itemCell = frjColumnLetter_(itemColumn) + row;
   var inventoryId = FRJ_SYNC_CONFIG.inventorySpreadsheetId;
   var inventorySheet = FRJ_SYNC_CONFIG.inventorySheets.enzo.replace(/'/g, "''");
-  return '=IF(' + itemCell + '="","",IFERROR(LET(' +
-    'inventory,IMPORTRANGE("' + inventoryId + '","\'' + inventorySheet + '\'!B2:E"),' +
-    'itemNames,INDEX(inventory,0,1),' +
-    'quantities,INDEX(inventory,0,2),' +
-    'containerNames,INDEX(inventory,0,4),' +
-    'enabledContainers,FILTER(' + FRJ_CONTAINER_CONFIG.sheetName + '!$B$2:$B,' +
-      FRJ_CONTAINER_CONFIG.sheetName + '!$A$2:$A="enzo",' +
-      FRJ_CONTAINER_CONFIG.sheetName + '!$C$2:$C=TRUE),' +
-    'SUM(FILTER(quantities,' +
-      'LOWER(TRIM(itemNames))=LOWER(TRIM(' + itemCell + ')),' +
-      'ISNUMBER(MATCH(LOWER(TRIM(containerNames)),LOWER(TRIM(enabledContainers)),0))))' +
-  '),0))';
+  var separator = argumentSeparator || ",";
+  return '=IF(' + itemCell + '=""' + separator + '""' + separator + 'IFERROR(LET(' +
+    'inventory' + separator + 'IMPORTRANGE("' + inventoryId + '"' + separator + '"\'' + inventorySheet + '\'!B2:E")' + separator +
+    'itemNames' + separator + 'INDEX(inventory' + separator + '0' + separator + '1)' + separator +
+    'quantities' + separator + 'INDEX(inventory' + separator + '0' + separator + '2)' + separator +
+    'containerNames' + separator + 'INDEX(inventory' + separator + '0' + separator + '4)' + separator +
+    'enabledContainers' + separator + 'FILTER(' + FRJ_CONTAINER_CONFIG.sheetName + '!$B$2:$B' + separator +
+      FRJ_CONTAINER_CONFIG.sheetName + '!$A$2:$A="enzo"' + separator +
+      FRJ_CONTAINER_CONFIG.sheetName + '!$C$2:$C=TRUE)' + separator +
+    'SUM(FILTER(quantities' + separator +
+      'LOWER(TRIM(itemNames))=LOWER(TRIM(' + itemCell + '))' + separator +
+      'ISNUMBER(MATCH(LOWER(TRIM(containerNames))' + separator + 'LOWER(TRIM(enabledContainers))' + separator + '0))))' +
+  ')' + separator + '0))';
+}
+
+function frjFormulaArgumentSeparator_(locale) {
+  return /^fr(?:_|$)/i.test(String(locale || "")) ? ";" : ",";
 }
 
 function frjColumnLetter_(column) {

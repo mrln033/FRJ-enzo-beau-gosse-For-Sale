@@ -49,6 +49,17 @@ test("d.8.5 construit une formule pilotée par CONFIG_CONTAINER", () => {
   assert.doesNotMatch(formula, /calypso|pitbull|limited/i);
 });
 
+test("le correctif d.6.4 adapte les séparateurs à la locale française", () => {
+  const formula = context.frjBuildContainerQuantityFormula_(2, 3, ";");
+
+  assert.match(formula, /^=IF\(C2="";"";IFERROR\(LET\(/);
+  assert.match(formula, /IMPORTRANGE\("inventory-sheet-id";"'Inventaire Enzo'!B2:E"\)/);
+  assert.match(formula, /CONFIG_CONTAINER!\$A\$2:\$A="enzo";/);
+  assert.doesNotMatch(formula, /,/);
+  assert.equal(context.frjFormulaArgumentSeparator_("fr_FR"), ";");
+  assert.equal(context.frjFormulaArgumentSeparator_("en_US"), ",");
+});
+
 test("d.8.5 prépare les quatre avatars", () => {
   assert.deepEqual(
     JSON.parse(JSON.stringify(context.FRJ_CONTAINER_CONFIG.avatars)),

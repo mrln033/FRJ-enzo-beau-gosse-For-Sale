@@ -196,6 +196,9 @@ function frjDailyAuditTrigger() {
 function frjD1SignalPollTrigger() {
   frjEnsureSchedulerVersion_();
   var properties = PropertiesService.getScriptProperties();
+  // Le poll régulier applique aussi une préparation locale devenue nécessaire
+  // après un déploiement, même lorsqu'aucun dataset n'attend de synchronisation.
+  frjEnsureContainerConfigurationReady_();
   var outbox = frjCaptureGasOutbox_();
   frjPublishGasObservations_(outbox);
   var scheduled = [];
