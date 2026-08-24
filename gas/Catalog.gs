@@ -1,4 +1,7 @@
 var FRJ_APP_SPREADSHEET_ID = "13r_PzIZE8dJiPFU8w7UXxtEednHhS-yijNgTiYLqYP0";
+var FRJ_CATALOG_CACHE_TTL_SECONDS = 300;
+var FRJ_CATALOG_CACHE_CHUNK_SIZE = 30000;
+var FRJ_CATALOG_CACHE_PREFIX = "catalog_v2_";
 
 // Lit BDD_APP en un seul lot, puis normalise les lignes exposées par l'API.
 function getBDDAppData(category = null) {
@@ -57,59 +60,49 @@ function getBDDAppData(category = null) {
 }
 
 function getDataFast(category) {
-  const cache = CacheService.getScriptCache();
-  const key = "cat_" + category;
+  const normalizedCategory = String(category || "").trim().toUpperCase();
+  const key = FRJ_CATALOG_CACHE_PREFIX + "category_" + normalizedCategory;
+  const cached = frjReadCatalogCache_(key);
+  if (cached !== null) return cached;
 
-  const cached = cache.get(key);
-  if (cached) {
-    return JSON.parse(cached);
-  }
-
-  const data = getBDDAppData(category);
-
-  cache.put(key, JSON.stringify(data), 300); // 5 min
-
-  return data;
-}
-
-function getCachedData(category) {
-  const cache = CacheService.getScriptCache();
-  const key = "cat_" + category;
-
-  const cached = cache.get(key);
-  if (cached) {
-    return JSON.parse(cached);
-  }
-
-  const data = getBDDAppData(category);
-
-  cache.put(key, JSON.stringify(data), 300); // 5 min
-
+  const data = getBDDAppData(normalizedCategory);
+  frjWriteCatalogCache_(key, data);
   return data;
 }
 
 function getAvailableCategories() {
+  const cacheKey = FRJ_CATALOG_CACHE_PREFIX + "categories";
+  const cached = frjReadCatalogCache_(cacheKey);
+  if (cached !== null) return cached;
+
   // Une Web App autonome n'a pas de classeur actif : ouvrir explicitement BDD_APP.
   const ss = SpreadsheetApp.openById(FRJ_APP_SPREADSHEET_ID);
   const sheet = ss.getSheetByName("BDD_APP");
 
   if (!sheet) return [];
 
-  const data = sheet.getDataRange().getValues();
-  if (data.length < 2) return [];
+  const lastRow = sheet.getLastRow();
+  const lastColumn = sheet.getLastColumn();
+  if (lastRow < 2 || lastColumn < 1) return [];
 
-  const headers = data.shift();
+  const headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
 
   const storageIndex = headers.indexOf("STORAGE");
   const rayonIndex = headers.indexOf("RAYON");
   const qtyIndex = headers.indexOf("QUANTITE");
+  if (storageIndex < 0 || rayonIndex < 0 || qtyIndex < 0) return [];
+
+  // Ne transférer que la tranche contenant les trois colonnes nécessaires.
+  const firstIndex = Math.min(storageIndex, rayonIndex, qtyIndex);
+  const lastIndex = Math.max(storageIndex, rayonIndex, qtyIndex);
+  const data = sheet.getRange(2, firstIndex + 1, lastRow - 1, lastIndex - firstIndex + 1).getValues();
 
   const categories = new Set();
 
   data.forEach(row => {
-    const storage = (row[storageIndex] || "").toString().trim().toUpperCase();
-    const rayon = row[rayonIndex];
-    const qty = parseFloat(row[qtyIndex]);
+    const storage = (row[storageIndex - firstIndex] || "").toString().trim().toUpperCase();
+    const rayon = row[rayonIndex - firstIndex];
+    const qty = parseFloat(row[qtyIndex - firstIndex]);
 
     if (!storage) return;
     if (!rayon) return;
@@ -118,7 +111,43 @@ function getAvailableCategories() {
     categories.add(storage);
   });
 
-  return [...categories];
+  const result = [...categories];
+  frjWriteCatalogCache_(cacheKey, result);
+  return result;
+}
+
+// Cache découpé pour rester sous la limite par entrée, y compris pour les grosses catégories.
+function frjReadCatalogCache_(key) {
+  const cache = CacheService.getScriptCache();
+  const cached = cache.get(key);
+  if (!cached) return null;
+
+  const value = JSON.parse(cached);
+  if (!value || !value.frjChunks) return value;
+
+  const keys = [];
+  for (let index = 0; index < value.frjChunks; index++) keys.push(key + "_" + index);
+  const chunks = cache.getAll(keys);
+  if (keys.some(chunkKey => typeof chunks[chunkKey] !== "string")) return null;
+  return JSON.parse(keys.map(chunkKey => chunks[chunkKey]).join(""));
+}
+
+function frjWriteCatalogCache_(key, value) {
+  const cache = CacheService.getScriptCache();
+  const json = JSON.stringify(value);
+  if (json.length <= FRJ_CATALOG_CACHE_CHUNK_SIZE) {
+    cache.put(key, json, FRJ_CATALOG_CACHE_TTL_SECONDS);
+    return;
+  }
+
+  const entries = {};
+  let chunkCount = 0;
+  for (let offset = 0; offset < json.length; offset += FRJ_CATALOG_CACHE_CHUNK_SIZE) {
+    entries[key + "_" + chunkCount] = json.slice(offset, offset + FRJ_CATALOG_CACHE_CHUNK_SIZE);
+    chunkCount++;
+  }
+  entries[key] = JSON.stringify({ frjChunks: chunkCount });
+  cache.putAll(entries, FRJ_CATALOG_CACHE_TTL_SECONDS);
 }
 
 function getInventoryDate() {
