@@ -79,8 +79,9 @@ normalisées.
 
 Depuis d.8.1, `container_config` prépare un choix indépendant par avatar. La migration reprend le filtre D1
 historique pour Enzo, désactive les autres avatars par défaut et découvre les nouveaux conteneurs par ajout
-uniquement. Les suppressions d'inventaire ne retirent jamais une configuration existante. Le catalogue public
-continue temporairement d'utiliser l'ancien filtre jusqu'à d.8.2.
+uniquement. Les suppressions d'inventaire ne retirent jamais une configuration existante. Depuis d.8.2, la vue
+`saleable_inventory` joint ce référentiel à l'inventaire courant : le catalogue, les contrôles de stock et les
+révisions de demandes utilisent tous les mêmes choix, sans liste de conteneurs dans le code du Worker.
 
 Une seule base commune par dataset remplace les anciens snapshots pour la fusion GAS ↔ D1. Le journal de
 synchronisation conserve les 500 dernières opérations par dataset et indique le nombre réel de lignes D1

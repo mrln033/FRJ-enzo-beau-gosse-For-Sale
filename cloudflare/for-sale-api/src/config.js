@@ -21,19 +21,3 @@ export const SYNC_DATASETS = new Set([
   "mu",
   ...Object.keys(AVATAR_SHEETS).map((avatar) => `inventory:${avatar}`)
 ]);
-
-export const SALEABLE_CONTAINER_SQL = `(
-  lower(coalesce(ii.container, '')) LIKE '%calypso%'
-  OR lower(coalesce(ii.container, '')) LIKE '%carried%'
-  OR lower(coalesce(ii.container, '')) IN (
-    'pitbull mk. 1 (c,l)',
-    'pitbull mk. 2 (c,l)',
-    'personal avatar',
-    'ni armors',
-    'ni tailoring/textiles',
-    'blueprints: a.r.c.',
-    'blueprints: cyrene',
-    'kulokhar tall urn'
-  )
-  OR lower(coalesce(ii.container, '')) LIKE '%limited%'
-)`;

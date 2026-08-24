@@ -29,8 +29,7 @@ import {
   MAX_ORDER_BYTES,
   SYNC_AUDIT_RETENTION_COUNT,
   AVATAR_SHEETS,
-  SYNC_DATASETS,
-  SALEABLE_CONTAINER_SQL
+  SYNC_DATASETS
 } from "./config.js";
 import {
   ApiError,
@@ -68,13 +67,12 @@ export async function handleGet(url, env) {
       SELECT l.storage
       FROM catalog_listings l
       JOIN catalog_items c ON c.name = l.item_name COLLATE NOCASE
-      JOIN inventory_current ii
+      JOIN saleable_inventory ii
         ON ii.avatar_id = 'enzo'
        AND ii.item_name = c.name COLLATE NOCASE
       WHERE l.enabled = 1
         AND l.storage <> ''
         AND l.aisle <> ''
-        AND ${SALEABLE_CONTAINER_SQL}
       GROUP BY l.storage
       HAVING SUM(ii.quantity) > 0
       ORDER BY l.storage
@@ -102,9 +100,8 @@ export async function handleGet(url, env) {
   const result = await env.DB.prepare(`
     WITH inventory AS (
       SELECT ii.item_name, SUM(ii.quantity) AS quantity
-      FROM inventory_current ii
+      FROM saleable_inventory ii
       WHERE ii.avatar_id = 'enzo'
-        AND ${SALEABLE_CONTAINER_SQL}
       GROUP BY ii.item_name COLLATE NOCASE
     ),
     recent_market AS (
@@ -1292,10 +1289,9 @@ async function updateOrderProposal(env, orderId, requestedItems) {
     )
     SELECT r.item_name, COALESCE(SUM(ii.quantity), 0) AS stock
     FROM requested r
-    LEFT JOIN inventory_current ii
+    LEFT JOIN saleable_inventory ii
       ON ii.avatar_id = 'enzo'
      AND ii.item_name = r.item_name COLLATE NOCASE
-     AND ${SALEABLE_CONTAINER_SQL}
     GROUP BY r.item_name COLLATE NOCASE
   `).bind(JSON.stringify(itemNames)).all();
   const stocks = new Map(stocksResult.results.map((row) => [String(row.item_name).toLocaleLowerCase("en-US"), Number(row.stock || 0)]));
@@ -1395,10 +1391,9 @@ export async function handleAdminPost(request, url, env) {
 
     const stockRow = await env.DB.prepare(`
       SELECT COALESCE(SUM(ii.quantity), 0) AS stock
-      FROM inventory_current ii
+      FROM saleable_inventory ii
       WHERE ii.avatar_id = 'enzo'
         AND ii.item_name = ? COLLATE NOCASE
-        AND ${SALEABLE_CONTAINER_SQL}
     `).bind(existing.item_name).first();
     const revised = parseOrderValue(() => reviseOrderLine(existing, payload, Number(stockRow?.stock || 0)));
     if (hasSameOrderTerms(existing, revised)) {
@@ -1689,8 +1684,8 @@ async function readOrderCatalogRows(env, requestedItems) {
       FROM json_each(?)
     ), inventory AS (
       SELECT ii.item_name, SUM(ii.quantity) AS stock
-      FROM inventory_current ii
-      WHERE ii.avatar_id = 'enzo' AND ${SALEABLE_CONTAINER_SQL}
+      FROM saleable_inventory ii
+      WHERE ii.avatar_id = 'enzo'
       GROUP BY ii.item_name COLLATE NOCASE
     )
     SELECT
