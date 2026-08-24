@@ -3,7 +3,9 @@ var FRJ_CONTAINER_CONFIG = Object.freeze({
   catalogSheetName: "BDD_APP",
   catalogItemHeader: "ITEM",
   catalogQuantityHeader: "QUANTITE",
-  avatars: ["enzo", "arkaman", "kenza", "nocturnal"]
+  avatars: ["enzo", "arkaman", "kenza", "nocturnal"],
+  readinessProperty: "FRJ_CONTAINER_CONFIG_VERSION",
+  readinessVersion: "2026-08-24-v1"
 });
 
 /**
@@ -15,20 +17,38 @@ function prepareFrjContainerConfiguration() {
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
-    var schema = frjEnsureContainerConfigSchema_();
-    var result = {
-      migrated: schema.migrated,
-      avatars: {}
-    };
-
-    FRJ_CONTAINER_CONFIG.avatars.forEach(function(avatar) {
-      result.avatars[avatar] = frjRefreshContainerConfig_(avatar, schema.sheet);
-    });
-    result.formulaRows = frjInstallContainerQuantityFormulas_();
-    return result;
+    return frjPrepareContainerConfigurationUnlocked_();
   } finally {
     lock.releaseLock();
   }
+}
+
+// La synchronisation détient déjà le verrou global : cette variante permet au
+// premier passage de production d'effectuer la migration sans double verrou.
+function frjPrepareContainerConfigurationUnlocked_() {
+  var schema = frjEnsureContainerConfigSchema_();
+  var result = {
+    migrated: schema.migrated,
+    avatars: {}
+  };
+
+  FRJ_CONTAINER_CONFIG.avatars.forEach(function(avatar) {
+    result.avatars[avatar] = frjRefreshContainerConfig_(avatar, schema.sheet);
+  });
+  result.formulaRows = frjInstallContainerQuantityFormulas_();
+  PropertiesService.getScriptProperties().setProperty(
+    FRJ_CONTAINER_CONFIG.readinessProperty,
+    FRJ_CONTAINER_CONFIG.readinessVersion
+  );
+  return result;
+}
+
+function frjEnsureContainerConfigurationReady_() {
+  var properties = PropertiesService.getScriptProperties();
+  if (properties.getProperty(FRJ_CONTAINER_CONFIG.readinessProperty) === FRJ_CONTAINER_CONFIG.readinessVersion) {
+    return null;
+  }
+  return frjPrepareContainerConfigurationUnlocked_();
 }
 
 /** Ajoute les conteneurs inconnus d'un inventaire sans jamais en supprimer. */

@@ -17,7 +17,7 @@ Les secrets `FRJ_D1_SYNC_TOKEN`, `FRJ_DISCORD_ORDER_WEBHOOK_URL` et les options 
 
 ## Migration d.8.5 des conteneurs
 
-Après la première publication de `Containers.gs`, exécuter manuellement `prepareFrjContainerConfiguration` une seule fois depuis l'éditeur Apps Script. Cette fonction :
+Au premier cycle de synchronisation suivant la publication, l'initialisation versionnée exécute automatiquement et une seule fois la préparation des conteneurs. La fonction `prepareFrjContainerConfiguration` reste disponible pour une reprise manuelle contrôlée. Cette préparation :
 
 - transforme sans remise à zéro `CONFIG_CONTAINER` de `Container | Enabled` vers `Avatar | Container | Enabled` ;
 - conserve les choix Enzo existants, y compris les anciens conteneurs absents de l'inventaire courant ;
@@ -38,4 +38,4 @@ Le dataset `containers` fait ensuite partie de la synchronisation bidirectionnel
 6. Mettre à jour le déploiement Web App existant avec son `deploymentId`, afin de conserver la même URL `/exec`.
 7. Cloner à nouveau le projet et comparer les empreintes des fichiers, puis tester les routes publiques sans écriture métier.
 
-Le déploiement de production actuel est la version 17. Son URL est référencée par `js/api-client.js` pour le secours des demandes et par le Worker pour la synchronisation ; elle doit rester stable.
+Le déploiement de production actuel est la version 20. Son URL est référencée par `js/api-client.js` pour le secours des demandes et par le Worker pour la synchronisation ; elle doit rester stable.

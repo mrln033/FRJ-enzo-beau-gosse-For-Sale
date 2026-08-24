@@ -261,6 +261,9 @@ function frjRunSync_(forceAudit) {
     var properties = PropertiesService.getScriptProperties();
     var summary = [];
     try {
+      // Déploiement sûr : la première synchronisation d'une nouvelle version
+      // prépare CONFIG_CONTAINER et les formules, puis mémorise cette étape.
+      frjEnsureContainerConfigurationReady_();
       var remoteStates = frjD1Request_("/sync/state").datasets || {};
       Object.keys(FRJ_SYNC_CONFIG.inventorySheets).forEach(function(avatar) {
         var dataset = "inventory:" + avatar;

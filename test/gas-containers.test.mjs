@@ -55,3 +55,30 @@ test("d.8.5 prépare les quatre avatars", () => {
     ["enzo", "arkaman", "kenza", "nocturnal"]
   );
 });
+
+test("d.8.7 initialise automatiquement CONFIG_CONTAINER une seule fois par version", () => {
+  const properties = new Map();
+  let preparations = 0;
+  context.PropertiesService = {
+    getScriptProperties() {
+      return {
+        getProperty: (key) => properties.get(key) || null
+      };
+    }
+  };
+  context.frjPrepareContainerConfigurationUnlocked_ = () => {
+    preparations += 1;
+    properties.set(
+      context.FRJ_CONTAINER_CONFIG.readinessProperty,
+      context.FRJ_CONTAINER_CONFIG.readinessVersion
+    );
+    return { migrated: true };
+  };
+
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(context.frjEnsureContainerConfigurationReady_())),
+    { migrated: true }
+  );
+  assert.equal(context.frjEnsureContainerConfigurationReady_(), null);
+  assert.equal(preparations, 1);
+});
