@@ -67,17 +67,19 @@ export async function handleGet(url, env) {
 
   if (action === "categories") {
     const result = await env.DB.prepare(`
-      SELECT l.storage
+      SELECT DISTINCT l.storage
       FROM catalog_listings l
-      JOIN catalog_items c ON c.name = l.item_name COLLATE NOCASE
-      JOIN saleable_inventory ii
-        ON ii.avatar_id = 'enzo'
-       AND ii.item_name = c.name COLLATE NOCASE
       WHERE l.enabled = 1
         AND l.storage <> ''
         AND l.aisle <> ''
-      GROUP BY l.storage
-      HAVING SUM(ii.quantity) > 0
+        AND EXISTS (
+          SELECT 1
+          FROM saleable_inventory ii
+          WHERE ii.avatar_id = 'enzo'
+            AND ii.item_name = l.item_name COLLATE NOCASE
+          GROUP BY ii.item_name COLLATE NOCASE
+          HAVING SUM(ii.quantity) > 0
+        )
       ORDER BY l.storage
     `).all();
     return publicJson(result.results.map((row) => row.storage));
@@ -101,43 +103,35 @@ export async function handleGet(url, env) {
   if (!category) return publicJson([]);
 
   const result = await env.DB.prepare(`
-    WITH inventory AS (
-      SELECT ii.item_name, SUM(ii.quantity) AS quantity
-      FROM saleable_inventory ii
-      WHERE ii.avatar_id = 'enzo'
-      GROUP BY ii.item_name COLLATE NOCASE
-    ),
-    recent_market AS (
-      SELECT
-        mo.item_name,
-        mo.weighted_display,
-        mo.observed_at
-      FROM market_current mo
-      WHERE datetime(mo.observed_at) >= datetime('now', '-7 days')
-    )
     SELECT
       l.storage AS STORAGE,
       l.aisle AS RAYON,
       c.name AS ITEM,
-      inventory.quantity AS QUANTITE,
+      SUM(ii.quantity) AS QUANTITE,
       c.unit_price_ped AS PRIX_UNITAIRE,
       c.image AS IMAGE,
       c.wiki_url AS LIEN_WIKI,
-      recent_market.observed_at AS DATE_MU_ISO,
-      recent_market.weighted_display AS MU,
+      mo.observed_at AS DATE_MU_ISO,
+      mo.weighted_display AS MU,
       COALESCE(p.discount_rate, '') AS Remise_Promo
     FROM catalog_listings l
     JOIN catalog_items c ON c.name = l.item_name COLLATE NOCASE
-    JOIN inventory ON inventory.item_name = c.name COLLATE NOCASE
-    LEFT JOIN recent_market
-      ON recent_market.item_name = c.name COLLATE NOCASE
+    JOIN saleable_inventory ii
+      ON ii.avatar_id = 'enzo'
+     AND ii.item_name = c.name COLLATE NOCASE
+    LEFT JOIN market_current mo
+      ON mo.item_name = c.name COLLATE NOCASE
+     AND datetime(mo.observed_at) >= datetime('now', '-7 days')
     LEFT JOIN promotions p
       ON p.promotion_date = date('now')
-     AND p.storage = l.storage
-     AND p.aisle = l.aisle
+      AND p.storage = l.storage
+      AND p.aisle = l.aisle
     WHERE l.enabled = 1
       AND l.storage = ? COLLATE NOCASE
-      AND inventory.quantity > 0
+    GROUP BY
+      l.storage, l.aisle, c.name, c.unit_price_ped, c.image, c.wiki_url,
+      mo.observed_at, mo.weighted_display, p.discount_rate
+    HAVING SUM(ii.quantity) > 0
     ORDER BY c.name COLLATE NOCASE
   `).bind(category).all();
 
