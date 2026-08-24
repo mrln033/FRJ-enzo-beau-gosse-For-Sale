@@ -893,12 +893,13 @@ async function storeCatalogSnapshot(env, options) {
     env.DB.prepare(`
       DELETE FROM catalog_listings AS listing
       WHERE NOT EXISTS (
-        SELECT 1 FROM json_each(?) incoming
-        WHERE lower(trim(json_extract(incoming.value, '$.itemName'))) = lower(listing.item_name)
-          AND upper(trim(json_extract(incoming.value, '$.storage'))) = listing.storage
-          AND upper(trim(json_extract(incoming.value, '$.aisle'))) = listing.aisle
+        SELECT 1
+        FROM catalog_current AS current
+        WHERE current.item_name = listing.item_name
+          AND current.storage = listing.storage
+          AND current.aisle = listing.aisle
       )
-    `).bind(payload),
+    `),
     env.DB.prepare(`
       DELETE FROM catalog_items
       WHERE NOT EXISTS (
