@@ -25,6 +25,8 @@ Le panier reste dans le stockage local jusqu'à sa transmission. D1 reçoit la d
 
 Le booléen de session ne donne aucun droit supplémentaire. Les routes D1 `/admin/*` exigent toujours le jeton administrateur et les routes `/sync/*` leur jeton de synchronisation.
 
+`conteneurs.html` gère les choix D1 des quatre inventaires via les routes Admin dédiées. Son contrôleur `js/pages/conteneurs.js` conserve les modifications localement jusqu'à l'enregistrement explicite et n'envoie que les choix réellement modifiés.
+
 ### Synchronisation GAS ↔ D1
 
 `gas/SyncD1.gs` et les routes `/sync/*` du Worker échangent catalogue, MU, inventaires et demandes. Les détails opérationnels sont documentés dans `cloudflare/for-sale-api/README.md`.
@@ -58,6 +60,7 @@ Le contrôleur du rapport D1 se trouve dans `js/pages/rapport-sync.js` ; la page
 Les contrôleurs des demandes sont `js/pages/commandes.js` et `js/pages/suivi-commande.js`.
 Leurs statuts, règles d'action et formats communs sont centralisés dans `js/common/order-ui.js` ; leurs textes et parcours propres restent séparés.
 Le catalogue conserve `index.html` comme point d'entrée stable et charge sa logique depuis `js/pages/index.js`, avant le composant panier.
+La gestion des conteneurs conserve elle aussi une séparation complète entre `conteneurs.html`, `js/pages/conteneurs.js` et `css/pages/conteneurs.css`.
 
 ## Organisation du Worker D1
 

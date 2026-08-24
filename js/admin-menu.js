@@ -14,6 +14,7 @@
       label: "MàJ Inventaire / MU (GAS + D1)",
       href: "maj_inventaire-enzo.html"
     },
+    { section: "containers", backend: "", label: "Conteneurs D1", href: "conteneurs.html" },
     { section: "report", backend: "", label: "Rapport de synchronisation", href: "rapport-sync.html" },
     { section: "orders", backend: "", label: "Demandes d'achat", href: "commandes.html" }
   ];
@@ -23,6 +24,8 @@
     const pathname = global.location.pathname.toLowerCase();
     const section = pathname.includes("commandes")
       ? "orders"
+      : pathname.includes("conteneurs")
+      ? "containers"
       : pathname.includes("rapport-sync")
       ? "report"
       : (pathname.includes("maj_") ? "update" : "catalog");

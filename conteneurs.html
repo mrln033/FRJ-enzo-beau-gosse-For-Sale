@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <base target="_self">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <link rel="icon" href="./favicon.ico">
+  <link rel="stylesheet" href="./css/site.css?v=20260820-1">
+  <link rel="stylesheet" href="./css/pages/conteneurs.css?v=20260824-1">
+  <script src="./js/admin-session.js?v=20260820-1"></script>
+  <script src="./js/api-client.js?v=20260814-7"></script>
+  <script defer src="./js/admin-menu.js?v=20260824-1"></script>
+  <script defer src="./js/pages/conteneurs.js?v=20260824-1"></script>
+  <title>[FRJ] — Conteneurs pris en compte</title>
+</head>
+<body class="containers-page">
+  <main class="containers-admin">
+    <header class="containers-header">
+      <div>
+        <h1>Conteneurs pris en compte</h1>
+        <p>Choisissez les conteneurs inclus dans les quantités publiées par D1.</p>
+      </div>
+      <div class="containers-header-actions">
+        <button type="button" id="reloadContainers" class="secondary">Recharger</button>
+        <button type="button" id="clearContainersToken" class="secondary">Oublier le jeton</button>
+      </div>
+    </header>
+
+    <section class="containers-panel containers-toolbar" aria-label="Filtres des conteneurs">
+      <label>
+        Inventaire
+        <select id="containerAvatar">
+          <option value="enzo">Inventaire Enzo</option>
+        </select>
+      </label>
+      <label>
+        Rechercher
+        <input type="search" id="containerSearch" placeholder="Nom du conteneur" autocomplete="off">
+      </label>
+      <label>
+        Afficher
+        <select id="containerFilter">
+          <option value="all">Tous</option>
+          <option value="enabled">Activés</option>
+          <option value="disabled">Désactivés</option>
+        </select>
+      </label>
+    </section>
+
+    <div id="containersLoading" class="containers-message">Chargement des conteneurs…</div>
+    <div id="containersError" class="containers-message error" role="alert" hidden></div>
+
+    <section id="containersContent" hidden>
+      <div class="containers-summary-bar">
+        <p id="containersSummary"></p>
+        <p id="containersSaveStatus" role="status" aria-live="polite"></p>
+        <button type="button" id="saveContainers" disabled>Enregistrer les modifications</button>
+      </div>
+      <div id="containersList" class="containers-list"></div>
+    </section>
+  </main>
+</body>
+</html>

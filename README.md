@@ -10,6 +10,7 @@ Le frontend statique est publié par GitHub Pages. Il peut lire les données dep
 - `aide-panier.html` : aide bilingue affichée dans le panier.
 - `suivi-commande.html` : suivi client par lien privé.
 - `commandes.html` : console des demandes d'achat.
+- `conteneurs.html` : configuration D1 des conteneurs inclus dans les quantités.
 - `maj_mu.html` et `maj_inventaire-enzo.html` : imports administrateur.
 - `rapport-sync.html` : rapport de synchronisation GAS ↔ D1.
 

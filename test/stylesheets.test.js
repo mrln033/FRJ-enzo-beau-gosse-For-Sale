@@ -37,6 +37,7 @@ test("les anciennes feuilles racine ont été remplacées par css/", async () =>
     "css/pages/imports.css",
     "css/pages/sync-report.css",
     "css/pages/commandes.css",
+    "css/pages/conteneurs.css",
     "css/pages/suivi-commande.css"
   ]) {
     await assert.doesNotReject(access(path.join(root, name)));
