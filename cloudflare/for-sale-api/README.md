@@ -83,6 +83,12 @@ uniquement. Les suppressions d'inventaire ne retirent jamais une configuration e
 `saleable_inventory` joint ce référentiel à l'inventaire courant : le catalogue, les contrôles de stock et les
 révisions de demandes utilisent tous les mêmes choix, sans liste de conteneurs dans le code du Worker.
 
+Depuis d.8.3, `GET /admin/containers?avatar=enzo` retourne les conteneurs configurés et les quatre avatars
+disponibles. `POST /admin/containers` accepte un avatar et une liste de `{ containerKey, enabled }`. Ces deux
+routes exigent `ADMIN_TOKEN`. L'écriture refuse les clés inconnues ou dupliquées, n'accepte que des booléens et
+regroupe les seules modifications effectives dans un lot D1 transactionnel. L'interface dédiée est traitée
+séparément à l'étape suivante.
+
 Une seule base commune par dataset remplace les anciens snapshots pour la fusion GAS ↔ D1. Le journal de
 synchronisation conserve les 500 dernières opérations par dataset et indique le nombre réel de lignes D1
 écrites. Les anciennes tables versionnées restent temporairement en lecture seule pour permettre un retour

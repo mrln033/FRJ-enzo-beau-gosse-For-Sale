@@ -23,6 +23,7 @@ import {
   validateOrderStatus
 } from "./orders.js";
 import { sendOrUpdateDiscordOrder } from "./discord.js";
+import { diffContainerConfig, mapContainerConfigRow, normalizeContainerConfigPayload } from "./containers.js";
 import {
   MAX_IMPORT_BYTES,
   MAX_OBSERVATION_BYTES,
@@ -149,6 +150,9 @@ export async function handleGet(url, env) {
 export async function handleAdminGet(url, env) {
   if (url.pathname === "/admin/orders") {
     return json(await readAdminOrders(env));
+  }
+  if (url.pathname === "/admin/containers") {
+    return json(await readContainerConfig(env, url.searchParams.get("avatar")));
   }
   if (url.pathname !== "/admin/sync-report") {
     return json({ error: "Endpoint administrateur inconnu" }, 404);
@@ -1359,6 +1363,11 @@ async function updateOrderProposal(env, orderId, requestedItems) {
 }
 
 export async function handleAdminPost(request, url, env) {
+  if (url.pathname === "/admin/containers") {
+    const payload = parseJsonBody(await readTextBody(request, 100_000));
+    return json(await updateContainerConfig(env, payload));
+  }
+
   const orderProposalMatch = url.pathname.match(/^\/admin\/orders\/([a-f0-9-]{36})\/proposal$/i);
   if (orderProposalMatch) {
     const payload = parseJsonBody(await readTextBody(request, 40_000));
@@ -1507,6 +1516,62 @@ export async function handleAdminPost(request, url, env) {
   const dataset = String(payload.dataset || "").trim();
   const reason = String(payload.reason || "modification-gas").trim();
   return json(await notifyGasDataChanged(env, dataset, reason));
+}
+
+async function readContainerConfig(env, requestedAvatar) {
+  const avatar = String(requestedAvatar || "enzo").trim().toLowerCase();
+  if (!AVATAR_SHEETS[avatar]) throw new ApiError(400, `Avatar inconnu : ${avatar || "absent"}`);
+  const result = await env.DB.prepare(`
+    SELECT container_key, container, enabled, updated_at
+    FROM container_config
+    WHERE avatar_id = ?
+    ORDER BY container COLLATE NOCASE
+  `).bind(avatar).all();
+  return {
+    avatar,
+    avatars: Object.entries(AVATAR_SHEETS).map(([id, sheet]) => ({ id, sheet })),
+    containers: result.results.map(mapContainerConfigRow)
+  };
+}
+
+async function updateContainerConfig(env, payload) {
+  let normalized;
+  try {
+    normalized = normalizeContainerConfigPayload(payload, AVATAR_SHEETS);
+  } catch (error) {
+    throw new ApiError(400, error instanceof Error ? error.message : "Configuration de conteneurs invalide");
+  }
+
+  const keys = normalized.changes.map((entry) => entry.containerKey);
+  const existingResult = await env.DB.prepare(`
+    SELECT container_key, enabled
+    FROM container_config
+    WHERE avatar_id = ?
+      AND container_key IN (SELECT CAST(value AS TEXT) FROM json_each(?))
+  `).bind(normalized.avatar, JSON.stringify(keys)).all();
+  const { changed, missing } = diffContainerConfig(normalized.changes, existingResult.results);
+  if (missing.length) {
+    throw new ApiError(409, "La liste des conteneurs a changé ; rechargez-la avant d'enregistrer");
+  }
+
+  if (!changed.length) return { ok: true, avatar: normalized.avatar, changed: 0, noChange: true };
+
+  const statement = env.DB.prepare(`
+    UPDATE container_config
+    SET enabled = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE avatar_id = ? AND container_key = ? AND enabled <> ?
+  `);
+  const results = await env.DB.batch(changed.map((entry) => {
+    const enabled = entry.enabled ? 1 : 0;
+    return statement.bind(enabled, normalized.avatar, entry.containerKey, enabled);
+  }));
+  const rowsChanged = results.reduce((total, result) => total + Number(result.meta?.changes || 0), 0);
+  return {
+    ok: true,
+    avatar: normalized.avatar,
+    changed: rowsChanged,
+    noChange: rowsChanged === 0
+  };
 }
 
 export async function handlePublicOrderGet(url, env) {

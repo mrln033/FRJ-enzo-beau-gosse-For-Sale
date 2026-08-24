@@ -63,7 +63,7 @@ Le catalogue conserve `index.html` comme point d'entrée stable et charge sa log
 
 Le point d'entrée Cloudflare reste `cloudflare/for-sale-api/src/index.js`. Il se limite désormais au routage HTTP, à l'authentification, au contrôle des origines et à la conversion uniforme des erreurs.
 
-Les traitements applicatifs sont regroupés dans `application.js`. La configuration statique et les limites sont centralisées dans `config.js`, tandis que `http.js` porte les réponses, CORS, lecture bornée des corps, empreintes et comparaisons de jetons. Les modules métier existants `domain.js`, `orders.js`, `sync.js` et `discord.js` restent indépendants. Cette séparation ne change ni le nom du Worker, ni ses routes, ni ses formats de réponse.
+Les traitements applicatifs sont regroupés dans `application.js`. La configuration statique et les limites sont centralisées dans `config.js`, tandis que `http.js` porte les réponses, CORS, lecture bornée des corps, empreintes et comparaisons de jetons. Les modules métier `domain.js`, `orders.js`, `sync.js`, `discord.js` et `containers.js` restent indépendants ; ce dernier valide et compare les choix de conteneurs avant toute écriture D1. Cette séparation ne change pas le nom du Worker ni ses protections HTTP.
 
 ## Organisation du backend GAS
 
