@@ -175,21 +175,34 @@ export async function handleAdminGet(url, env) {
       ORDER BY dataset_key
     `),
     env.DB.prepare(`
-      WITH ranked AS (
-        SELECT
-          id, dataset_key, direction, action, source_checksum, target_checksum,
-          details, created_at,
-          ROW_NUMBER() OVER (PARTITION BY dataset_key ORDER BY id DESC) AS rank
-        FROM sync_audit
-        WHERE dataset_key = '_system'
-           OR action IN ('verified', 'reconciled')
+      WITH latest_ids AS (
+        SELECT (
+          SELECT id
+          FROM sync_audit
+          WHERE dataset_key = state.dataset_key
+            AND action IN ('verified', 'reconciled')
+          ORDER BY id DESC
+          LIMIT 1
+        ) AS id
+        FROM sync_state AS state
+
+        UNION ALL
+
+        SELECT (
+          SELECT id
+          FROM sync_audit
+          WHERE dataset_key = '_system'
+          ORDER BY id DESC
+          LIMIT 1
+        ) AS id
       )
       SELECT
-        id, dataset_key, direction, action, source_checksum, target_checksum,
-        details, created_at
-      FROM ranked
-      WHERE rank = 1
-      ORDER BY dataset_key
+        audit.id, audit.dataset_key, audit.direction, audit.action,
+        audit.source_checksum, audit.target_checksum, audit.details, audit.created_at
+      FROM latest_ids
+      JOIN sync_audit AS audit ON audit.id = latest_ids.id
+      WHERE latest_ids.id IS NOT NULL
+      ORDER BY audit.dataset_key
     `),
     env.DB.prepare(`
       SELECT
@@ -201,7 +214,7 @@ export async function handleAdminGet(url, env) {
     `).bind(limit),
     env.DB.prepare(`
       SELECT id, details, created_at
-      FROM sync_audit
+      FROM sync_audit INDEXED BY idx_sync_audit_completed_run_id
       WHERE dataset_key = '_system'
         AND action = 'sync-run-completed'
       ORDER BY id DESC
@@ -384,7 +397,7 @@ export async function handleSyncGet(url, env) {
   if (url.pathname === "/sync/pending") {
     const row = await env.DB.prepare(`
       SELECT id, details, created_at
-      FROM sync_audit
+      FROM sync_audit INDEXED BY idx_sync_audit_pending_signal_id
       WHERE dataset_key = '_system'
         AND direction = 'signal'
         AND action = 'sync-requested'
@@ -1276,13 +1289,14 @@ function syncAuditRetentionStatement(env, datasetKey) {
   return env.DB.prepare(`
     DELETE FROM sync_audit
     WHERE dataset_key = ?
-      AND id NOT IN (
-        SELECT id FROM sync_audit
+      AND id < COALESCE((
+        SELECT id
+        FROM sync_audit
         WHERE dataset_key = ?
         ORDER BY id DESC
-        LIMIT ?
-      )
-  `).bind(datasetKey, datasetKey, SYNC_AUDIT_RETENTION_COUNT);
+        LIMIT 1 OFFSET ?
+      ), 0)
+  `).bind(datasetKey, datasetKey, SYNC_AUDIT_RETENTION_COUNT - 1);
 }
 
 function baselineStatement(env, state, rows) {
