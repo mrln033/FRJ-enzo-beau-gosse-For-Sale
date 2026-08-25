@@ -7,6 +7,10 @@ const migration = await readFile(
   new URL("../cloudflare/for-sale-api/migrations/0011_container_config.sql", import.meta.url),
   "utf8"
 );
+const idempotentDiscoveryMigration = await readFile(
+  new URL("../cloudflare/for-sale-api/migrations/0015_idempotent_container_discovery.sql", import.meta.url),
+  "utf8"
+);
 
 function createDatabase() {
   const database = new DatabaseSync(":memory:");
@@ -114,6 +118,54 @@ test("d.8.1 découvre uniquement par ajout et conserve les anciens conteneurs", 
     { container: "CARRIED", enabled: 1 },
     { container: "Coffre Renommé", enabled: 0 },
     { container: "Nouveau Coffre", enabled: 0 }
+  ]);
+  database.close();
+});
+
+test("la découverte reste idempotente pendant un UPSERT groupé d'inventaire", () => {
+  const database = createDatabase();
+  insertInventory(database, "enzo", "enzo-1", "Item A", "CARRIED");
+  database.exec(migration);
+  database.exec(idempotentDiscoveryMigration);
+  database.prepare(`
+    UPDATE container_config
+    SET enabled = 1
+    WHERE avatar_id = 'enzo' AND container_key = 'carried'
+  `).run();
+
+  const rows = JSON.stringify([
+    { rowKey: "enzo-1", lineNo: 1, itemName: "Item A", quantity: 2, container: "CARRIED" },
+    { rowKey: "enzo-2", lineNo: 2, itemName: "Item B", quantity: 1, container: "Nouveau Coffre" },
+    { rowKey: "enzo-3", lineNo: 3, itemName: "Item C", quantity: 1, container: " nouveau coffre " }
+  ]);
+  database.prepare(`
+    INSERT INTO inventory_current (
+      avatar_id, row_key, line_no, item_name, quantity, container
+    )
+    SELECT
+      'enzo',
+      json_extract(value, '$.rowKey'),
+      CAST(json_extract(value, '$.lineNo') AS INTEGER),
+      json_extract(value, '$.itemName'),
+      CAST(json_extract(value, '$.quantity') AS REAL),
+      json_extract(value, '$.container')
+    FROM json_each(?)
+    WHERE true
+    ON CONFLICT (avatar_id, row_key) DO UPDATE SET
+      item_name = excluded.item_name,
+      quantity = excluded.quantity,
+      container = excluded.container
+  `).run(rows);
+
+  const containers = database.prepare(`
+    SELECT container_key, container, enabled
+    FROM container_config
+    WHERE avatar_id = 'enzo'
+    ORDER BY container_key
+  `).all().map((row) => ({ ...row }));
+  assert.deepEqual(containers, [
+    { container_key: "carried", container: "CARRIED", enabled: 1 },
+    { container_key: "nouveau coffre", container: "Nouveau Coffre", enabled: 0 }
   ]);
   database.close();
 });
