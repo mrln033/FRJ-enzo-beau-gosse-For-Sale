@@ -10,7 +10,7 @@ var FRJ_SYNC_CONFIG = Object.freeze({
   syncDelayMs: 5 * 60 * 1000,
   auditDelayMs: 30 * 60 * 1000,
   dailyAuditHour: 2,
-  schedulerVersion: "2026-08-13-v3",
+  schedulerVersion: "2026-08-27-v4",
   outboxProperty: "FRJ_GAS_OUTBOX",
   inventorySheets: {
     enzo: "Inventaire Enzo",
@@ -50,6 +50,7 @@ function setFrjSyncTokenForDeployment(token) {
 
 function installFrjBidirectionalSync() {
   frjRequireSyncToken_();
+  getOrCreatePurchaseOrderHistorySheet_(SpreadsheetApp.openById(FRJ_SYNC_CONFIG.appSpreadsheetId));
   var handlers = frjOwnedTriggerHandlers_();
   ScriptApp.getProjectTriggers().forEach(function(trigger) {
     if (handlers.indexOf(trigger.getHandlerFunction()) !== -1) ScriptApp.deleteTrigger(trigger);
@@ -133,6 +134,8 @@ function frjSpreadsheetChangedTrigger(e) {
   frjEnsureSchedulerVersion_();
   var sourceId = "";
   try { sourceId = e && e.source ? e.source.getId() : ""; } catch (ignored) {}
+  var purchaseOrderChanged = frjCapturePurchaseOrderEdit_(e);
+  if (purchaseOrderChanged) frjPushPendingPurchaseOrderHistory_();
   var outbox = frjCaptureGasOutbox_();
   frjPublishGasObservations_(outbox);
   return frjRequestSynchronization_("modification-google-sheet", sourceId);
@@ -221,6 +224,8 @@ function frjD1SignalPollTrigger() {
     }
     var ordersPushed = frjPushPendingPurchaseOrders_();
     if (ordersPushed) scheduled.push("COMMANDES:" + ordersPushed);
+    var historyPushed = frjPushPendingPurchaseOrderHistory_();
+    if (historyPushed) scheduled.push("HISTORIQUE-COMMANDES:" + historyPushed);
     var ordersPulled = frjPullPurchaseOrdersFromD1_();
     if (ordersPulled) scheduled.push("COMMANDES-D1:" + ordersPulled);
     properties.deleteProperty("FRJ_D1_POLL_LAST_ERROR");

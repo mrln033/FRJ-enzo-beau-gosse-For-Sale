@@ -6,6 +6,12 @@
   const ui = global.FRJ_ORDER_UI;
   const STATUS_FILTER_KEY = "FRJ_ADMIN_ORDER_STATUS_FILTER_V1";
   const STATUS_KEYS = ui.statusKeys;
+  const HISTORY_ACTOR_LABELS = Object.freeze({
+    admin: "Administrateur",
+    client: "Client",
+    gas: "Google Sheets / GAS",
+    system: "Système"
+  });
   let selectedStatuses = readSelectedStatuses();
 
   function hasAtMostDecimals(value, decimals) {
@@ -291,7 +297,149 @@
       comment.textContent = order.buyerComment;
       article.appendChild(comment);
     }
+    article.appendChild(createHistoryPanel(order));
     return article;
+  }
+
+  function createHistoryPanel(order) {
+    const section = document.createElement("section");
+    section.className = "order-history";
+    const panelId = `order-history-${order.id}`;
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "order-history-toggle";
+    toggle.textContent = "Afficher l’historique";
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.setAttribute("aria-controls", panelId);
+
+    const panel = document.createElement("div");
+    panel.id = panelId;
+    panel.className = "order-history-panel";
+    panel.hidden = true;
+    let loaded = false;
+    let loading = false;
+
+    toggle.addEventListener("click", async () => {
+      const shouldOpen = panel.hidden;
+      panel.hidden = !shouldOpen;
+      toggle.setAttribute("aria-expanded", String(shouldOpen));
+      toggle.textContent = shouldOpen ? "Masquer l’historique" : "Afficher l’historique";
+      if (!shouldOpen || loaded || loading) return;
+
+      loading = true;
+      toggle.disabled = true;
+      const pending = document.createElement("p");
+      pending.className = "order-history-message";
+      pending.textContent = "Chargement de l’historique…";
+      panel.replaceChildren(pending);
+      try {
+        const response = await global.FRJ_API.fetchD1Admin(
+          `/admin/orders/${encodeURIComponent(order.id)}/history`,
+          { cache: "no-store" }
+        );
+        const history = await response.json();
+        renderOrderHistory(order, panel, history.events || []);
+        loaded = true;
+      } catch (error) {
+        pending.className = "order-history-message error";
+        pending.textContent = `Historique indisponible : ${error.message}`;
+      } finally {
+        loading = false;
+        toggle.disabled = false;
+      }
+    });
+
+    section.append(toggle, panel);
+    return section;
+  }
+
+  function renderOrderHistory(order, panel, events) {
+    if (!events.length) {
+      const empty = document.createElement("p");
+      empty.className = "order-history-message";
+      empty.textContent = "Aucun événement d’historique.";
+      panel.replaceChildren(empty);
+      return;
+    }
+
+    const title = document.createElement("h3");
+    title.textContent = "Vie de la demande";
+    const list = document.createElement("ol");
+    list.className = "order-history-list";
+    events.forEach((historyEvent) => {
+      list.appendChild(renderOrderHistoryEvent(order, historyEvent));
+    });
+    panel.replaceChildren(title, list);
+  }
+
+  function renderOrderHistoryEvent(order, historyEvent) {
+    const item = document.createElement("li");
+    item.className = "order-history-event";
+    const meta = document.createElement("p");
+    meta.className = "order-history-meta";
+    const parts = [
+      ui.formatDate(historyEvent.createdAt),
+      HISTORY_ACTOR_LABELS[historyEvent.actor] || historyEvent.actor || "Système"
+    ];
+    if (historyEvent.newStatus) {
+      parts.push(`Nouveau statut : ${ui.statusLabel(historyEvent.newStatus, "FR", "admin")}`);
+    }
+    meta.textContent = parts.join(" · ");
+
+    const editor = document.createElement("div");
+    editor.className = "order-history-editor";
+    const textarea = document.createElement("textarea");
+    textarea.rows = 2;
+    textarea.maxLength = 500;
+    textarea.value = historyEvent.comment || "";
+    textarea.setAttribute("aria-label", `Commentaire historique du ${ui.formatDate(historyEvent.createdAt)}`);
+    const controls = document.createElement("div");
+    controls.className = "order-history-controls";
+    const feedback = document.createElement("span");
+    feedback.className = "order-history-feedback";
+    const save = document.createElement("button");
+    save.type = "button";
+    save.textContent = "Enregistrer le commentaire";
+    save.disabled = true;
+    let savedComment = textarea.value.trim();
+
+    textarea.addEventListener("input", () => {
+      save.disabled = textarea.value.trim() === savedComment;
+      feedback.textContent = "";
+      feedback.className = "order-history-feedback";
+    });
+    save.addEventListener("click", async () => {
+      save.disabled = true;
+      textarea.disabled = true;
+      feedback.textContent = "Enregistrement…";
+      feedback.className = "order-history-feedback";
+      try {
+        const response = await global.FRJ_API.fetchD1Admin(
+          `/admin/orders/${encodeURIComponent(order.id)}/history/${encodeURIComponent(historyEvent.id)}/comment`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ comment: textarea.value })
+          }
+        );
+        const result = await response.json();
+        textarea.value = result.event?.comment || textarea.value;
+        savedComment = textarea.value.trim();
+        feedback.textContent = "Commentaire enregistré.";
+        feedback.className = "order-history-feedback success";
+      } catch (error) {
+        feedback.textContent = error.message;
+        feedback.className = "order-history-feedback error";
+        save.disabled = false;
+      } finally {
+        textarea.disabled = false;
+      }
+    });
+
+    controls.append(feedback, save);
+    editor.append(textarea, controls);
+    item.append(meta, editor);
+    return item;
   }
 
   async function updateStatus(id, select) {

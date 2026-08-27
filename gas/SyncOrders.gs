@@ -29,6 +29,28 @@ function frjPushPendingPurchaseOrders_() {
   return pushed;
 }
 
+function frjPushPendingPurchaseOrderHistory_() {
+  var featureValue = PropertiesService.getScriptProperties().getProperty("FRJ_CART_ENABLED");
+  if (String(featureValue || "true").toLowerCase() === "false") return 0;
+  var pending = purchaseReadPendingHistoryEvents_();
+  if (!pending.entries.length) return 0;
+  try {
+    var response = frjD1Request_("/sync/order-history", {
+      method: "post",
+      payload: JSON.stringify({
+        events: pending.entries.map(function(entry) { return entry.event; })
+      })
+    });
+    return purchaseMarkHistorySyncResult_(pending, response && response.results || []);
+  } catch (error) {
+    pending.entries.forEach(function(entry) {
+      pending.sheet.getRange(entry.rowNumber, pending.indexes.SYNC_ERROR + 1)
+        .setValue(new Date().toISOString() + " — " + error.message);
+    });
+    return 0;
+  }
+}
+
 function frjPullPurchaseOrdersFromD1_() {
   var properties = PropertiesService.getScriptProperties();
   var cursorKey = "FRJ_D1_ORDERS_EVENT_CURSOR";
@@ -41,6 +63,7 @@ function frjPullPurchaseOrdersFromD1_() {
     var orders = response && Array.isArray(response.orders) ? response.orders : [];
     orders.forEach(function(order) {
       upsertPurchaseOrderMirror_(order);
+      upsertPurchaseOrderHistoryMirror_(order.historyEvents || []);
       pulled++;
     });
     var nextCursor = Number(response && response.cursor || cursor);

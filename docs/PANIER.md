@@ -22,7 +22,7 @@ D1 utilise exclusivement :
 - `purchase_order_items` ;
 - `purchase_order_events`.
 
-GAS utilise exclusivement la feuille `COMMANDES_APP` pour les demandes reçues pendant une indisponibilité D1. Les colonnes `DISCORD_MESSAGE_ID` et `DISCORD_ERROR` assurent la reprise vers D1. Aucun schéma d'inventaire, de catalogue ou de MU n'est modifié.
+GAS utilise la feuille `COMMANDES_APP` pour le miroir des demandes et `COMMANDES_HISTORIQUE` pour leur chronologie bidirectionnelle. Les clés d'événement évitent les doublons entre GAS et D1 ; les colonnes de synchronisation conservent les erreurs à retenter. `DISCORD_MESSAGE_ID` et `DISCORD_ERROR` assurent la reprise des notifications. Aucun schéma d'inventaire, de catalogue ou de MU n'est modifié.
 
 ## Désactivation immédiate et réversible
 

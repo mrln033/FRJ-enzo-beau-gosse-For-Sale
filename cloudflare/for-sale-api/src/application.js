@@ -27,6 +27,14 @@ import {
 import { sendOrUpdateDiscordOrder } from "./discord.js";
 import { diffContainerConfig, mapContainerConfigRow, normalizeContainerConfigPayload } from "./containers.js";
 import {
+  isVisibleOrderHistoryAction,
+  mapOrderHistoryEvent,
+  normalizeOrderHistoryComment,
+  normalizeSyncedOrderHistoryEvent,
+  prepareOrderHistoryEvent,
+  prepareSyncedOrderHistoryEvent
+} from "./order-history.js";
+import {
   MAX_IMPORT_BYTES,
   MAX_OBSERVATION_BYTES,
   MAX_ORDER_BYTES,
@@ -146,6 +154,10 @@ export async function handleGet(url, env) {
 export async function handleAdminGet(url, env) {
   if (url.pathname === "/admin/orders") {
     return json(await readAdminOrders(env));
+  }
+  const orderHistoryMatch = url.pathname.match(/^\/admin\/orders\/([a-f0-9-]{36})\/history$/i);
+  if (orderHistoryMatch) {
+    return json(await readOrderHistory(env, orderHistoryMatch[1].toLowerCase()));
   }
   if (url.pathname === "/admin/containers") {
     return json(await readContainerConfig(env, url.searchParams.get("avatar")));
@@ -454,6 +466,11 @@ export async function handleSyncPost(request, url, env) {
   if (url.pathname === "/sync/order") {
     if (!isCartEnabled(env)) throw new ApiError(503, "Transmission des paniers désactivée");
     return json(await importGasFallbackOrder(env, payload));
+  }
+
+  if (url.pathname === "/sync/order-history") {
+    if (!isCartEnabled(env)) throw new ApiError(503, "Suivi des demandes désactivé");
+    return json(await importGasOrderHistory(env, payload));
   }
 
   if (url.pathname === "/sync/observation") {
@@ -1526,13 +1543,10 @@ async function updateOrderProposal(env, orderId, requestedItems) {
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).bind(orderId, orderId, orderId, orderId),
-    env.DB.prepare(`
-      INSERT INTO purchase_order_events (order_id, action, details)
-      VALUES (?, 'proposal-changed', ?)
-    `).bind(orderId, JSON.stringify({
+    prepareOrderHistoryEvent(env, { orderId, action: "proposal-changed", details: {
       proposalVersion: nextVersion,
       lines: changed.map(({ existing, revised }) => ({ lineNo: Number(existing.line_no), itemName: existing.item_name, revised }))
-    }))
+    } })
   );
   await env.DB.batch(statements);
   const discord = await synchronizeDiscordOrder(env, orderId);
@@ -1550,6 +1564,20 @@ export async function handleAdminPost(request, url, env) {
   if (url.pathname === "/admin/containers") {
     const payload = parseJsonBody(await readTextBody(request, 100_000));
     return json(await updateContainerConfig(env, payload));
+  }
+
+  const historyCommentMatch = url.pathname.match(
+    /^\/admin\/orders\/([a-f0-9-]{36})\/history\/(\d+)\/comment$/i
+  );
+  if (historyCommentMatch) {
+    const payload = parseJsonBody(await readTextBody(request, 20_000));
+    const comment = parseOrderValue(() => normalizeOrderHistoryComment(payload.comment));
+    return json(await updateOrderHistoryComment(
+      env,
+      historyCommentMatch[1].toLowerCase(),
+      Number(historyCommentMatch[2]),
+      comment
+    ));
   }
 
   const orderProposalMatch = url.pathname.match(/^\/admin\/orders\/([a-f0-9-]{36})\/proposal$/i);
@@ -1615,10 +1643,11 @@ export async function handleAdminPost(request, url, env) {
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `).bind(orderId, orderId, orderId, orderId),
-      env.DB.prepare(`
-        INSERT INTO purchase_order_events (order_id, action, details)
-        VALUES (?, 'proposal-line-changed', ?)
-      `).bind(orderId, JSON.stringify({ lineNo, itemName: existing.item_name, revised }))
+      prepareOrderHistoryEvent(env, {
+        orderId,
+        action: "proposal-line-changed",
+        details: { lineNo, itemName: existing.item_name, revised }
+      })
     ]);
     const discord = await synchronizeDiscordOrder(env, orderId);
     return json({ ok: true, status: "awaiting_approval", discord: publicDiscordResult(discord) });
@@ -1638,8 +1667,11 @@ export async function handleAdminPost(request, url, env) {
     await env.DB.batch([
       env.DB.prepare(`UPDATE purchase_orders SET status = ?, approval_required = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
         .bind(status, existing.id),
-      env.DB.prepare(`INSERT INTO purchase_order_events (order_id, action, details) VALUES (?, 'status-changed', ?)`)
-        .bind(existing.id, JSON.stringify({ from: existing.status, to: status }))
+      prepareOrderHistoryEvent(env, {
+        orderId: existing.id,
+        action: "status-changed",
+        details: { from: existing.status, to: status }
+      })
     ]);
     const discord = await synchronizeDiscordOrder(env, existing.id);
     return json({ ok: true, noChange: false, status, discord: publicDiscordResult(discord) });
@@ -1803,18 +1835,26 @@ export async function handlePublicOrderAcceptance(request, url, env) {
   if (Number(order.proposal_version || 0) !== proposalVersion) {
     throw new ApiError(409, "La proposition a changé. Actualisez la page avant de l’accepter.");
   }
-  const result = await env.DB.prepare(`
-    UPDATE purchase_orders
-    SET status = 'submitted', approval_required = 0, updated_at = CURRENT_TIMESTAMP
-    WHERE id = ? AND approval_required = 1 AND proposal_version = ?
-  `).bind(order.id, proposalVersion).run();
+  const [result] = await env.DB.batch([
+    env.DB.prepare(`
+      UPDATE purchase_orders
+      SET status = 'submitted', approval_required = 0, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND approval_required = 1 AND proposal_version = ?
+    `).bind(order.id, proposalVersion),
+    env.DB.prepare(`
+      INSERT INTO purchase_order_events (order_id, event_key, action, actor, comment, details)
+      SELECT ?, ?, 'proposal-accepted', 'client', ?, ?
+      WHERE changes() = 1
+    `).bind(
+      order.id,
+      crypto.randomUUID(),
+      "Proposition acceptée par le client.",
+      JSON.stringify({ proposalVersion, to: "submitted" })
+    )
+  ]);
   if (Number(result.meta?.changes || 0) !== 1) {
     throw new ApiError(409, "La proposition a changé. Actualisez la page avant de l’accepter.");
   }
-  await env.DB.prepare(`
-    INSERT INTO purchase_order_events (order_id, action, details)
-    VALUES (?, 'proposal-accepted', ?)
-  `).bind(order.id, JSON.stringify({ proposalVersion })).run();
   const discord = await synchronizeDiscordOrder(env, order.id);
   return json({ ok: true, noChange: false, status: "submitted", discord: publicDiscordResult(discord) });
 }
@@ -1833,18 +1873,26 @@ export async function handlePublicOrderCancellation(url, env) {
     throw new ApiError(409, "Cette demande ne peut plus être annulée par le client");
   }
 
-  const result = await env.DB.prepare(`
-    UPDATE purchase_orders
-    SET status = 'cancelled', approval_required = 0, updated_at = CURRENT_TIMESTAMP
-    WHERE id = ? AND (approval_required = 1 OR status IN ('submitted', 'viewed'))
-  `).bind(order.id).run();
+  const [result] = await env.DB.batch([
+    env.DB.prepare(`
+      UPDATE purchase_orders
+      SET status = 'cancelled', approval_required = 0, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND (approval_required = 1 OR status IN ('submitted', 'viewed'))
+    `).bind(order.id),
+    env.DB.prepare(`
+      INSERT INTO purchase_order_events (order_id, event_key, action, actor, comment, details)
+      SELECT ?, ?, 'client-cancelled', 'client', ?, ?
+      WHERE changes() = 1
+    `).bind(
+      order.id,
+      crypto.randomUUID(),
+      "Demande annulée par le client.",
+      JSON.stringify({ to: "cancelled" })
+    )
+  ]);
   if (Number(result.meta?.changes || 0) !== 1) {
     throw new ApiError(409, "Le statut de la demande a changé. Actualisez le panier.");
   }
-  await env.DB.prepare(`
-    INSERT INTO purchase_order_events (order_id, action, details)
-    VALUES (?, 'client-cancelled', '{}')
-  `).bind(order.id).run();
   const discord = await synchronizeDiscordOrder(env, order.id);
   return json({ ok: true, status: "cancelled", discord: publicDiscordResult(discord) });
 }
@@ -1970,7 +2018,7 @@ async function readOrderCatalogRows(env, requestedItems) {
   }));
 }
 
-async function storePurchaseOrder(env, order, items, eventAction) {
+async function storePurchaseOrder(env, order, items, eventAction, syncedEvent = null) {
   const statements = [
     env.DB.prepare(`
       INSERT INTO purchase_orders (
@@ -2000,8 +2048,13 @@ async function storePurchaseOrder(env, order, items, eventAction) {
       Number(item.unitSalePed), Number(item.lineTtPed), Number(item.lineSalePed),
       item.priceStatus || "estimated"
     )),
-    env.DB.prepare(`INSERT INTO purchase_order_events (order_id, action, details) VALUES (?, ?, ?)`)
-      .bind(order.id, eventAction, JSON.stringify({ sourceBackend: order.sourceBackend || "d1" }))
+    syncedEvent
+      ? prepareSyncedOrderHistoryEvent(env, syncedEvent)
+      : prepareOrderHistoryEvent(env, {
+        orderId: order.id,
+        action: eventAction,
+        details: { sourceBackend: order.sourceBackend || "d1", to: order.status || "submitted" }
+      })
   ];
   await env.DB.batch(statements);
 }
@@ -2036,11 +2089,121 @@ async function importGasFallbackOrder(env, payload) {
   if (!/^FRJ-\d{8}-[A-F0-9]{6}$/.test(canonical.publicReference)) throw new ApiError(400, "Référence GAS invalide");
   if (!/^[a-f0-9]{64}$/.test(canonical.accessTokenHash)) throw new ApiError(400, "Jeton GAS invalide");
   if (!canonical.buyerAvatar) throw new ApiError(400, "Avatar GAS absent");
-  await storePurchaseOrder(env, canonical, items, "gas-fallback-synchronized");
+  const incomingHistory = Array.isArray(payload?.historyEvents) ? payload.historyEvents[0] : null;
+  const syncedEvent = incomingHistory
+    ? parseOrderValue(() => normalizeSyncedOrderHistoryEvent(incomingHistory))
+    : null;
+  if (syncedEvent && syncedEvent.orderId !== canonical.id) {
+    throw new ApiError(400, "Historique GAS rattaché à une autre demande");
+  }
+  if (syncedEvent && syncedEvent.action !== "gas-fallback-synchronized") {
+    throw new ApiError(400, "Événement initial GAS invalide");
+  }
+  await storePurchaseOrder(env, canonical, items, "gas-fallback-synchronized", syncedEvent);
   // Rejouer systématiquement l'état canonique dans Discord : la demande a pu
   // être annulée côté secours GAS avant son premier transfert vers D1.
   const discord = await synchronizeDiscordOrder(env, canonical.id);
   return { ok: true, duplicate: false, id, discord: publicDiscordResult(discord) };
+}
+
+async function importGasOrderHistory(env, payload) {
+  const sourceEvents = Array.isArray(payload?.events) ? payload.events : [];
+  if (sourceEvents.length < 1 || sourceEvents.length > 50) {
+    throw new ApiError(400, "Lot d’historique GAS invalide");
+  }
+
+  const results = [];
+  const discordOrderIds = new Set();
+  for (const sourceEvent of sourceEvents) {
+    const eventKey = String(sourceEvent?.eventKey || "").trim().toLowerCase();
+    try {
+      const event = parseOrderValue(() => normalizeSyncedOrderHistoryEvent(sourceEvent));
+      const result = await importGasOrderHistoryEvent(env, event);
+      results.push({ eventKey: event.eventKey, ok: true, event: result.event, changed: result.changed });
+      if (result.orderUpdated) discordOrderIds.add(event.orderId);
+    } catch (error) {
+      results.push({
+        eventKey,
+        ok: false,
+        error: error instanceof Error ? error.message : "Événement GAS invalide"
+      });
+    }
+  }
+
+  for (const orderId of discordOrderIds) await synchronizeDiscordOrder(env, orderId);
+  return { ok: results.every((result) => result.ok), results };
+}
+
+async function importGasOrderHistoryEvent(env, event) {
+  const row = await env.DB.prepare(`
+    SELECT po.id AS purchase_order_id, po.status AS purchase_order_status,
+           po.updated_at AS purchase_order_updated_at,
+           history.id, history.order_id, history.event_key, history.action, history.actor,
+           history.comment, history.details, history.created_at, history.comment_updated_at
+    FROM purchase_orders AS po
+    LEFT JOIN purchase_order_events AS history ON history.event_key = ?
+    WHERE po.id = ?
+  `).bind(event.eventKey, event.orderId).first();
+  if (!row) throw new ApiError(404, "Demande GAS introuvable dans D1");
+  if (row.id && row.order_id !== event.orderId) {
+    throw new ApiError(409, "Clé d’historique déjà utilisée par une autre demande");
+  }
+
+  if (row.id) {
+    const incomingDate = event.commentUpdatedAt || "";
+    const storedDate = row.comment_updated_at ? normalizeSyncTimestamp(row.comment_updated_at) : "";
+    const commentChanged = event.comment !== row.comment;
+    if (incomingDate && incomingDate > storedDate && commentChanged) {
+      await env.DB.batch([
+        env.DB.prepare(`
+          UPDATE purchase_order_events
+          SET comment = ?, comment_updated_at = ?
+          WHERE id = ? AND order_id = ?
+        `).bind(event.comment, incomingDate, row.id, event.orderId),
+        prepareOrderHistoryEvent(env, {
+          orderId: event.orderId,
+          action: "history-comment-updated",
+          actor: "gas",
+          details: { targetEventKey: event.eventKey }
+        })
+      ]);
+      const updated = { ...row, comment: event.comment, comment_updated_at: incomingDate };
+      return { event: mapOrderHistoryEvent(updated), changed: true, orderUpdated: false };
+    }
+    return { event: mapOrderHistoryEvent(row), changed: false, orderUpdated: false };
+  }
+
+  const statements = [];
+  const orderUpdatedAt = normalizeSyncTimestamp(row.purchase_order_updated_at, "");
+  const shouldUpdateOrder = Boolean(
+    event.newStatus
+    && event.newStatus !== row.purchase_order_status
+    && (!orderUpdatedAt || event.createdAt > orderUpdatedAt)
+  );
+  if (shouldUpdateOrder) {
+    statements.push(env.DB.prepare(`
+      UPDATE purchase_orders
+      SET status = ?, approval_required = 0, updated_at = ?
+      WHERE id = ?
+    `).bind(event.newStatus, event.createdAt, event.orderId));
+  }
+  statements.push(prepareSyncedOrderHistoryEvent(env, event));
+  await env.DB.batch(statements);
+  return {
+    event: mapOrderHistoryEvent({
+      id: 0,
+      order_id: event.orderId,
+      event_key: event.eventKey,
+      action: event.action,
+      actor: event.actor,
+      comment: event.comment,
+      details: JSON.stringify(event.details),
+      created_at: event.createdAt,
+      comment_updated_at: event.commentUpdatedAt
+    }),
+    changed: true,
+    orderUpdated: shouldUpdateOrder
+  };
 }
 
 async function synchronizeDiscordOrder(env, orderId) {
@@ -2080,19 +2243,21 @@ async function synchronizeDiscordOrder(env, orderId) {
         SET discord_message_id = ?, discord_synced_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `).bind(result.messageId, orderId),
-      env.DB.prepare(`
-        INSERT INTO purchase_order_events (order_id, action, details)
-        VALUES (?, ?, ?)
-      `).bind(orderId, `discord-${result.action}`, JSON.stringify({ messageId: result.messageId }))
+      prepareOrderHistoryEvent(env, {
+        orderId,
+        action: `discord-${result.action}`,
+        details: { messageId: result.messageId }
+      })
     ]);
     return result;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(JSON.stringify({ message: "Notification Discord impossible", orderId, error: message }));
-    await env.DB.prepare(`
-      INSERT INTO purchase_order_events (order_id, action, details)
-      VALUES (?, 'discord-notification-failed', ?)
-    `).bind(orderId, JSON.stringify({ error: message.slice(0, 500) })).run();
+    await prepareOrderHistoryEvent(env, {
+      orderId,
+      action: "discord-notification-failed",
+      details: { error: message.slice(0, 500) }
+    }).run();
     return { ok: false, error: message };
   }
 }
@@ -2140,13 +2305,74 @@ async function readAdminOrders(env) {
   };
 }
 
+async function readOrderHistory(env, orderId) {
+  const [orderResult, eventsResult] = await env.DB.batch([
+    env.DB.prepare(`SELECT id FROM purchase_orders WHERE id = ?`).bind(orderId),
+    env.DB.prepare(`
+      SELECT id, order_id, event_key, action, actor, comment, details,
+             created_at, comment_updated_at
+      FROM (
+        SELECT id, order_id, event_key, action, actor, comment, details,
+               created_at, comment_updated_at
+        FROM purchase_order_events
+        WHERE order_id = ?
+          AND action NOT LIKE 'discord-%'
+          AND action <> 'history-comment-updated'
+        ORDER BY id DESC
+        LIMIT 200
+      )
+      ORDER BY datetime(created_at), id
+    `).bind(orderId)
+  ]);
+  if (!orderResult.results.length) throw new ApiError(404, "Demande introuvable");
+  return {
+    orderId,
+    events: eventsResult.results.map(mapOrderHistoryEvent)
+  };
+}
+
+async function updateOrderHistoryComment(env, orderId, eventId, comment) {
+  const existing = await env.DB.prepare(`
+    SELECT id, order_id, event_key, action, actor, comment, details,
+           created_at, comment_updated_at
+    FROM purchase_order_events
+    WHERE id = ? AND order_id = ?
+  `).bind(eventId, orderId).first();
+  if (!existing || !isVisibleOrderHistoryAction(existing.action)) {
+    throw new ApiError(404, "Événement d’historique introuvable");
+  }
+
+  await env.DB.batch([
+    env.DB.prepare(`
+      UPDATE purchase_order_events
+      SET comment = ?, comment_updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND order_id = ?
+    `).bind(comment, eventId, orderId),
+    prepareOrderHistoryEvent(env, {
+      orderId,
+      action: "history-comment-updated",
+      actor: "admin",
+      details: { targetEventKey: existing.event_key || `d1-${existing.id}` }
+    })
+  ]);
+
+  const updated = await env.DB.prepare(`
+    SELECT id, order_id, event_key, action, actor, comment, details,
+           created_at, comment_updated_at
+    FROM purchase_order_events
+    WHERE id = ? AND order_id = ?
+  `).bind(eventId, orderId).first();
+  return { ok: true, event: mapOrderHistoryEvent(updated) };
+}
+
 async function readOrdersForGasMirror(env, url) {
   const afterEventId = Number(url.searchParams.get("afterEventId") || 0);
   if (!Number.isInteger(afterEventId) || afterEventId < 0) {
     throw new ApiError(400, "Curseur de commandes invalide");
   }
   const eventsResult = await env.DB.prepare(`
-    SELECT id, order_id
+    SELECT id, order_id, event_key, action, actor, comment, details,
+           created_at, comment_updated_at
     FROM purchase_order_events
     WHERE id > ?
     ORDER BY id
@@ -2158,7 +2384,11 @@ async function readOrdersForGasMirror(env, url) {
 
   const orderIds = [...new Set(eventsResult.results.map((row) => String(row.order_id)))];
   const idsJson = JSON.stringify(orderIds);
-  const [ordersResult, itemsResult] = await env.DB.batch([
+  const targetKeys = eventsResult.results
+    .filter((row) => row.action === "history-comment-updated")
+    .map((row) => parseOrderHistoryTargetKey(row.details))
+    .filter(Boolean);
+  const [ordersResult, itemsResult, targetEventsResult] = await env.DB.batch([
     env.DB.prepare(`
       SELECT id, public_reference, access_token_hash, status, approval_required, proposal_version,
              buyer_avatar, buyer_contact, buyer_comment, language, frj_member, source_backend,
@@ -2174,22 +2404,50 @@ async function readOrdersForGasMirror(env, url) {
       FROM purchase_order_items
       WHERE order_id IN (SELECT CAST(value AS TEXT) FROM json_each(?))
       ORDER BY order_id, line_no
-    `).bind(idsJson)
+    `).bind(idsJson),
+    targetKeys.length
+      ? env.DB.prepare(`
+        SELECT id, order_id, event_key, action, actor, comment, details,
+               created_at, comment_updated_at
+        FROM purchase_order_events
+        WHERE event_key IN (SELECT CAST(value AS TEXT) FROM json_each(?))
+      `).bind(JSON.stringify(targetKeys))
+      : env.DB.prepare(`
+        SELECT id, order_id, event_key, action, actor, comment, details,
+               created_at, comment_updated_at
+        FROM purchase_order_events WHERE 0
+      `)
   ]);
   const itemsByOrder = {};
   itemsResult.results.forEach((item) => {
     (itemsByOrder[item.order_id] ||= []).push(mapOrderItem(item));
   });
+  const historyByOrder = {};
+  const historyKeys = new Set();
+  [...eventsResult.results, ...targetEventsResult.results].forEach((event) => {
+    if (!isVisibleOrderHistoryAction(event.action) || historyKeys.has(event.event_key)) return;
+    historyKeys.add(event.event_key);
+    (historyByOrder[event.order_id] ||= []).push(mapOrderHistoryEvent(event));
+  });
   const orders = ordersResult.results.map((row) => ({
     ...mapAdminOrder(row),
     accessTokenHash: row.access_token_hash,
-    items: itemsByOrder[row.id] || []
+    items: itemsByOrder[row.id] || [],
+    historyEvents: historyByOrder[row.id] || []
   }));
   return {
     orders,
     cursor: Math.max(...eventsResult.results.map((row) => Number(row.id))),
     hasMore: eventsResult.results.length === 500
   };
+}
+
+function parseOrderHistoryTargetKey(details) {
+  try {
+    return String(JSON.parse(details || "{}").targetEventKey || "").trim();
+  } catch {
+    return "";
+  }
 }
 
 function mapPublicOrder(order, items) {

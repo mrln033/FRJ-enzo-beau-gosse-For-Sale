@@ -59,9 +59,17 @@ function processPurchaseOrderRequest(rawBody) {
       order.clientCreatedAt || "", new Date(), "", "", "", "", "", "FALSE", 0
     ]);
     var orderRow = sheet.getLastRow();
+    var historyEvent = purchaseCreateHistoryEvent_(
+      order.id,
+      "gas-fallback-synchronized",
+      "gas",
+      { sourceBackend: "gas-fallback", to: "submitted" },
+      "submitted"
+    );
+    purchaseAppendHistoryEvent_(ss, historyEvent);
     var discordResult = purchasePublishDiscord_(order, priced.lines);
     if (discordResult.ok) order.discordMessageId = discordResult.messageId;
-    var syncPayload = JSON.stringify({ order: order, items: priced.lines });
+    var syncPayload = JSON.stringify({ order: order, items: priced.lines, historyEvents: [historyEvent] });
     sheet.getRange(orderRow, 14).setValue(syncPayload);
     if (discordResult.messageId) sheet.getRange(orderRow, 17).setValue(discordResult.messageId);
     if (discordResult.error) sheet.getRange(orderRow, 18).setValue(discordResult.error);
@@ -120,8 +128,19 @@ function processPurchaseOrderCancellation(rawBody) {
       return purchaseJsonOutput_({ ok: false, error: "Cette demande ne peut plus être annulée par le client" });
     }
 
+    var previousStatus = found.order.status;
     found.order.status = "cancelled";
     found.order.approvalRequired = false;
+    var historyEvent = purchaseCreateHistoryEvent_(
+      found.order.id,
+      "client-cancelled",
+      "client",
+      { from: String(previousStatus || "submitted"), to: "cancelled" },
+      "cancelled"
+    );
+    found.payload.historyEvents = Array.isArray(found.payload.historyEvents) ? found.payload.historyEvents : [];
+    found.payload.historyEvents.push(historyEvent);
+    purchaseAppendHistoryEvent_(ss, historyEvent);
     var targetRow = found.rowIndex + 1;
     sheet.getRange(targetRow, indexes.STATUT + 1).setValue("cancelled");
     sheet.getRange(targetRow, indexes.SYNC_PAYLOAD_JSON + 1).setValue(JSON.stringify(found.payload));

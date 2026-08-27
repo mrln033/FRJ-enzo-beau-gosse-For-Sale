@@ -9,6 +9,7 @@ const expectedFiles = [
   "Code.gs",
   "Containers.gs",
   "Imports.gs",
+  "OrderHistory.gs",
   "PurchaseOrders.gs",
   "SyncD1.gs",
   "SyncEngine.gs",
@@ -67,4 +68,13 @@ test("le correctif d.6.4 réinstalle automatiquement les formules au prochain po
     sources["SyncD1.gs"],
     /function frjD1SignalPollTrigger\(\)[\s\S]*frjEnsureContainerConfigurationReady_\(\)/
   );
+});
+
+test("d.10.3 raccorde l'historique GAS au canal bidirectionnel des commandes", () => {
+  assert.match(sources["OrderHistory.gs"], /"COMMANDES_HISTORIQUE"/);
+  assert.match(sources["OrderHistory.gs"], /function frjCapturePurchaseOrderEdit_\(e\)/);
+  assert.match(sources["PurchaseOrders.gs"], /purchaseAppendHistoryEvent_\(ss, historyEvent\)/);
+  assert.match(sources["SyncOrders.gs"], /\/sync\/order-history/);
+  assert.match(sources["SyncOrders.gs"], /upsertPurchaseOrderHistoryMirror_\(order\.historyEvents \|\| \[\]\)/);
+  assert.match(sources["SyncD1.gs"], /frjPushPendingPurchaseOrderHistory_\(\)/);
 });

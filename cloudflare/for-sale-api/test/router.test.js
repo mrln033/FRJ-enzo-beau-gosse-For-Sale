@@ -22,6 +22,16 @@ test("conserve la protection des routes administrateur", async () => {
   assert.deepEqual(await response.json(), { error: "Unauthorized" });
 });
 
+test("protège aussi l'historique détaillé d'une demande", async () => {
+  const request = new Request(
+    "https://api.example/admin/orders/11111111-1111-4111-8111-111111111111/history",
+    { headers: { Origin: "https://mrln033.github.io" } }
+  );
+  const response = await worker.fetch(request, {});
+  assert.equal(response.status, 401);
+  assert.deepEqual(await response.json(), { error: "Unauthorized" });
+});
+
 test("conserve le contrat de pré-vérification CORS", async () => {
   const request = new Request("https://api.example/health", {
     method: "OPTIONS",

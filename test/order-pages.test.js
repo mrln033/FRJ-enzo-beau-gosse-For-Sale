@@ -184,6 +184,80 @@ test("la Console Admin enregistre la précision autorisée puis recharge D1", as
   assert.equal(requests.filter((request) => request.path === "/admin/orders").length, 2);
 });
 
+test("la Console Admin charge l'historique à la demande et modifie un commentaire", async () => {
+  const ids = ["ordersList", "ordersSummary", "ordersError", "ordersFilters", "refreshOrders"];
+  const elements = new Map(ids.map((id) => [id, new FakeElement(id)]));
+  const created = [];
+  const requests = [];
+  const order = {
+    id: "123e4567-e89b-42d3-a456-426614174000",
+    publicReference: "FRJ-20260827-ABC123",
+    buyerAvatar: "Test Player",
+    status: "viewed",
+    createdAt: "2026-08-27T10:00:00Z",
+    updatedAt: "2026-08-27T10:30:00Z",
+    totalSalePed: 10,
+    items: []
+  };
+  const historyEvent = {
+    id: 7,
+    actor: "admin",
+    newStatus: "viewed",
+    comment: "Statut modifié : Transmise → Vue.",
+    createdAt: "2026-08-27T10:30:00Z"
+  };
+  const document = {
+    getElementById: (id) => elements.get(id),
+    createElement: () => {
+      const element = new FakeElement();
+      created.push(element);
+      return element;
+    }
+  };
+  const window = {
+    FRJ_ADMIN: { require: () => true },
+    FRJ_API: {
+      fetchD1Admin: async (path, options) => {
+        requests.push({ path, options });
+        if (path === "/admin/orders") {
+          return { json: async () => ({ orders: [order], enabled: true, generatedAt: order.updatedAt }) };
+        }
+        if (path.endsWith("/history")) return { json: async () => ({ events: [historyEvent] }) };
+        return { json: async () => ({ ok: true, event: { ...historyEvent, comment: "Client prévenu" } }) };
+      }
+    },
+    localStorage: createStorage(),
+    alert: () => {}
+  };
+  const context = vm.createContext({ window, document, console });
+  vm.runInContext(commonSource, context);
+  vm.runInContext(adminSource, context);
+  await settle();
+
+  assert.equal(requests.some((request) => request.path.endsWith("/history")), false);
+  const toggle = created.find((element) => element.className === "order-history-toggle");
+  await toggle.listeners.get("click")();
+  await settle();
+  assert.equal(requests[1].path, `/admin/orders/${order.id}/history`);
+
+  const textarea = created.find((element) => String(element.attributes.get("aria-label") || "")
+    .startsWith("Commentaire historique du"));
+  const save = created.find((element) => element.textContent === "Enregistrer le commentaire");
+  const meta = created.find((element) => element.className === "order-history-meta");
+  assert.match(meta.textContent, /Administrateur/);
+  assert.match(meta.textContent, /Nouveau statut : Vue/);
+  assert.equal(textarea.value, historyEvent.comment);
+
+  textarea.value = "Client prévenu";
+  textarea.listeners.get("input")();
+  assert.equal(save.disabled, false);
+  await save.listeners.get("click")();
+  await settle();
+  const post = requests.find((request) => request.options?.method === "POST");
+  assert.equal(post.path, `/admin/orders/${order.id}/history/${historyEvent.id}/comment`);
+  assert.deepEqual(JSON.parse(post.options.body), { comment: "Client prévenu" });
+});
+
 test("le suivi public rend une demande et la mémorise localement", async () => {
   const token = "a".repeat(72);
   const ids = ["catalogReturnLink", "catalogLink", "pageTitle", "pageSubtitle", "trackingContent"];

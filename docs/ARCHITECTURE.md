@@ -66,7 +66,7 @@ La gestion des conteneurs conserve elle aussi une séparation complète entre `c
 
 Le point d'entrée Cloudflare reste `cloudflare/for-sale-api/src/index.js`. Il se limite désormais au routage HTTP, à l'authentification, au contrôle des origines et à la conversion uniforme des erreurs.
 
-Les traitements applicatifs sont regroupés dans `application.js`. La configuration statique et les limites sont centralisées dans `config.js`, tandis que `http.js` porte les réponses, CORS, lecture bornée des corps, empreintes et comparaisons de jetons. Les modules métier `domain.js`, `orders.js`, `sync.js`, `discord.js` et `containers.js` restent indépendants ; ce dernier valide et compare les choix de conteneurs avant toute écriture D1. Cette séparation ne change pas le nom du Worker ni ses protections HTTP.
+Les traitements applicatifs sont regroupés dans `application.js`. La configuration statique et les limites sont centralisées dans `config.js`, tandis que `http.js` porte les réponses, CORS, lecture bornée des corps, empreintes et comparaisons de jetons. Les modules métier `domain.js`, `orders.js`, `order-history.js`, `sync.js`, `discord.js` et `containers.js` restent indépendants ; `order-history.js` valide les événements partagés avant écriture D1 et `containers.js` valide les choix de conteneurs. Cette séparation ne change pas le nom du Worker ni ses protections HTTP.
 
 ## Organisation du backend GAS
 
@@ -77,6 +77,7 @@ gas/
 ├── Code.gs             entrées HTTP GAS
 ├── Catalog.gs          lecture du catalogue et des catégories
 ├── Imports.gs          imports MU et inventaires
+├── OrderHistory.gs     historique partagé des demandes
 ├── PurchaseOrders.gs   demandes, miroir et publication Discord
 ├── SyncD1.gs           configuration, installation et déclencheurs
 ├── SyncEngine.gs       planification, audit, fusion et orchestration

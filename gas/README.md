@@ -9,11 +9,18 @@ Ce dossier contient la totalité du projet Apps Script autonome. Apps Script cha
 - `Catalog.gs` : catalogue, catégories et date d'inventaire ;
 - `Containers.gs` : configuration multi-avatar des conteneurs et formules de quantité ;
 - `Imports.gs` : imports MU et inventaires ;
+- `OrderHistory.gs` : modèle, capture et miroir de l'historique des demandes ;
 - `PurchaseOrders.gs` : demandes de secours et Discord ;
 - `SyncD1.gs` : configuration, installation et déclencheurs ;
 - `SyncEngine.gs`, `SyncOrders.gs`, `SyncSheets.gs`, `SyncTransport.gs` : orchestration, demandes, feuilles et transport D1.
 
 Les secrets `FRJ_D1_SYNC_TOKEN`, `FRJ_DISCORD_ORDER_WEBHOOK_URL` et les options comme `FRJ_CART_ENABLED` restent dans les propriétés du script. Ils ne doivent jamais être ajoutés au dépôt.
+
+## Historique des demandes
+
+La feuille `COMMANDES_HISTORIQUE` est créée de façon idempotente lors de l'installation de la synchronisation. Chaque événement possède une clé stable commune à GAS et D1. Une création ou annulation reçue par le secours GAS, ainsi qu'un changement manuel de la colonne `STATUT` dans `COMMANDES_APP`, ajoute une ligne non synchronisée. Le prochain envoi la réplique dans D1 ; inversement, le curseur des commandes rapatrie les événements D1 nouveaux ou modifiés.
+
+Pour une ligne d'historique déjà créée, seule la colonne `COMMENTAIRE` est destinée à être modifiée manuellement. Sa date de modification départage deux changements concurrents : la version la plus récente est conservée puis renvoyée à l'autre côté. Les colonnes `SYNCED_D1_AT` et `SYNC_ERROR` indiquent respectivement la dernière convergence et l'éventuel échec à retenter.
 
 ## Migration d.8.5 des conteneurs
 
@@ -38,4 +45,4 @@ Le dataset `containers` fait ensuite partie de la synchronisation bidirectionnel
 6. Mettre à jour le déploiement Web App existant avec son `deploymentId`, afin de conserver la même URL `/exec`.
 7. Cloner à nouveau le projet et comparer les empreintes des fichiers, puis tester les routes publiques sans écriture métier.
 
-Le déploiement de production actuel est la version 22. Son URL est référencée par `js/api-client.js` pour le secours des demandes et par le Worker pour la synchronisation ; elle doit rester stable.
+Le déploiement de production actuel est la version 23. Son URL est référencée par `js/api-client.js` pour le secours des demandes et par le Worker pour la synchronisation ; elle doit rester stable.
