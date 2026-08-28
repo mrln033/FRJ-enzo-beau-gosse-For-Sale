@@ -109,8 +109,10 @@ test("une modification de statut dans COMMANDES_APP crée immédiatement son his
   const orderRow = new Array(orderHeaders.length).fill("");
   orderRow[orderHeaders.indexOf("ORDER_ID")] = orderId;
   orderRow[orderHeaders.indexOf("STATUT")] = "viewed";
+  orderRow[orderHeaders.indexOf("PRIX_STATUT")] = "estimated";
   orderRow[orderHeaders.indexOf("SYNC_PAYLOAD_JSON")] = JSON.stringify({
-    order: { id: orderId, status: "submitted", approvalRequired: false }, items: []
+    order: { id: orderId, status: "submitted", pricingStatus: "estimated", approvalRequired: false },
+    items: [{ priceStatus: "to-confirm" }]
   });
   orderRow[orderHeaders.indexOf("SYNCED_D1_AT")] = new Date();
   const orders = new FakeSheet("COMMANDES_APP", [orderHeaders, orderRow]);
@@ -129,5 +131,67 @@ test("une modification de statut dans COMMANDES_APP crée immédiatement son his
   assert.equal(history.data[1][historyHeaders.indexOf("NOUVEAU_STATUT")], "viewed");
   assert.equal(history.data[1][historyHeaders.indexOf("ACTION")], "status-changed");
   assert.equal(orderRow[orderHeaders.indexOf("SYNCED_D1_AT")], "");
-  assert.equal(JSON.parse(orderRow[orderHeaders.indexOf("SYNC_PAYLOAD_JSON")]).order.status, "viewed");
+  const payload = JSON.parse(orderRow[orderHeaders.indexOf("SYNC_PAYLOAD_JSON")]);
+  assert.equal(payload.order.status, "viewed");
+  assert.equal(payload.order.pricingStatus, "estimated");
+  assert.equal(payload.items[0].priceStatus, "to-confirm");
+  assert.equal(orderRow[orderHeaders.indexOf("PRIX_STATUT")], "estimated");
+  assert.equal(JSON.parse(history.data[1][historyHeaders.indexOf("DETAILS_JSON")]).pricingConfirmed, false);
+});
+
+test("le passage GAS à préparer confirme définitivement les prix de la demande et de ses lignes", () => {
+  const context = loadHistory();
+  const orderHeaders = [
+    "ORDER_ID", "REFERENCE", "AVATAR_ACHETEUR", "CONTACT", "COMMENTAIRE", "LANGUE",
+    "MEMBRE_FRJ", "STATUT", "TOTAL_TT_PED", "TOTAL_VENTE_PED", "PRIX_STATUT",
+    "DATE_CLIENT", "DATE_RECEPTION", "SYNC_PAYLOAD_JSON", "SYNCED_D1_AT", "SYNC_ERROR",
+    "DISCORD_MESSAGE_ID", "DISCORD_ERROR", "APPROVAL_REQUIRED", "PROPOSAL_VERSION"
+  ];
+  const orderId = "11111111-1111-4111-8111-111111111111";
+  const orderRow = new Array(orderHeaders.length).fill("");
+  orderRow[orderHeaders.indexOf("ORDER_ID")] = orderId;
+  orderRow[orderHeaders.indexOf("STATUT")] = "preparing";
+  orderRow[orderHeaders.indexOf("PRIX_STATUT")] = "estimated";
+  orderRow[orderHeaders.indexOf("APPROVAL_REQUIRED")] = "TRUE";
+  orderRow[orderHeaders.indexOf("SYNC_PAYLOAD_JSON")] = JSON.stringify({
+    order: { id: orderId, status: "viewed", pricingStatus: "estimated", approvalRequired: true },
+    items: [{ priceStatus: "estimated" }, { priceStatus: "to-confirm" }]
+  });
+  orderRow[orderHeaders.indexOf("SYNCED_D1_AT")] = new Date();
+  const orders = new FakeSheet("COMMANDES_APP", [orderHeaders, orderRow]);
+  const historyHeaders = context.purchaseOrderHistoryHeaders_();
+  const history = new FakeSheet("COMMANDES_HISTORIQUE", [historyHeaders]);
+  const spreadsheet = {
+    getSheetByName: (name) => name === "COMMANDES_HISTORIQUE" ? history : orders,
+    insertSheet: () => { throw new Error("Feuille déjà créée"); }
+  };
+  orders.parent = spreadsheet;
+  history.parent = spreadsheet;
+
+  assert.equal(context.purchaseCaptureOrderStatusEdit_(
+    { oldValue: "viewed" },
+    orders,
+    orders.getRange(2, orderHeaders.indexOf("STATUT") + 1)
+  ), true);
+
+  const payload = JSON.parse(orderRow[orderHeaders.indexOf("SYNC_PAYLOAD_JSON")]);
+  assert.equal(payload.order.status, "preparing");
+  assert.equal(payload.order.pricingStatus, "confirmed");
+  assert.equal(payload.order.approvalRequired, false);
+  assert.deepEqual(payload.items.map((item) => item.priceStatus), ["confirmed", "confirmed"]);
+  assert.equal(orderRow[orderHeaders.indexOf("PRIX_STATUT")], "confirmed");
+  assert.equal(orderRow[orderHeaders.indexOf("APPROVAL_REQUIRED")], "FALSE");
+  assert.equal(JSON.parse(history.data[1][historyHeaders.indexOf("DETAILS_JSON")]).pricingConfirmed, true);
+
+  orderRow[orderHeaders.indexOf("STATUT")] = "cancelled";
+  assert.equal(context.purchaseCaptureOrderStatusEdit_(
+    { oldValue: "preparing" },
+    orders,
+    orders.getRange(2, orderHeaders.indexOf("STATUT") + 1)
+  ), true);
+  const cancelledPayload = JSON.parse(orderRow[orderHeaders.indexOf("SYNC_PAYLOAD_JSON")]);
+  assert.equal(cancelledPayload.order.pricingStatus, "confirmed");
+  assert.deepEqual(cancelledPayload.items.map((item) => item.priceStatus), ["confirmed", "confirmed"]);
+  assert.equal(orderRow[orderHeaders.indexOf("PRIX_STATUT")], "confirmed");
+  assert.equal(JSON.parse(history.data[2][historyHeaders.indexOf("DETAILS_JSON")]).pricingConfirmed, false);
 });

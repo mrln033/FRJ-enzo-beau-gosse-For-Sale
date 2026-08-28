@@ -18,6 +18,7 @@ import {
 import {
   canClientCancelOrder,
   canReviseOrder,
+  confirmsOrderPricing,
   hasSameOrderTerms,
   normalizeOrderSubmission,
   priceOrderLines,
@@ -1664,15 +1665,29 @@ export async function handleAdminPost(request, url, env) {
     if (existing.status === status && Number(existing.approval_required || 0) === 0) {
       return json({ ok: true, noChange: true, status });
     }
-    await env.DB.batch([
-      env.DB.prepare(`UPDATE purchase_orders SET status = ?, approval_required = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
-        .bind(status, existing.id),
+    const confirmsPricing = confirmsOrderPricing(status);
+    const statements = [
+      env.DB.prepare(`
+        UPDATE purchase_orders
+        SET status = ?, approval_required = 0,
+            pricing_status = CASE WHEN ? = 1 THEN 'confirmed' ELSE pricing_status END,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).bind(status, confirmsPricing ? 1 : 0, existing.id)
+    ];
+    if (confirmsPricing) {
+      statements.push(env.DB.prepare(`
+        UPDATE purchase_order_items SET price_status = 'confirmed' WHERE order_id = ?
+      `).bind(existing.id));
+    }
+    statements.push(
       prepareOrderHistoryEvent(env, {
         orderId: existing.id,
         action: "status-changed",
-        details: { from: existing.status, to: status }
+        details: { from: existing.status, to: status, pricingConfirmed: confirmsPricing }
       })
-    ]);
+    );
+    await env.DB.batch(statements);
     const discord = await synchronizeDiscordOrder(env, existing.id);
     return json({ ok: true, noChange: false, status, discord: publicDiscordResult(discord) });
   }
@@ -2181,11 +2196,19 @@ async function importGasOrderHistoryEvent(env, event) {
     && (!orderUpdatedAt || event.createdAt > orderUpdatedAt)
   );
   if (shouldUpdateOrder) {
+    const confirmsPricing = confirmsOrderPricing(event.newStatus);
     statements.push(env.DB.prepare(`
       UPDATE purchase_orders
-      SET status = ?, approval_required = 0, updated_at = ?
+      SET status = ?, approval_required = 0,
+          pricing_status = CASE WHEN ? = 1 THEN 'confirmed' ELSE pricing_status END,
+          updated_at = ?
       WHERE id = ?
-    `).bind(event.newStatus, event.createdAt, event.orderId));
+    `).bind(event.newStatus, confirmsPricing ? 1 : 0, event.createdAt, event.orderId));
+    if (confirmsPricing) {
+      statements.push(env.DB.prepare(`
+        UPDATE purchase_order_items SET price_status = 'confirmed' WHERE order_id = ?
+      `).bind(event.orderId));
+    }
   }
   statements.push(prepareSyncedOrderHistoryEvent(env, event));
   await env.DB.batch(statements);

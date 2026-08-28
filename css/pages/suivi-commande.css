@@ -12,6 +12,7 @@
     .tracking-header p { margin: 0; color: #ded4c2; }
     .tracking-body { padding: 20px; }
     .tracking-status-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+    .tracking-statuses { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
     .tracking-status { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; color: #3a2a0e; background: #ead9a8; font-weight: 800; }
     .tracking-status::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: #9a6e19; }
     .tracking-status.ready, .tracking-status.completed { color: #164d2a; background: #d9efdf; }
@@ -20,6 +21,12 @@
     .tracking-status.cancelled::before, .tracking-status.expired::before { background: #b43c34; }
     .tracking-status.awaiting_approval { color: #563a87; background: #eee7ff; }
     .tracking-status.awaiting_approval::before { background: #8b5cf6; }
+    .tracking-price-status { display: inline-flex; align-items: center; gap: 7px; padding: 8px 12px; border-radius: 999px; color: #6d4d12; background: #f3e4ba; font-weight: 800; }
+    .tracking-price-status::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: #a87920; }
+    .tracking-price-status.to-confirm { color: #79231f; background: #f4d9d6; }
+    .tracking-price-status.to-confirm::before { background: #b43c34; }
+    .tracking-price-status.confirmed { color: #164d2a; background: #d9efdf; }
+    .tracking-price-status.confirmed::before { background: #27834a; }
     button { padding: 8px 12px; border: 1px solid #8b795a; border-radius: 6px; background: #fff; cursor: pointer; }
     button:hover { background: #f5eee1; }
     button:disabled { opacity: .65; cursor: wait; }
@@ -51,4 +58,3 @@
       .tracking-top img { width: 58px; }
       .tracking-body { padding: 15px; }
     }
-

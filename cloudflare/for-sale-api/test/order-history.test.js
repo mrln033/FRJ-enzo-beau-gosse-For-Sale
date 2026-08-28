@@ -81,6 +81,95 @@ function insertOrder(database) {
   `).run(ORDER_ID, "FRJ-20260827-ABC123", "a".repeat(64), "Enzo", 10, 11);
 }
 
+function insertOrderItem(database, orderId = ORDER_ID, priceStatus = "estimated") {
+  database.prepare(`
+    INSERT INTO purchase_order_items (
+      order_id, line_no, item_name, storage, aisle, quantity, stock_at_submission,
+      unit_tt_ped, markup_kind, unit_sale_ped, line_tt_ped, line_sale_ped, price_status
+    ) VALUES (?, 1, 'Item A', 'ARMORS', 'PARTS', 1, 1, 10, 'percent', 11, 10, 11, ?)
+  `).run(orderId, priceStatus);
+}
+
+test("d.11 reprend les prix des demandes ayant déjà atteint la préparation", () => {
+  const database = new DatabaseSync(":memory:");
+  applyMigration(database, "0007_purchase_requests.sql");
+  applyMigration(database, "0016_purchase_order_history.sql");
+  insertOrder(database);
+  insertOrderItem(database);
+  database.prepare(`UPDATE purchase_orders SET status = 'cancelled' WHERE id = ?`).run(ORDER_ID);
+  database.prepare(`
+    INSERT INTO purchase_order_events (order_id, event_key, action, actor, details)
+    VALUES (?, 'event-preparing', 'status-changed', 'admin', '{"from":"submitted","to":"preparing"}')
+  `).run(ORDER_ID);
+
+  const directCancelledId = "22222222-2222-4222-8222-222222222222";
+  database.prepare(`
+    INSERT INTO purchase_orders (
+      id, public_reference, access_token_hash, status, buyer_avatar,
+      total_tt_ped, total_sale_ped
+    ) VALUES (?, 'FRJ-20260828-DEF456', ?, 'cancelled', 'Enzo', 10, 11)
+  `).run(directCancelledId, "b".repeat(64));
+  insertOrderItem(database, directCancelledId, "to-confirm");
+  database.prepare(`
+    INSERT INTO purchase_order_events (order_id, event_key, action, actor, details)
+    VALUES (?, 'event-legacy-invalid', 'status-changed', 'admin', 'ancienne donnée non JSON')
+  `).run(directCancelledId);
+
+  applyMigration(database, "0017_confirm_purchase_order_prices.sql");
+  assert.equal(database.prepare(`SELECT pricing_status FROM purchase_orders WHERE id = ?`).get(ORDER_ID)
+    .pricing_status, "confirmed");
+  assert.equal(database.prepare(`SELECT price_status FROM purchase_order_items WHERE order_id = ?`).get(ORDER_ID)
+    .price_status, "confirmed");
+  assert.equal(database.prepare(`SELECT pricing_status FROM purchase_orders WHERE id = ?`).get(directCancelledId)
+    .pricing_status, "estimated");
+  assert.equal(database.prepare(`SELECT price_status FROM purchase_order_items WHERE order_id = ?`).get(directCancelledId)
+    .price_status, "to-confirm");
+  assert.equal(database.prepare(`
+    SELECT COUNT(*) AS count FROM purchase_order_events
+    WHERE order_id = ? AND action = 'pricing-confirmed-backfill'
+  `).get(ORDER_ID).count, 1);
+  assert.equal(database.prepare(`
+    SELECT COUNT(*) AS count FROM purchase_order_events
+    WHERE order_id = ? AND action = 'pricing-confirmed-backfill'
+  `).get(directCancelledId).count, 0);
+});
+
+test("d.11 confirme atomiquement les prix lors d'un changement de statut Admin", async () => {
+  const database = new DatabaseSync(":memory:");
+  applyMigration(database, "0007_purchase_requests.sql");
+  applyMigration(database, "0008_order_discord_notifications.sql");
+  applyMigration(database, "0009_order_proposals.sql");
+  applyMigration(database, "0016_purchase_order_history.sql");
+  insertOrder(database);
+  insertOrderItem(database, ORDER_ID, "to-confirm");
+  const env = { DB: makeD1(database), CART_ENABLED: "true" };
+  const statusUrl = new URL(`https://api.example/admin/orders/${ORDER_ID}/status`);
+
+  await handleAdminPost(
+    new Request(statusUrl, { method: "POST", body: JSON.stringify({ status: "viewed" }) }),
+    statusUrl,
+    env
+  );
+  assert.equal(database.prepare(`SELECT pricing_status FROM purchase_orders WHERE id = ?`).get(ORDER_ID)
+    .pricing_status, "estimated");
+  assert.equal(database.prepare(`SELECT price_status FROM purchase_order_items WHERE order_id = ?`).get(ORDER_ID)
+    .price_status, "to-confirm");
+
+  await handleAdminPost(
+    new Request(statusUrl, { method: "POST", body: JSON.stringify({ status: "preparing" }) }),
+    statusUrl,
+    env
+  );
+  assert.equal(database.prepare(`SELECT pricing_status FROM purchase_orders WHERE id = ?`).get(ORDER_ID)
+    .pricing_status, "confirmed");
+  assert.equal(database.prepare(`SELECT price_status FROM purchase_order_items WHERE order_id = ?`).get(ORDER_ID)
+    .price_status, "confirmed");
+  const eventDetails = JSON.parse(database.prepare(`
+    SELECT details FROM purchase_order_events WHERE action = 'status-changed' ORDER BY id DESC LIMIT 1
+  `).get().details);
+  assert.equal(eventDetails.pricingConfirmed, true);
+});
+
 test("la migration enrichit les événements existants sans les perdre", () => {
   const database = new DatabaseSync(":memory:");
   applyMigration(database, "0007_purchase_requests.sql");
@@ -105,6 +194,7 @@ test("les commentaires automatiques et leur validation suivent le contrat", () =
   assert.equal(orderHistoryActor("proposal-accepted"), "client");
   assert.equal(orderHistoryActor("status-changed"), "admin");
   assert.equal(isVisibleOrderHistoryAction("discord-updated"), false);
+  assert.equal(isVisibleOrderHistoryAction("pricing-confirmed-backfill"), false);
   assert.equal(
     automaticOrderHistoryComment("status-changed", { from: "submitted", to: "preparing" }),
     "Statut modifié : Transmise → À préparer."
@@ -198,6 +288,7 @@ test("l'historique GAS met à jour D1 puis revient par le curseur sans doublon",
   applyMigration(database, "0009_order_proposals.sql");
   applyMigration(database, "0016_purchase_order_history.sql");
   insertOrder(database);
+  insertOrderItem(database);
   database.prepare(`UPDATE purchase_orders SET updated_at = ? WHERE id = ?`)
     .run("2026-08-27 10:00:00", ORDER_ID);
   const env = { DB: makeD1(database), CART_ENABLED: "true" };
@@ -221,6 +312,10 @@ test("l'historique GAS met à jour D1 puis revient par le curseur sans doublon",
   const firstResult = await firstResponse.json();
   assert.equal(firstResult.ok, true);
   assert.equal(database.prepare(`SELECT status FROM purchase_orders WHERE id = ?`).get(ORDER_ID).status, "preparing");
+  assert.equal(database.prepare(`SELECT pricing_status FROM purchase_orders WHERE id = ?`).get(ORDER_ID)
+    .pricing_status, "confirmed");
+  assert.equal(database.prepare(`SELECT price_status FROM purchase_order_items WHERE order_id = ?`).get(ORDER_ID)
+    .price_status, "confirmed");
   assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM purchase_order_events WHERE event_key = ?`)
     .get(event.eventKey).count, 1);
 

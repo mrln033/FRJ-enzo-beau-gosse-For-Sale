@@ -12,7 +12,7 @@ const STATUS_LABELS = Object.freeze({
 
 const CLIENT_ACTIONS = new Set(["submitted", "proposal-accepted", "client-cancelled"]);
 const ADMIN_ACTIONS = new Set(["status-changed", "proposal-changed", "proposal-line-changed"]);
-const HIDDEN_ACTIONS = new Set(["history-comment-updated"]);
+const HIDDEN_ACTIONS = new Set(["history-comment-updated", "pricing-confirmed-backfill"]);
 const SYNCED_ACTIONS = new Set([
   "submitted",
   "gas-fallback-synchronized",

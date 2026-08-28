@@ -12,6 +12,11 @@
     expired: Object.freeze({ admin: "Expirée", FR: "Expirée", EN: "Expired" })
   });
   const statusKeys = Object.freeze(Object.keys(statusDefinitions));
+  const pricingDefinitions = Object.freeze({
+    estimated: Object.freeze({ admin: "Prix estimés", FR: "Prix estimés", EN: "Estimated prices" }),
+    "to-confirm": Object.freeze({ admin: "Prix à confirmer", FR: "Prix à confirmer", EN: "Prices to confirm" }),
+    confirmed: Object.freeze({ admin: "Prix confirmés", FR: "Prix confirmés", EN: "Confirmed prices" })
+  });
   const editableStatuses = new Set(["awaiting_approval", "submitted", "viewed"]);
   const hideableStatuses = new Set(["completed", "cancelled", "expired"]);
 
@@ -22,6 +27,11 @@
   function statusLabel(status, language = "FR", variant = "tracking") {
     const definition = statusDefinitions[status];
     if (!definition) return status || "—";
+    return variant === "admin" ? definition.admin : definition[normalizeLanguage(language)];
+  }
+
+  function pricingLabel(status, language = "FR", variant = "tracking") {
+    const definition = pricingDefinitions[status] || pricingDefinitions.estimated;
     return variant === "admin" ? definition.admin : definition[normalizeLanguage(language)];
   }
 
@@ -59,6 +69,7 @@
   global.FRJ_ORDER_UI = Object.freeze({
     statusKeys,
     statusLabel,
+    pricingLabel,
     formatPed,
     formatQuantity,
     formatDate,

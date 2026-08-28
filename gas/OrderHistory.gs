@@ -157,6 +157,21 @@ function frjCapturePurchaseOrderEdit_(e) {
   return false;
 }
 
+function purchaseStatusConfirmsPricing_(status) {
+  return ["preparing", "ready", "completed"].indexOf(
+    String(status || "").trim().toLowerCase()
+  ) !== -1;
+}
+
+function purchaseConfirmPricingInPayload_(payload) {
+  if (!payload || !payload.order) return false;
+  payload.order.pricingStatus = "confirmed";
+  (Array.isArray(payload.items) ? payload.items : []).forEach(function(item) {
+    if (item && typeof item === "object") item.priceStatus = "confirmed";
+  });
+  return true;
+}
+
 function purchaseCaptureOrderStatusEdit_(e, sheet, range) {
   var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
   var indexes = {};
@@ -175,10 +190,15 @@ function purchaseCaptureOrderStatusEdit_(e, sheet, range) {
   try { payload = JSON.parse(String(row[indexes.SYNC_PAYLOAD_JSON] || "{}")); } catch (ignored) {}
   var previousStatus = String(e.oldValue || (payload.order && payload.order.status) || "submitted").trim().toLowerCase();
   if (previousStatus === newStatus) return false;
+  var pricingConfirmed = purchaseStatusConfirmsPricing_(newStatus);
   if (payload.order) {
     payload.order.status = newStatus;
     payload.order.approvalRequired = false;
+    if (pricingConfirmed) purchaseConfirmPricingInPayload_(payload);
     sheet.getRange(range.getRow(), indexes.SYNC_PAYLOAD_JSON + 1).setValue(JSON.stringify(payload));
+  }
+  if (pricingConfirmed && indexes.PRIX_STATUT !== undefined) {
+    sheet.getRange(range.getRow(), indexes.PRIX_STATUT + 1).setValue("confirmed");
   }
   if (indexes.APPROVAL_REQUIRED !== undefined) {
     sheet.getRange(range.getRow(), indexes.APPROVAL_REQUIRED + 1).setValue("FALSE");
@@ -189,7 +209,7 @@ function purchaseCaptureOrderStatusEdit_(e, sheet, range) {
     orderId,
     "status-changed",
     "admin",
-    { from: previousStatus, to: newStatus },
+    { from: previousStatus, to: newStatus, pricingConfirmed: pricingConfirmed },
     newStatus
   );
   purchaseAppendHistoryEvent_(sheet.getParent(), event);

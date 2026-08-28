@@ -125,6 +125,7 @@ test("la Console Admin enregistre la précision autorisée puis recharge D1", as
     publicReference: "FRJ-20260820-ABC123",
     buyerAvatar: "Test Player",
     status: "submitted",
+    pricingStatus: "estimated",
     approvalRequired: false,
     proposalVersion: 0,
     createdAt: "2026-08-20T10:00:00Z",
@@ -173,6 +174,8 @@ test("la Console Admin enregistre la précision autorisée puis recharge D1", as
   assert.equal(quantity.step, "1");
   assert.equal(amount.step, "0.000001");
   assert.equal(amount.value, "115.123456");
+  const pricing = created.find((element) => element.className === "order-price-status estimated");
+  assert.equal(pricing.textContent, "Prix estimés");
 
   amount.value = "115.123455";
   amount.listeners.get("input")();
@@ -194,6 +197,7 @@ test("la Console Admin charge l'historique à la demande et modifie un commentai
     publicReference: "FRJ-20260827-ABC123",
     buyerAvatar: "Test Player",
     status: "viewed",
+    pricingStatus: "confirmed",
     createdAt: "2026-08-27T10:00:00Z",
     updatedAt: "2026-08-27T10:30:00Z",
     totalSalePed: 10,
@@ -275,6 +279,7 @@ test("le suivi public rend une demande et la mémorise localement", async () => 
     buyerAvatar: "Test Player",
     language: "EN",
     status: "submitted",
+    pricingStatus: "confirmed",
     createdAt: "2026-08-20T10:00:00Z",
     updatedAt: "2026-08-20T11:00:00Z",
     frjMember: false,
@@ -300,7 +305,12 @@ test("le suivi public rend une demande et la mémorise localement", async () => 
 
   assert.equal(elements.get("catalogReturnLink").href, "./?backend=d1");
   assert.equal(elements.get("trackingContent").className, "tracking-body");
-  assert.equal(elements.get("trackingContent").children[0].children[0].textContent, "Request submitted");
+  const statuses = elements.get("trackingContent").children[0].children[0];
+  assert.equal(statuses.children[0].textContent, "Request submitted");
+  assert.equal(statuses.children[1].textContent, "Confirmed prices");
+  assert.equal(statuses.children[1].className, "tracking-price-status confirmed");
+  const note = elements.get("trackingContent").children.at(-1);
+  assert.equal(note.textContent, "The prices in this request are confirmed. Stock is not reserved by this request.");
   assert.equal(document.documentElement.lang, "en");
   const remembered = JSON.parse(storage.getItem("FRJ_PURCHASE_REQUESTS_V1"));
   assert.equal(remembered[0].accessToken, token);

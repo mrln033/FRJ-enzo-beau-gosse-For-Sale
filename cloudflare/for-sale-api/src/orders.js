@@ -3,6 +3,7 @@ const ORDER_STATUSES = new Set([
 ]);
 const EDITABLE_ORDER_STATUSES = new Set(["submitted", "viewed"]);
 const CLIENT_CANCELLABLE_STATUSES = new Set(["submitted", "viewed"]);
+const PRICE_CONFIRMING_ORDER_STATUSES = new Set(["preparing", "ready", "completed"]);
 
 export function canReviseOrder(status, approvalRequired = false) {
   return approvalRequired === true || Number(approvalRequired || 0) === 1
@@ -12,6 +13,10 @@ export function canReviseOrder(status, approvalRequired = false) {
 export function canClientCancelOrder(status, approvalRequired = false) {
   return approvalRequired === true || Number(approvalRequired || 0) === 1
     || CLIENT_CANCELLABLE_STATUSES.has(String(status || "").trim().toLowerCase());
+}
+
+export function confirmsOrderPricing(status) {
+  return PRICE_CONFIRMING_ORDER_STATUSES.has(String(status || "").trim().toLowerCase());
 }
 
 export function normalizeOrderSubmission(payload) {

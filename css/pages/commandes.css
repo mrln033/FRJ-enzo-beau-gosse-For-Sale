@@ -13,6 +13,9 @@ body { max-width: 1250px; margin: 0 auto; padding: 78px 18px 40px; box-sizing: b
     .order-card header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
     .order-card h2 { margin: 0 0 4px; font-size: 1.05rem; }
     .order-meta { display: flex; flex-wrap: wrap; gap: 7px 15px; font-size: .88rem; color: #675e51; }
+    .order-price-status { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; color: #6d4d12; background: #f3e4ba; font-weight: 800; }
+    .order-price-status.to-confirm { color: #79231f; background: #f4d9d6; }
+    .order-price-status.confirmed { color: #164d2a; background: #d9efdf; }
     .order-card table { width: 100%; border-collapse: collapse; margin-top: 12px; }
     .order-card th, .order-card td { padding: 6px; border-bottom: 1px solid #e2dbcf; text-align: left; }
     .order-card th:not(:first-child), .order-card td:not(:first-child) { text-align: right; }

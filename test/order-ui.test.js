@@ -19,6 +19,14 @@ test("les statuts partagés conservent les libellés Admin, FR et EN", () => {
   assert.equal(ui.statusKeys.length, 8);
 });
 
+test("les statuts de prix partagent leurs libellés Admin, FR et EN", () => {
+  const ui = loadOrderUi();
+  assert.equal(ui.pricingLabel("estimated", "FR", "admin"), "Prix estimés");
+  assert.equal(ui.pricingLabel("to-confirm", "FR"), "Prix à confirmer");
+  assert.equal(ui.pricingLabel("confirmed", "EN"), "Confirmed prices");
+  assert.equal(ui.pricingLabel("inconnu", "EN"), "Estimated prices");
+});
+
 test("les règles d'action changent au début de la préparation", () => {
   const ui = loadOrderUi();
   assert.equal(ui.canEditProposal("viewed"), true);

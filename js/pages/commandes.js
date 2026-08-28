@@ -135,6 +135,11 @@
       span.textContent = value;
       meta.appendChild(span);
     });
+    const pricingStatus = order.pricingStatus || "estimated";
+    const pricing = document.createElement("span");
+    pricing.className = `order-price-status ${pricingStatus}`;
+    pricing.textContent = ui.pricingLabel(pricingStatus, "FR", "admin");
+    meta.appendChild(pricing);
     identity.append(title, meta);
 
     const select = document.createElement("select");

@@ -8,10 +8,10 @@ Par la même occasion, si tu as de l'historique de ton côté, n'hésite pas à 
 Je tiens à garder une trace de tout ce qu'on a fait sur ce projet.
 
 ----------------------------------------
-POINT DE REPRISE — 27/08/2026
+POINT DE REPRISE — 28/08/2026
 
 Ordre recommandé déjà réalisé et validé : d.1 -> d.2 -> d.3 -> d.7 -> d.8 -> d.6 -> d.10.
-La demande d.10 est terminée et déployée : modèle D1, interface Admin, feuille GAS et synchronisation bidirectionnelle sont en production.
+La demande d.10 est terminée et déployée. La demande d.11 est en cours par étapes ; d.11.1 traite localement la règle et la reprise D1, d.11.2 aligne localement GAS et d.11.3 affiche localement le statut des prix dans les interfaces Admin et client. La prochaine étape proposée est d.11.4 pour la sauvegarde, le déploiement coordonné et les contrôles de production.
 
 Les demandes encore ouvertes sont d.4, d.5, d.9, d.11 et d.12. Leur priorité devra être réévaluée avant la prochaine réalisation.
 
@@ -56,6 +56,15 @@ Dans un premier temps, effectue ces changements/modifications du coté D1 seulem
 
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
+
+28/08/2026 = Avancement d.11 — étape d.11.3 : affichage local du statut des prix.
+Réalisation locale : les libellés de prix sont mutualisés dans le composant commun des demandes avec les trois états 'Prix estimés', 'Prix à confirmer' et 'Prix confirmés', ainsi que leurs traductions anglaises. La Console Admin affiche ce statut sous forme de badge dans l'en-tête de chaque demande. Le suivi client présente un second badge à côté du statut d'avancement, dans la langue enregistrée par la demande ; sa note précise désormais que les prix sont confirmés lorsqu'ils le sont, tout en conservant l'information selon laquelle le stock n'est pas réservé. Les badges distinguent visuellement l'estimation, le prix restant à confirmer et la confirmation, sans répéter une colonne identique sur chaque ligne d'article puisque la confirmation d.11 porte simultanément sur toute la demande. Les versions des ressources HTML sont renouvelées afin d'éviter un ancien cache lors du futur déploiement. Les tests couvrent les libellés Admin, FR et EN, le rendu Admin, le rendu client anglais et la note confirmée ; les 157 tests du projet réussissent. Aucun frontend, Worker, GAS, Google Sheet ou D1 distant n'est modifié à cette étape.
+
+28/08/2026 = Avancement d.11 — étape d.11.2 : confirmation des prix côté GAS local.
+Réalisation locale : une modification manuelle de STATUT dans 'COMMANDES_APP' applique désormais la même règle que D1. Le passage à 'preparing', 'ready' ou 'completed' inscrit 'confirmed' dans la colonne PRIX_STATUT, dans le statut global du payload de synchronisation et dans chacune de ses lignes d'article. La confirmation est permanente : un passage ultérieur à 'cancelled' ou 'expired' ne la remet pas à l'état estimé. L'événement d'historique GAS indique explicitement si la transition vient de confirmer les prix ; les marqueurs de synchronisation sont vidés comme auparavant afin que le statut et son historique repartent immédiatement vers D1. Dans l'autre sens, le miroir GAS existant conserve déjà le statut global et les statuts de ligne fournis par D1. Les tests vérifient qu'un simple passage à 'Vue' ne confirme rien, qu'un passage à 'A préparer' confirme tout et qu'une annulation ultérieure ne régresse pas ; les 156 tests du projet réussissent. La reprise coordonnée des commandes historiques dans GAS sera contrôlée lors du déploiement final de d.11. Aucun fichier GAS distant, Google Sheet distant, Worker ou D1 distant n'est modifié à cette étape.
+
+28/08/2026 = Avancement d.11 — étape d.11.1 : confirmation des prix côté D1 local.
+Réalisation locale : la règle métier devient explicite et commune aux traitements D1 : atteindre les statuts 'À préparer', 'Prête' ou 'Terminée' confirme définitivement le prix global de la demande et celui de toutes ses lignes. Le changement Admin écrit le statut, la confirmation et l'événement d'historique dans un même lot transactionnel ; l'événement précise si ce passage a confirmé les prix. Un statut plus ancien reçu depuis GAS applique la même règle uniquement lorsqu'il est réellement retenu par D1, sans permettre à un événement retardé de modifier la demande. La migration '0017_confirm_purchase_order_prices.sql' reprend les demandes historiques actuellement dans ces trois statuts et utilise aussi les événements d.10 pour conserver la confirmation d'une demande passée par la préparation avant de devenir annulée ou expirée. Une annulation directe avant préparation reste estimée. La migration est appliquée uniquement à D1 local et aucune migration locale ne reste en attente. Les tests couvrent la règle des statuts, la reprise historique y compris face à un ancien détail non JSON, le changement Admin et la réception d'un statut GAS ; les 154 tests du projet et le dry-run Wrangler réussissent. Cette étape ne modifie encore ni GAS, ni les libellés du suivi client et de la Console Admin, ni les services distants.
 
 27/08/2026 = Demande d.10 — terminée.
 Demande d'origine : Console Admin - Demandes d'Achat ==> implémenter un historique de la vie d'une demande : à chaque changement de statut, créer une ligne avec la date, le nouveau statut et un commentaire automatique modifiable par l'admin. Cet historique ne doit être visible que par l'admin et doit être présent et enregistré des deux côtés, GAS et D1, en s'appuyant si possible sur la table D1 existante 'purchase_order_events'.

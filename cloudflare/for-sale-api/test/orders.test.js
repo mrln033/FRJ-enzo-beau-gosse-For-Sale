@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   canClientCancelOrder,
   canReviseOrder,
+  confirmsOrderPricing,
   hasSameOrderTerms,
   normalizeOrderSubmission,
   priceOrderLines,
@@ -105,6 +106,16 @@ test("calcule avec le MU arrondi exactement comme sur la tuile", () => {
 test("valide uniquement les statuts connus", () => {
   assert.equal(validateOrderStatus("READY"), "ready");
   assert.throws(() => validateOrderStatus("deleted"), /invalide/);
+});
+
+test("confirme les prix au début de la préparation", () => {
+  assert.equal(confirmsOrderPricing("submitted"), false);
+  assert.equal(confirmsOrderPricing("viewed"), false);
+  assert.equal(confirmsOrderPricing("preparing"), true);
+  assert.equal(confirmsOrderPricing("READY"), true);
+  assert.equal(confirmsOrderPricing("completed"), true);
+  assert.equal(confirmsOrderPricing("cancelled"), false);
+  assert.equal(confirmsOrderPricing("expired"), false);
 });
 
 test("accepte uniquement des quantités entières", () => {

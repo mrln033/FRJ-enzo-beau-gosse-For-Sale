@@ -78,3 +78,12 @@ test("d.10.3 raccorde l'historique GAS au canal bidirectionnel des commandes", (
   assert.match(sources["SyncOrders.gs"], /upsertPurchaseOrderHistoryMirror_\(order\.historyEvents \|\| \[\]\)/);
   assert.match(sources["SyncD1.gs"], /frjPushPendingPurchaseOrderHistory_\(\)/);
 });
+
+test("d.11.2 applique dans GAS la confirmation permanente des prix", () => {
+  assert.match(sources["OrderHistory.gs"], /function purchaseStatusConfirmsPricing_\(status\)/);
+  assert.match(sources["OrderHistory.gs"], /payload\.order\.pricingStatus = "confirmed"/);
+  assert.match(sources["OrderHistory.gs"], /item\.priceStatus = "confirmed"/);
+  assert.match(sources["OrderHistory.gs"], /pricingConfirmed: pricingConfirmed/);
+  assert.match(sources["PurchaseOrders.gs"], /set\("PRIX_STATUT", order\.pricingStatus \|\| "estimated"\)/);
+  assert.match(sources["PurchaseOrders.gs"], /pricingStatus: order\.pricingStatus \|\| "estimated"/);
+});

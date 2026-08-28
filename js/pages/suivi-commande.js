@@ -14,7 +14,8 @@
       cancel: "Annuler la demande", cancelConfirm: "Confirmer l’annulation de cette demande ?",
       cancelling: "Annulation…", cancelError: "L’annulation a échoué. Actualisez la page et réessayez.",
       hide: "Masquer dans la liste", hidden: "Cette demande a été masquée de la liste de votre panier sur cette machine.",
-      note: "Prix indicatif, à confirmer avec Enzo. Le stock n’est pas réservé par cette demande.",
+      estimatedNote: "Prix indicatif, à confirmer avec Enzo. Le stock n’est pas réservé par cette demande.",
+      confirmedNote: "Les prix de cette demande sont confirmés. Le stock n’est pas réservé par cette demande.",
       loading: "Actualisation…", missing: "Lien de suivi invalide ou incomplet.",
       gasPending: "Votre demande a été reçue par le secours GAS. Elle apparaîtra ici après son transfert automatique vers D1 (généralement sous cinq minutes).",
       notFound: "Cette demande est introuvable. Vérifiez que le lien est complet.",
@@ -32,7 +33,8 @@
       cancel: "Cancel request", cancelConfirm: "Confirm cancellation of this request?",
       cancelling: "Cancelling…", cancelError: "Cancellation failed. Refresh the page and try again.",
       hide: "Hide from list", hidden: "This request has been hidden from your cart list on this device.",
-      note: "Indicative price, to be confirmed with Enzo. Stock is not reserved by this request.",
+      estimatedNote: "Indicative price, to be confirmed with Enzo. Stock is not reserved by this request.",
+      confirmedNote: "The prices in this request are confirmed. Stock is not reserved by this request.",
       loading: "Refreshing…", missing: "Invalid or incomplete tracking link.",
       gasPending: "Your request was received by the GAS fallback. It will appear here after its automatic transfer to D1 (usually within five minutes).",
       notFound: "This request could not be found. Check that the link is complete.",
@@ -153,6 +155,13 @@
     const status = document.createElement("span");
     status.className = `tracking-status ${order.status}`;
     status.textContent = ui.statusLabel(order.status, lang);
+    const pricingStatus = order.pricingStatus || "estimated";
+    const pricing = document.createElement("span");
+    pricing.className = `tracking-price-status ${pricingStatus}`;
+    pricing.textContent = ui.pricingLabel(pricingStatus, lang);
+    const statuses = document.createElement("div");
+    statuses.className = "tracking-statuses";
+    statuses.append(status, pricing);
     const actions = document.createElement("div");
     actions.className = "tracking-actions";
     const refresh = document.createElement("button");
@@ -183,7 +192,7 @@
       hide.addEventListener("click", hideOrder);
       actions.appendChild(hide);
     }
-    statusRow.append(status, actions);
+    statusRow.append(statuses, actions);
     content.appendChild(statusRow);
 
     if (order.status === "awaiting_approval") {
@@ -252,7 +261,7 @@
     content.appendChild(total);
     const note = document.createElement("p");
     note.className = "tracking-note";
-    note.textContent = text("note");
+    note.textContent = text(pricingStatus === "confirmed" ? "confirmedNote" : "estimatedNote");
     content.appendChild(note);
   }
 
