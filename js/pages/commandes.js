@@ -164,7 +164,8 @@
     }
 
     const table = document.createElement("table");
-    table.innerHTML = "<thead><tr><th>Article</th><th>Qté proposée</th><th>Prix affiché</th><th>MU ponctuel</th><th>Estimation vente</th></tr></thead>";
+    const saleHeading = pricingStatus === "confirmed" ? "Prix de vente" : "Estimation vente";
+    table.innerHTML = `<thead><tr><th>Article</th><th>Qté proposée</th><th>Prix affiché</th><th>MU ponctuel</th><th>${saleHeading}</th></tr></thead>`;
     const body = document.createElement("tbody");
     const editors = [];
     (order.items || []).forEach((item) => {
@@ -371,7 +372,9 @@
     title.textContent = "Vie de la demande";
     const list = document.createElement("ol");
     list.className = "order-history-list";
-    events.forEach((historyEvent) => {
+    list.reversed = true;
+    list.start = events.length;
+    [...events].reverse().forEach((historyEvent) => {
       list.appendChild(renderOrderHistoryEvent(order, historyEvent));
     });
     panel.replaceChildren(title, list);

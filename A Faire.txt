@@ -11,7 +11,7 @@ Je tiens à garder une trace de tout ce qu'on a fait sur ce projet.
 POINT DE REPRISE — 28/08/2026
 
 Ordre recommandé déjà réalisé et validé : d.1 -> d.2 -> d.3 -> d.7 -> d.8 -> d.6 -> d.10 -> d.11.
-La demande d.11 est terminée, déployée et contrôlée en production : D1, Worker, GAS et frontend affichent et propagent désormais la confirmation des prix.
+La demande d.11 et son correctif d'affichage sont terminés, déployés et contrôlés en production : historique Admin antéchronologique avec numérotation chronologique, et intitulés de prix de vente lorsque les prix sont confirmés.
 
 Les demandes encore ouvertes sont d.4, d.5, d.9 et d.12. Leur priorité devra être réévaluée avant la prochaine réalisation.
 
@@ -54,6 +54,9 @@ Dans un premier temps, effectue ces changements/modifications du coté D1 seulem
 
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
+
+28/08/2026 = Correctif d'affichage post-d.11 — terminé et publié.
+Réalisation : l'historique de la Console Admin affiche désormais les événements du plus récent au plus ancien tout en utilisant une liste ordonnée inversée, de sorte que chaque événement conserve son numéro chronologique réel. Dans le tableau Admin, la colonne 'Estimation vente' devient 'Prix de vente' uniquement lorsque le statut global des prix est confirmé. Le suivi client applique la même règle à la colonne 'Estimation', avec 'Prix de vente' en français et 'Sale price' en anglais ; son total devient alors 'Prix de Vente total' ou 'Total sale price', au lieu de l'intitulé d'estimation. Les versions des deux contrôleurs HTML ont été renouvelées pour éviter un ancien cache. Les tests de page couvrent l'ordre et la numérotation de l'historique ainsi que les intitulés Admin et client confirmés ; les 157 tests du projet réussissent. Le correctif frontend est publié par GitHub Pages et contrôlé en production. Aucun changement D1, Worker, GAS ou Google Sheet n'a été nécessaire.
 
 28/08/2026 = Demande d.11 — terminée et déployée.
 Demande d'origine : Sytème de panier ==> dans les demandes d'achat, le prix est 'de base' dans un statut 'Estimé'. Lors du passage de la demande en 'A préparer' | 'Prête' | 'Terminée', je voudrais les le statut des prix passe à 'Confirmé'. Celà correspond à une acceptation du client pour les prix affichés ,)

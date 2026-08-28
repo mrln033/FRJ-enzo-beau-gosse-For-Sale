@@ -6,8 +6,8 @@
       title: "Suivi de votre demande", subtitle: "Ce lien est privé : conservez-le pour consulter l’avancement.",
       back: "Retour au catalogue", refresh: "Actualiser", copy: "Copier le lien", copied: "Lien copié",
       reference: "Référence", avatar: "Avatar", created: "Transmise le", updated: "Dernière mise à jour",
-      item: "Article", quantity: "Qté", price: "Prix affiché", markup: "MU appliqué", estimate: "Estimation",
-      total: "Estimation totale", member: "MU FRJ", public: "MU", pending: "à confirmer",
+      item: "Article", quantity: "Qté", price: "Prix affiché", markup: "MU appliqué", estimate: "Estimation", salePrice: "Prix de vente",
+      total: "Estimation totale", totalSale: "Prix de Vente total", member: "MU FRJ", public: "MU", pending: "à confirmer",
       proposal: "Enzo a modifié une ou plusieurs quantités ou MU. Vérifiez les nouvelles conditions affichées ci-dessous, puis acceptez-les pour retransmettre la demande.",
       accept: "Accepter les modifications", accepting: "Validation…",
       acceptError: "La validation a échoué. Actualisez la page et réessayez.",
@@ -25,8 +25,8 @@
       title: "Track your request", subtitle: "This link is private: keep it to check progress.",
       back: "Back to catalogue", refresh: "Refresh", copy: "Copy link", copied: "Link copied",
       reference: "Reference", avatar: "Avatar", created: "Submitted", updated: "Last update",
-      item: "Item", quantity: "Qty", price: "Displayed price", markup: "Applied MU", estimate: "Estimate",
-      total: "Total estimate", member: "FRJ MU", public: "MU", pending: "to confirm",
+      item: "Item", quantity: "Qty", price: "Displayed price", markup: "Applied MU", estimate: "Estimate", salePrice: "Sale price",
+      total: "Total estimate", totalSale: "Total sale price", member: "FRJ MU", public: "MU", pending: "to confirm",
       proposal: "Enzo changed one or more quantities or MUs. Review the new terms below, then accept them to resubmit the request.",
       accept: "Accept changes", accepting: "Accepting…",
       acceptError: "Acceptance failed. Refresh the page and try again.",
@@ -229,7 +229,8 @@
     const tableWrap = document.createElement("div");
     tableWrap.className = "tracking-table-wrap";
     const table = document.createElement("table");
-    table.innerHTML = `<thead><tr><th>${text("item")}</th><th>${text("quantity")}</th><th>${text("price")}</th><th>${text("markup")}</th><th>${text("estimate")}</th></tr></thead>`;
+    const saleHeading = pricingStatus === "confirmed" ? text("salePrice") : text("estimate");
+    table.innerHTML = `<thead><tr><th>${text("item")}</th><th>${text("quantity")}</th><th>${text("price")}</th><th>${text("markup")}</th><th>${saleHeading}</th></tr></thead>`;
     const body = document.createElement("tbody");
     (order.items || []).forEach((item) => {
       const row = document.createElement("tr");
@@ -255,7 +256,7 @@
     total.className = "tracking-total";
     const totalLabel = document.createElement("span");
     const totalValue = document.createElement("strong");
-    totalLabel.textContent = text("total");
+    totalLabel.textContent = text(pricingStatus === "confirmed" ? "totalSale" : "total");
     totalValue.textContent = `${ui.formatPed(order.totalSalePed, lang)} PED`;
     total.append(totalLabel, totalValue);
     content.appendChild(total);

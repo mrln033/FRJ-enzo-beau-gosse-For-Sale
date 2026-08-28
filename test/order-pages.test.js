@@ -210,6 +210,13 @@ test("la Console Admin charge l'historique à la demande et modifie un commentai
     comment: "Statut modifié : Transmise → Vue.",
     createdAt: "2026-08-27T10:30:00Z"
   };
+  const previousHistoryEvent = {
+    id: 6,
+    actor: "client",
+    newStatus: "submitted",
+    comment: "Demande transmise par le client.",
+    createdAt: "2026-08-27T10:00:00Z"
+  };
   const document = {
     getElementById: (id) => elements.get(id),
     createElement: () => {
@@ -226,7 +233,9 @@ test("la Console Admin charge l'historique à la demande et modifie un commentai
         if (path === "/admin/orders") {
           return { json: async () => ({ orders: [order], enabled: true, generatedAt: order.updatedAt }) };
         }
-        if (path.endsWith("/history")) return { json: async () => ({ events: [historyEvent] }) };
+        if (path.endsWith("/history")) {
+          return { json: async () => ({ events: [previousHistoryEvent, historyEvent] }) };
+        }
         return { json: async () => ({ ok: true, event: { ...historyEvent, comment: "Client prévenu" } }) };
       }
     },
@@ -243,6 +252,14 @@ test("la Console Admin charge l'historique à la demande et modifie un commentai
   await toggle.listeners.get("click")();
   await settle();
   assert.equal(requests[1].path, `/admin/orders/${order.id}/history`);
+
+  const historyList = created.find((element) => element.className === "order-history-list");
+  assert.equal(historyList.reversed, true);
+  assert.equal(historyList.start, 2);
+  assert.match(historyList.children[0].children[0].textContent, /Nouveau statut : Vue/);
+  assert.match(historyList.children[1].children[0].textContent, /Nouveau statut : Transmise/);
+  const orderTable = created.find((element) => element.innerHTML.includes("<thead>"));
+  assert.match(orderTable.innerHTML, /<th>Prix de vente<\/th>/);
 
   const textarea = created.find((element) => String(element.attributes.get("aria-label") || "")
     .startsWith("Commentaire historique du"));
@@ -309,6 +326,10 @@ test("le suivi public rend une demande et la mémorise localement", async () => 
   assert.equal(statuses.children[0].textContent, "Request submitted");
   assert.equal(statuses.children[1].textContent, "Confirmed prices");
   assert.equal(statuses.children[1].className, "tracking-price-status confirmed");
+  const trackingTable = elements.get("trackingContent").children[2].children[0];
+  assert.match(trackingTable.innerHTML, /<th>Sale price<\/th>/);
+  const trackingTotal = elements.get("trackingContent").children[3];
+  assert.equal(trackingTotal.children[0].textContent, "Total sale price");
   const note = elements.get("trackingContent").children.at(-1);
   assert.equal(note.textContent, "The prices in this request are confirmed. Stock is not reserved by this request.");
   assert.equal(document.documentElement.lang, "en");
