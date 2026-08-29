@@ -16,13 +16,16 @@
     },
     { section: "containers", backend: "", label: "Conteneurs D1", href: "conteneurs.html" },
     { section: "report", backend: "", label: "Rapport de synchronisation", href: "rapport-sync.html" },
-    { section: "orders", backend: "", label: "Demandes d'achat", href: "commandes.html" }
+    { section: "orders", backend: "", label: "Demandes d'achat", href: "commandes.html" },
+    { section: "visits", backend: "", label: "Statistiques des visites", href: "statistiques-visites.html" }
   ];
 
   function render() {
     if (document.querySelector(".admin-menu-drawer")) return;
     const pathname = global.location.pathname.toLowerCase();
-    const section = pathname.includes("commandes")
+    const section = pathname.includes("statistiques-visites")
+      ? "visits"
+      : pathname.includes("commandes")
       ? "orders"
       : pathname.includes("conteneurs")
       ? "containers"

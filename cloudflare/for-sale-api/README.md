@@ -18,7 +18,7 @@ Le point d'entrée déclaré dans `wrangler.jsonc` et tous les contrats HTTP res
 - D1 distant : `frj-for-sale` (`6afa102c-94a4-4b40-a61b-0fdc2e0a2b86`), région WEUR.
 - La volumétrie évolue avec les imports ; `GET /health` fournit les compteurs catalogue courants.
 - Le front GitHub Pages peut utiliser GAS ou D1 sans changer son adresse publique.
-- Les lectures D1 sont publiques ; `ADMIN_TOKEN`, `SYNC_TOKEN` et `DISCORD_ORDER_WEBHOOK_URL` sont configurés dans les secrets Cloudflare.
+- Les lectures D1 sont publiques ; `ADMIN_TOKEN`, `SYNC_TOKEN`, `DISCORD_ORDER_WEBHOOK_URL` et `VISIT_STATS_SALT` sont configurés dans les secrets Cloudflare.
 - Le frontend publié permet de choisir D1 avec `?backend=d1`, tout en conservant GAS comme secours de lecture.
 
 ## Contrat HTTP conservé
@@ -57,7 +57,7 @@ de mots de passe ; Cloudflare ne permet pas de la relire ensuite.
 
 1. Appliquer le schéma distant : `pnpm db:migrate:remote`.
 2. Charger le snapshot distant : `pnpm db:seed:remote`.
-3. Créer les secrets nécessaires : `pnpm wrangler secret put ADMIN_TOKEN`, `SYNC_TOKEN` et `DISCORD_ORDER_WEBHOOK_URL`.
+3. Créer les secrets nécessaires : `pnpm wrangler secret put ADMIN_TOKEN`, `SYNC_TOKEN`, `DISCORD_ORDER_WEBHOOK_URL` et `VISIT_STATS_SALT`.
 4. Déployer : `pnpm deploy`.
 5. Contrôler l’API distante : `pnpm smoke`.
 
@@ -135,3 +135,15 @@ La session activée par `admin=1` contrôle seulement l’affichage du menu et l
 `GET /admin/sync-report`, protégé par `ADMIN_TOKEN`; aucune donnée de synchronisation n’est exposée sans ce
 jeton. GAS remonte dans `sync_audit` le résultat global de chaque exécution, tandis que D1 conserve les 500
 derniers événements par dataset.
+
+## Statistiques de fréquentation
+
+Le frontend enregistre une vue au chargement de chaque page avec un identifiant visiteur et une session de
+30 minutes générés dans le navigateur. Le Worker ne conserve que leurs empreintes SHA-256 salées avec
+`VISIT_STATS_SALT` : aucun identifiant brut ni adresse IP n'est enregistré. `POST /visits` accepte uniquement
+les origines publiques autorisées et `GET /visits/counter` expose seulement le cumul des sessions publiques.
+
+La page `statistiques-visites.html`, accessible depuis le menu Admin, interroge
+`GET /admin/visit-statistics`. Cette route exige `ADMIN_TOKEN` et fournit les vues, sessions et visiteurs
+uniques quotidiens, filtrables par période, audience et page. Les événements sont conservés dans D1 afin de
+permettre des statistiques historiques sans dépendance à GAS.

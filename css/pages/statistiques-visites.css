@@ -1,0 +1,32 @@
+body.visit-statistics-page { max-width: 1250px; margin: 0 auto; padding: 78px 18px 40px; box-sizing: border-box; }
+.visit-statistics-shell { display: grid; gap: 16px; }
+.visit-statistics-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.visit-statistics-header h1 { margin: 0 0 6px; text-align: left; }
+.visit-statistics-header p { margin: 0; color: #625a4f; }
+.visit-statistics-header button, .visit-statistics-filters button { padding: 8px 13px; cursor: pointer; }
+.visit-statistics-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; padding: 14px; border: 1px solid #d3c9b8; border-radius: 9px; background: #fffdf7; }
+.visit-statistics-filters label { display: grid; gap: 5px; color: #51493f; font-size: .86rem; font-weight: 700; }
+.visit-statistics-filters input, .visit-statistics-filters select { min-width: 150px; padding: 7px; }
+.visit-statistics-kpis { display: grid; grid-template-columns: repeat(4, minmax(150px, 1fr)); gap: 12px; }
+.visit-statistics-kpis article { display: grid; gap: 8px; padding: 15px; border: 1px solid #d3c9b8; border-radius: 9px; background: #fffdf7; }
+.visit-statistics-kpis span { color: #625a4f; font-size: .85rem; }
+.visit-statistics-kpis strong { font-size: 1.7rem; }
+.visit-statistics-panel { padding: 15px; border: 1px solid #d3c9b8; border-radius: 9px; background: #fffdf7; }
+.visit-statistics-panel h2 { margin: 0 0 6px; }
+.visit-statistics-note, .visit-statistics-message { color: #625a4f; }
+.visit-statistics-message.error { color: #a02323; }
+.visit-statistics-table-wrap { overflow-x: auto; }
+.visit-statistics-table-wrap table { width: 100%; border-collapse: collapse; }
+.visit-statistics-table-wrap th, .visit-statistics-table-wrap td { padding: 8px; border-bottom: 1px solid #e2dbcf; text-align: left; white-space: nowrap; }
+.visit-statistics-table-wrap th:nth-child(n+4), .visit-statistics-table-wrap td:nth-child(n+4) { text-align: right; }
+.visit-statistics-total-row { background: #f0eadf; font-weight: 800; }
+.visit-statistics-empty { text-align: center !important; color: #625a4f; }
+@media (max-width: 800px) {
+  body.visit-statistics-page { padding-top: 55px; }
+  .visit-statistics-header { flex-direction: column; }
+  .visit-statistics-kpis { grid-template-columns: repeat(2, minmax(130px, 1fr)); }
+}
+@media (max-width: 480px) {
+  .visit-statistics-kpis { grid-template-columns: 1fr; }
+  .visit-statistics-filters label, .visit-statistics-filters input, .visit-statistics-filters select, .visit-statistics-filters button { width: 100%; box-sizing: border-box; }
+}

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <base target="_self">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <link rel="icon" href="./favicon.ico">
+  <link rel="stylesheet" href="./css/site.css?v=20260829-1">
+  <link rel="stylesheet" href="./css/pages/statistiques-visites.css?v=20260829-1">
+  <script src="./js/admin-session.js?v=20260820-1"></script>
+  <script src="./js/api-client.js?v=20260829-1"></script>
+  <script defer src="./js/visit-tracking.js?v=20260829-1"></script>
+  <script defer src="./js/admin-menu.js?v=20260829-1"></script>
+  <script defer src="./js/pages/statistiques-visites.js?v=20260829-1"></script>
+  <title>[FRJ] — Statistiques des visites</title>
+</head>
+<body class="visit-statistics-page" data-visit-module="visit-statistics">
+  <main class="visit-statistics-shell">
+    <header class="visit-statistics-header">
+      <div>
+        <h1>Statistiques des visites</h1>
+        <p>Mesure anonyme des sessions et pages vues enregistrées par D1.</p>
+      </div>
+      <button type="button" id="clearVisitStatsToken" class="secondary">Oublier le jeton</button>
+    </header>
+
+    <form id="visitStatisticsFilters" class="visit-statistics-filters">
+      <label>Du <input type="date" id="visitStartDate" required></label>
+      <label>Au <input type="date" id="visitEndDate" required></label>
+      <label>Audience
+        <select id="visitAudience">
+          <option value="ALL">Toutes</option>
+          <option value="PUBLIC">Public</option>
+          <option value="ADMIN">Administrateurs</option>
+        </select>
+      </label>
+      <label>Page
+        <select id="visitPage">
+          <option value="ALL">Toutes les pages</option>
+          <option value="catalog">Catalogue</option>
+          <option value="cart-help">Aide du panier</option>
+          <option value="order-tracking">Suivi de demande</option>
+          <option value="admin-orders">Demandes d'achat</option>
+          <option value="admin-containers">Conteneurs D1</option>
+          <option value="sync-report">Rapport de synchronisation</option>
+          <option value="inventory-import">Mise à jour inventaire</option>
+          <option value="markup-import">Mise à jour MU</option>
+          <option value="visit-statistics">Statistiques des visites</option>
+        </select>
+      </label>
+      <button type="submit">Actualiser</button>
+    </form>
+
+    <div id="visitStatisticsLoading" class="visit-statistics-message">Chargement…</div>
+    <div id="visitStatisticsError" class="visit-statistics-message error" role="alert" hidden></div>
+
+    <section id="visitStatisticsContent" hidden>
+      <div class="visit-statistics-kpis">
+        <article><span>Visites publiques cumulées</span><strong id="visitPublicTotal">0</strong></article>
+        <article><span>Visites sur la période</span><strong id="visitPeriodVisits">0</strong></article>
+        <article><span>Pages vues</span><strong id="visitPageViews">0</strong></article>
+        <article><span>Visiteurs uniques/jour</span><strong id="visitUniqueVisitors">0</strong></article>
+      </div>
+
+      <section class="visit-statistics-panel">
+        <h2>Détail journalier</h2>
+        <p class="visit-statistics-note">
+          Une visite correspond à une session interrompue après 30 minutes d’inactivité.
+          Les identifiants du navigateur et de la session sont anonymisés avant stockage.
+        </p>
+        <div class="visit-statistics-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th><th>Page</th><th>Audience</th>
+                <th>Pages vues</th><th>Visites</th><th>Visiteurs uniques</th>
+              </tr>
+            </thead>
+            <tbody id="visitStatisticsRows"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

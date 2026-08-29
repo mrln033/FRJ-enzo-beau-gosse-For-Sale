@@ -13,6 +13,7 @@ Le frontend statique est publié par GitHub Pages. Il peut lire les données dep
 - `conteneurs.html` : configuration D1 des conteneurs inclus dans les quantités.
 - `maj_mu.html` et `maj_inventaire-enzo.html` : imports administrateur.
 - `rapport-sync.html` : rapport de synchronisation GAS ↔ D1.
+- `statistiques-visites.html` : statistiques de fréquentation réservées à l'administration.
 
 Les noms et emplacements de ces pages restent stables, car certains liens sont enregistrés dans les demandes, Discord ou les outils d'administration.
 

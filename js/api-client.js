@@ -232,6 +232,24 @@
     }
   }
 
+  async function recordVisit(payload) {
+    const response = await global.fetch(`${D1_URL}/visits`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const result = await readJsonResponse(response);
+    if (!response.ok) throw new Error(result.error || `D1 répond ${response.status}`);
+    return result;
+  }
+
+  async function getVisitCounter() {
+    const response = await global.fetch(`${D1_URL}/visits/counter`, { cache: "no-store" });
+    const result = await readJsonResponse(response);
+    if (!response.ok) throw new Error(result.error || `D1 répond ${response.status}`);
+    return result;
+  }
+
   async function readJsonResponse(response) {
     const text = await response.text();
     try {
@@ -449,6 +467,8 @@
     getOrderStatus,
     acceptOrderProposal,
     cancelOrder,
+    recordVisit,
+    getVisitCounter,
     backend: preferredBackend,
     get activeBackend() { return activeBackend; },
     label: preferredBackend === "d1" ? "Cloudflare D1" : "Google Sheets / GAS",

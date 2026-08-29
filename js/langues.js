@@ -202,6 +202,7 @@ function setLanguage(lang) {
 	applyTranslations();
 	renderCards(lastRenderedItems);
 	window.FRJ_CART?.refresh();
+	window.FRJ_VISITS?.refreshCounterLabel();
 }
 
 

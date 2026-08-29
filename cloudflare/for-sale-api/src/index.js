@@ -12,6 +12,11 @@ import {
   handleSyncPost
 } from "./application.js";
 import { ApiError, corsPreflight, isAuthorized, json, withCors } from "./http.js";
+import {
+  handleAdminVisitStatisticsGet,
+  handleVisitCounterGet,
+  handleVisitPost
+} from "./visits.js";
 
 export default {
   async fetch(request, env) {
@@ -37,13 +42,23 @@ export default {
 
       if (request.method === "GET") {
         if (isSyncRequest) return withCors(await handleSyncGet(url, env), origin);
+        if (url.pathname === "/admin/visit-statistics") {
+          return withCors(await handleAdminVisitStatisticsGet(url, env), origin);
+        }
         if (isAdminRequest) return withCors(await handleAdminGet(url, env), origin);
+        if (url.pathname === "/visits/counter") return withCors(await handleVisitCounterGet(env), origin);
         if (isPublicOrderRequest) return withCors(await handlePublicOrderGet(url, env), origin);
         return withCors(await handleGet(url, env), origin);
       }
 
       if (request.method === "POST") {
         if (isSyncRequest) return withCors(await handleSyncPost(request, url, env), origin);
+        if (url.pathname === "/visits") {
+          if (!PUBLIC_ORIGINS.has(String(origin || ""))) {
+            return withCors(json({ error: "Origine non autorisée" }, 403), origin);
+          }
+          return withCors(await handleVisitPost(request, env), origin);
+        }
         if (/^\/orders\/status\/[a-f0-9-]{70,80}\/(?:accept|cancel)$/i.test(url.pathname)) {
           if (!PUBLIC_ORIGINS.has(String(origin || ""))) {
             return withCors(json({ error: "Origine non autorisée" }, 403), origin);

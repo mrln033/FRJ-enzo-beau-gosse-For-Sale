@@ -8,13 +8,14 @@
 	<script src="./js/admin-session.js?v=20260820-1"></script>
 	<script src="./js/langues.js"></script>
 	<script src="./js/features.js?v=20260814-2"></script>
-	<script src="./js/api-client.js?v=20260814-7"></script>
+	<script src="./js/api-client.js?v=20260829-1"></script>
+	<script defer src="./js/visit-tracking.js?v=20260829-1"></script>
 	<script defer src="./js/pages/index.js?v=20260822-1"></script>
 	<script defer src="./js/cart.js?v=20260820-4"></script>
-	<script defer src="./js/admin-menu.js?v=20260824-1"></script>
+	<script defer src="./js/admin-menu.js?v=20260829-1"></script>
 	<title>[FRJ] - enzo beau gosse : Item List</title>
   </head>
-  <body>
+  <body data-visit-module="catalog">
 	<span id="backendStatusDot" class="backend-status-dot" role="status"></span>
 	<div id="langSwitcher">
 		<button id="btnEN" type="button">
@@ -72,5 +73,8 @@
 	</div>
 
 	<div class="card-container" id="cardContainer"></div>
+	<footer class="site-visit-footer">
+		<span id="publicVisitCounter" class="public-visit-counter" aria-live="polite">— visits</span>
+	</footer>
 </body>
 </html>

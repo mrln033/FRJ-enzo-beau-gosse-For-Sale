@@ -609,6 +609,20 @@ html[data-frj-backend="d1"] .backend-status-dot {
   color: #fff;
 }
 
+.site-visit-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin: 28px auto 0;
+  padding: 12px 4px 0;
+  border-top: 1px solid #d8d8d8;
+  color: #777;
+  font-size: 0.8rem;
+}
+
+.public-visit-counter {
+  white-space: nowrap;
+}
+
 .admin-token-overlay {
   position: fixed;
   inset: 0;
@@ -713,4 +727,3 @@ html[data-frj-backend="d1"] .backend-status-dot {
     text-align: center;
   }
 }
-
