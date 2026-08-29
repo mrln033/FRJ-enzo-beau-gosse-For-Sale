@@ -87,6 +87,7 @@ body { max-width: 1250px; margin: 0 auto; padding: 78px 18px 40px; box-sizing: b
     .order-add-item { margin-top: 12px; padding-top: 12px; border-top: 1px dashed #c9bfae; }
     .order-add-item-toggle { padding: 7px 11px; border: 1px solid #55708d; border-radius: 6px; background: #e8f0f7; cursor: pointer; font-weight: 700; }
     .order-add-item-form { display: grid; gap: 9px; margin-top: 9px; }
+    .order-add-item-form[hidden] { display: none !important; }
     .order-add-item-actions { display: flex; justify-content: flex-end; gap: 8px; }
     .order-add-item-actions button { padding: 7px 11px; }
     .orders-error { color: #a02323; white-space: pre-line; }

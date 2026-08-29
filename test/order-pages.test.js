@@ -498,6 +498,15 @@ test("d.12 ajoute un article à une proposition existante", async () => {
   const toggle = created.filter((element) => element.className === "order-add-item-toggle").at(-1);
   assert.equal(toggle.disabled, false);
   toggle.listeners.get("click")();
+  const form = created.filter((element) => element.className === "order-add-item-form").at(-1);
+  assert.equal(form.hidden, false);
+  toggle.listeners.get("click")();
+  assert.equal(form.hidden, true);
+  toggle.listeners.get("click")();
+  const cancel = created.filter((element) => element.textContent === "Annuler").at(-1);
+  cancel.listeners.get("click")();
+  assert.equal(form.hidden, true);
+  toggle.listeners.get("click")();
   const save = created.filter((element) => element.textContent === "Ajouter à la proposition").at(-1);
   await save.listeners.get("click")();
   await settle();

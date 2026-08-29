@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const htmlFiles = (await readdir(root)).filter((name) => name.endsWith(".html"));
+const commandesCss = await readFile(path.join(root, "css/pages/commandes.css"), "utf8");
 
 test("toutes les feuilles référencées par les pages existent", async () => {
   for (const name of htmlFiles) {
@@ -42,4 +43,8 @@ test("les anciennes feuilles racine ont été remplacées par css/", async () =>
   ]) {
     await assert.doesNotReject(access(path.join(root, name)));
   }
+});
+
+test("le formulaire d'ajout d'article respecte son attribut hidden", () => {
+  assert.match(commandesCss, /\.order-add-item-form\[hidden\]\s*\{[^}]*display:\s*none\s*!important/);
 });
