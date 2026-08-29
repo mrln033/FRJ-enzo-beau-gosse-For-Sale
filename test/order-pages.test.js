@@ -372,7 +372,10 @@ test("d.12 crée une demande directe et propose son lien de suivi", async () => 
   const created = [];
   const requests = [];
   const token = `${"a".repeat(36)}-${"b".repeat(36)}`;
-  const catalog = [{ itemName: "Item A", storage: "ARMORS", aisle: "PARTS", availableStock: 5, unitTtPed: 10 }];
+  const catalog = [{
+    itemName: "Item A", storage: "ARMORS", aisle: "PARTS", availableStock: 5, unitTtPed: 10,
+    markupKind: "percent", markupValue: 1.2
+  }];
   const document = {
     getElementById: (id) => elements.get(id),
     createElement: () => {
@@ -411,6 +414,13 @@ test("d.12 crée une demande directe et propose son lien de suivi", async () => 
   elements.get("newOrderToggle").listeners.get("click")();
   const amount = created.find((element) => element.attributes.get("aria-label") === "Valeur de MU de la demande directe");
   assert.equal(amount.step, "0.01");
+  assert.equal(amount.value, "110.00");
+  elements.get("newOrderProfile").value = "public";
+  elements.get("newOrderProfile").listeners.get("change")({ target: elements.get("newOrderProfile") });
+  assert.equal(amount.value, "120.00");
+  elements.get("newOrderProfile").value = "frj";
+  elements.get("newOrderProfile").listeners.get("change")({ target: elements.get("newOrderProfile") });
+  assert.equal(amount.value, "110.00");
   await elements.get("newOrderForm").listeners.get("submit")({ preventDefault() {} });
   await settle();
 
@@ -420,7 +430,7 @@ test("d.12 crée une demande directe et propose son lien de suivi", async () => 
   assert.equal(body.frjMember, true);
   assert.equal(body.items.length, 1);
   assert.equal(body.items[0].markupKind, "percent");
-  assert.equal(body.items[0].markupAmount, 100);
+  assert.equal(body.items[0].markupAmount, 110);
   assert.equal(elements.get("newOrderResult").hidden, false);
   assert.match(elements.get("newOrderResult").children[0].textContent, /FRJ-20260829-ABC123/);
   assert.match(elements.get("newOrderResult").children[1].href, /suivi-commande\.html\?token=/);
@@ -440,6 +450,7 @@ test("d.12 ajoute un article à une proposition existante", async () => {
     id: "123e4567-e89b-42d3-a456-426614174000",
     publicReference: "FRJ-20260829-ABC123",
     buyerAvatar: "Direct Buyer",
+    frjMember: true,
     status: "submitted",
     pricingStatus: "estimated",
     createdAt: "2026-08-29T12:00:00Z",
@@ -452,7 +463,10 @@ test("d.12 ajoute un article à une proposition existante", async () => {
   };
   const catalog = [
     { itemName: "Item A", storage: "ARMORS", aisle: "PARTS", availableStock: 5, unitTtPed: 10 },
-    { itemName: "Item B", storage: "MATERIALS", aisle: "MINERALS", availableStock: 3, unitTtPed: 5 }
+    {
+      itemName: "Item B", storage: "MATERIALS", aisle: "MINERALS", availableStock: 3, unitTtPed: 5,
+      markupKind: "ped", markupValue: 2.5
+    }
   ];
   const document = {
     getElementById: (id) => elements.get(id),
@@ -492,7 +506,8 @@ test("d.12 ajoute un article à une proposition existante", async () => {
   assert.equal(post.options.method, "POST");
   const body = JSON.parse(post.options.body);
   assert.equal(body.itemName, "Item B");
-  assert.equal(body.markupAmount, 100);
+  assert.equal(body.markupKind, "ped");
+  assert.equal(body.markupAmount, 1.25);
 });
 
 test("le suivi public rend une demande et la mémorise localement", async () => {

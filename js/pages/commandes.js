@@ -405,6 +405,25 @@
     remove.className = "direct-order-remove";
     remove.textContent = "Retirer";
 
+    const applyCatalogMarkup = (frjMember = options.frjMember === true) => {
+      const item = catalogItems[Number(article.value)] || null;
+      const itemKind = item?.markupKind === "ped" || item?.markupKind === "percent"
+        ? item.markupKind
+        : "percent";
+      const storedValue = Number(item?.markupValue);
+      let displayedAmount = itemKind === "percent" ? 100 : 0;
+      if (Number.isFinite(storedValue)) {
+        displayedAmount = itemKind === "percent" ? storedValue * 100 : storedValue;
+        if (frjMember) {
+          displayedAmount = itemKind === "percent"
+            ? (1 + ((storedValue - 1) / 2)) * 100
+            : storedValue / 2;
+        }
+      }
+      kind.value = itemKind;
+      amount.value = ui.roundPed(displayedAmount).toFixed(2);
+    };
+
     const read = () => {
       const item = catalogItems[Number(article.value)] || null;
       const itemQuantity = Number(quantity.value);
@@ -445,7 +464,10 @@
       options.onChange?.();
       return value;
     };
-    article.addEventListener("change", refresh);
+    article.addEventListener("change", () => {
+      applyCatalogMarkup();
+      refresh();
+    });
     quantity.addEventListener("input", refresh);
     amount.addEventListener("input", refresh);
     kind.addEventListener("change", () => {
@@ -453,8 +475,19 @@
       refresh();
     });
     root.append(articleLabel, quantityLabel, markupLabel, output, remove);
-    const editor = { root, read, refresh, remove };
+    const editor = {
+      root,
+      read,
+      refresh,
+      remove,
+      setProfile(frjMember) {
+        options.frjMember = frjMember === true;
+        applyCatalogMarkup(options.frjMember);
+        refresh();
+      }
+    };
     remove.addEventListener("click", () => options.onRemove?.(editor));
+    applyCatalogMarkup();
     refresh();
     return editor;
   }
@@ -470,6 +503,11 @@
       if (!panel.hidden && !newOrderEditors.length) addNewOrderLine();
     });
     document.getElementById("newOrderAddLine").addEventListener("click", addNewOrderLine);
+    document.getElementById("newOrderProfile").addEventListener("change", (event) => {
+      const frjMember = event.target.value === "frj";
+      newOrderEditors.forEach((editor) => editor.setProfile(frjMember));
+      updateNewOrderForm();
+    });
     document.getElementById("newOrderCancel").addEventListener("click", () => {
       resetNewOrderForm();
       panel.hidden = true;
@@ -482,6 +520,7 @@
     if (!orderCatalog.length || newOrderEditors.length >= 10) return;
     let editor;
     editor = createDirectLineEditor(orderCatalog, {
+      frjMember: document.getElementById("newOrderProfile").value === "frj",
       onChange: updateNewOrderForm,
       onRemove: () => {
         newOrderEditors = newOrderEditors.filter((candidate) => candidate !== editor);
@@ -608,6 +647,7 @@
       save.textContent = "Ajouter à la proposition";
       let editor;
       editor = createDirectLineEditor(available, {
+        frjMember: order.frjMember === true,
         onChange: () => { if (editor) save.disabled = !editor.read().valid; }
       });
       editor.remove.hidden = true;

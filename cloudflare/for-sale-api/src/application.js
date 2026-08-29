@@ -2348,10 +2348,18 @@ async function readAdminOrderCatalog(env) {
       WHERE avatar_id = 'enzo'
       GROUP BY item_name COLLATE NOCASE
     )
-    SELECT l.item_name, l.storage, l.aisle, c.unit_price_ped, stock.available_stock
+    SELECT
+      l.item_name,
+      l.storage,
+      l.aisle,
+      c.unit_price_ped,
+      stock.available_stock,
+      CASE WHEN datetime(mc.observed_at) >= datetime('now', '-7 days') THEN mc.weighted_kind ELSE NULL END AS markup_kind,
+      CASE WHEN datetime(mc.observed_at) >= datetime('now', '-7 days') THEN mc.weighted_value ELSE NULL END AS markup_value
     FROM catalog_listings l
     JOIN catalog_items c ON c.name = l.item_name COLLATE NOCASE
     JOIN stock ON stock.item_name = l.item_name COLLATE NOCASE
+    LEFT JOIN market_current mc ON mc.item_name = l.item_name COLLATE NOCASE
     WHERE l.enabled = 1
       AND stock.available_stock > 0
       AND c.unit_price_ped IS NOT NULL
@@ -2364,7 +2372,11 @@ async function readAdminOrderCatalog(env) {
       storage: row.storage,
       aisle: row.aisle,
       availableStock: Number(row.available_stock || 0),
-      unitTtPed: Number(row.unit_price_ped || 0)
+      unitTtPed: Number(row.unit_price_ped || 0),
+      markupKind: row.markup_kind || "none",
+      markupValue: row.markup_value === null || row.markup_value === undefined
+        ? null
+        : Number(row.markup_value)
     }))
   };
 }

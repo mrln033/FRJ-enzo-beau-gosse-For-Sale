@@ -105,7 +105,13 @@ function setupDatabase() {
       JOIN container_config cc
         ON cc.avatar_id = ii.avatar_id
        AND cc.container_key = lower(trim(coalesce(ii.container, '')))
-       AND cc.enabled = 1;
+        AND cc.enabled = 1;
+    CREATE TABLE market_current (
+      item_name TEXT PRIMARY KEY COLLATE NOCASE,
+      weighted_kind TEXT,
+      weighted_value REAL,
+      observed_at TEXT
+    );
   `);
   applyMigration(database, "0007_purchase_requests.sql");
   applyMigration(database, "0008_order_discord_notifications.sql");
@@ -125,6 +131,9 @@ function setupDatabase() {
       ('enzo', 'a', 1, 'Item A', 5, 'Carried'),
       ('enzo', 'b', 2, 'Item B', 3, 'Carried'),
       ('enzo', 'c', 3, 'Sans stock', 0, 'Carried');
+    INSERT INTO market_current (item_name, weighted_kind, weighted_value, observed_at) VALUES
+      ('Item A', 'percent', 1.2, CURRENT_TIMESTAMP),
+      ('Item B', 'ped', 2.5, CURRENT_TIMESTAMP);
   `);
   return database;
 }
@@ -145,6 +154,13 @@ test("d.12 expose seulement les listings possédant un stock vendable", async ()
   const result = await response.json();
   assert.deepEqual(result.items.map((item) => item.itemName), ["Item A", "Item B"]);
   assert.equal(result.items[0].availableStock, 5);
+  assert.deepEqual(
+    result.items.map(({ markupKind, markupValue }) => ({ markupKind, markupValue })),
+    [
+      { markupKind: "percent", markupValue: 1.2 },
+      { markupKind: "ped", markupValue: 2.5 }
+    ]
+  );
 });
 
 test("d.12 crée atomiquement une demande directe à valider et son lien privé", async () => {

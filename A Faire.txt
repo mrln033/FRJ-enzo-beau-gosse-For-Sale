@@ -27,6 +27,9 @@ d.9/ GAS et D1  ==> je voudrais implémenter un système de "Promotions" quotidi
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
 
+29/08/2026 = Correctif post-d.12 — préremplissage du MU des articles ajoutés.
+Réalisation : le catalogue protégé de la Console Admin renvoie désormais, en plus du stock et du prix TT, le type et la valeur du MU pondéré récent présents dans D1. Lors de l'affichage d'une ligne ou de la sélection d'un article, les champs MU prennent automatiquement cette valeur dans sa bonne unité, pourcentage ou PED. Le profil tarifaire est appliqué comme dans le catalogue : le Public reçoit le MU complet ; le Membre FRJ reçoit la moitié de la marge, soit la moitié du supplément PED ou la moitié de l'écart entre le pourcentage public et 100 %. Changer le profil d'une nouvelle demande recalcule immédiatement toutes ses lignes ; l'ajout à une demande existante utilise le profil déjà enregistré. En l'absence de MU exploitable, la valeur neutre historique de 100 % est conservée. Le MU reste modifiable par l'administrateur avant enregistrement. Les 176 tests réussissent et le Worker est publié en version 'd7e28ef9-198e-4c62-a480-aedbeaf1c90a'. Le contrôle distant confirme 294 MU récents dans D1, dont 60 en PED et 234 en pourcentage. Ce changement étant limité à la lecture et à l'interface, aucune migration ni modification de données D1 n'a été nécessaire.
+
 29/08/2026 = Demande d.12 — terminée et déployée côté D1.
 Demande d'origine :
 d.12/ Console Admin > Demandes d'Achat  ==> j'aimerais pouvoir créer 'de toute pièce' une Demande d'achat dans cette page. Un bouton 'Ajouter une nouvelle demande' déploierait un formulaire (jusque-là masqué), demandant les infos nécessaires :
