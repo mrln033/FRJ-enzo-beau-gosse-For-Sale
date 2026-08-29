@@ -78,7 +78,12 @@
 
   function rememberOrder(order) {
     try {
-      if (readHiddenTokens().includes(token)) return;
+      const hiddenTokens = readHiddenTokens().filter((hiddenToken) => hiddenToken !== token);
+      if (hiddenTokens.length) {
+        global.localStorage.setItem(HIDDEN_REQUESTS_KEY, JSON.stringify(hiddenTokens));
+      } else {
+        global.localStorage.removeItem(HIDDEN_REQUESTS_KEY);
+      }
       const stored = JSON.parse(global.localStorage.getItem(REQUESTS_KEY) || "[]");
       const requests = Array.isArray(stored) ? stored : [];
       const current = {

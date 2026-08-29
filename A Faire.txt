@@ -8,19 +8,17 @@ Par la même occasion, si tu as de l'historique de ton côté, n'hésite pas à 
 Je tiens à garder une trace de tout ce qu'on a fait sur ce projet.
 
 ----------------------------------------
-POINT DE REPRISE — 28/08/2026
+POINT DE REPRISE — 29/08/2026
 
-Ordre recommandé déjà réalisé et validé : d.1 -> d.2 -> d.3 -> d.7 -> d.8 -> d.6 -> d.10 -> d.11.
-La demande d.11 et son correctif d'affichage sont terminés, déployés et contrôlés en production : historique Admin antéchronologique avec numérotation chronologique, et intitulés de prix de vente lorsque les prix sont confirmés.
+Ordre recommandé déjà réalisé et validé : d.1 -> d.2 -> d.3 -> d.7 -> d.8 -> d.6 -> d.10 -> d.11 -> d.5.
+La demande d.5 est terminée et déployée : restauration locale des suivis masqués, liens secondaires sécurisés et accès direct depuis la Console Admin.
 
-Les demandes encore ouvertes sont d.4, d.5, d.9 et d.12. Leur priorité devra être réévaluée avant la prochaine réalisation.
+Les demandes encore ouvertes sont d.4, d.9 et d.12. Leur priorité devra être réévaluée avant la prochaine réalisation.
 
 -------------------------------
 DEMANDES  => CE QUI EST A FAIRE
 
 d.4/ Console Admin "Demandes d'Achat" ==> ajouter un bouton 'Supprimer' à chaque demande avec message de confirmation. Celà supprimerais l'enregistrement complet dans D1. Propagation Discord avec modification du statut en 'SUPPRIMEE' pour archivage.
-
-d.5/ Console Admin "Demandes d'Achat" ==> ajouter un bouton 'Suivre la demande' avec le lien initialement présent dans le panier client. Si un client 'rouvre' un suivi de demande (précédemment retiré de sa liste), via un lien 'Suivre ma demande', j'aimerais qu'il réapparaissent à nouveau dans sa liste (variable locale, de mémoire).
 
 d.9/ GAS et D1  ==> je voudrais implémenter un système de "Promotions" quotidiennes (concernant un couple CATEGORIE/RAYON pour une date) et de "Soldes" (concernant tous les articles sur une période). Bien sur, les 2 ne peuvent pas être appliqués ensemble, du moins ne pas se cumuler : un Solde oblitère une Promotion si ça se chevauche. Il faudrait je pense une table dédiée pour les 'Promotions' et peut etre une également pour les 'Soldes'. 'Promotions' contiendrait : une date (de la promotion), Catégorie, Rayon, Taux applicable. La table Solde contiendrait : Date de début, Date de fin, Taux applicable). Les tuiles d'article aurait une 'étiquette' 'Promo' dans un coin (il y a un fichier déjà présent dans ./img/storage/Sticker Promo.png , mais j'aimerai que le taux appliqués soit également indiqué sur ce sticker), et afficherait le MU / Prix de vente 'normal' barré suivi du MU / Prix de vente remisés. Coté GAS, j'ai déjà ajouté une colonne Remise_Promo censée indiquer le taux aappliqué à l'article. Actuellement, ce taux est récupéré dans ma feuille 'PROMOS' non exploitée'. J'ai également ajouté une formule dans la dernière colonne (sans nom pour l'instant) pour m'assurer que le calcul fonctionne. Le but final serait d'automatiser (par un choix aléatoire) la 'classe' (CATEGORIE+RAYON) à remiser chaque jour, avec un taux par défaut défini (5% par exemple) qui serait modifiable via HTML+JS. Il faut donc prévoir cette fonctionnalité qui doit tourner des 2 côté (GAS et D1) à l'identique ! FAIT MOI UNE ANALYSE/ETUDE DE LA MISE EN PLACE ET UNE PROPOSITION REALISABLE.
 
@@ -54,6 +52,19 @@ Dans un premier temps, effectue ces changements/modifications du coté D1 seulem
 
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
+
+29/08/2026 = Demande d.5 — terminée et déployée.
+Demande d'origine : Console Admin "Demandes d'Achat" ==> ajouter un bouton 'Suivre la demande' avec le lien initialement présent dans le panier client. Si un client 'rouvre' un suivi de demande précédemment retiré de sa liste via un lien 'Suivre ma demande', il doit réapparaître dans sa liste locale.
+Clôture : un suivi valide rouvert réintègre désormais la liste locale du client. D1 conserve seulement l'empreinte SHA-256 du lien client original et ne peut donc pas le restituer ; la Console Admin génère à la place des liens secondaires cryptographiquement sûrs et équivalents, sans invalider l'original ni les liens précédents. Le bouton 'Suivre la demande' copie et ouvre le lien, fournit un accès cliquable de secours et réutilise le même jeton tant que la carte reste chargée. La lecture, l'acceptation et l'annulation fonctionnent avec tous les jetons. La migration 0018 a été appliquée à D1, sa table et son index ont été contrôlés, et le Worker a été publié en version 52ae9384-e385-4dc8-81c5-80a1547158d3. Les contrôles de production répondent 200 sur la santé, 401 sans authentification sur la création Admin et 404, sans erreur interne, pour un jeton inconnu. Les 160 tests réussissent. Sauvegarde préalable : 'save/frj-for-sale-before-d5-2026-08-29-073222.sql', 11 692 645 octets, SHA-256 8CC2C4407E1E960602F3D3F2BA6009F41F8EFCFB196407744CBA1C95716E6F05.
+
+29/08/2026 = Avancement d.5 — étape d.5.3 : accès au suivi client depuis la Console Admin.
+Réalisation locale validée : chaque carte de demande propose maintenant un bouton 'Suivre la demande'. Au premier clic, la Console appelle la route Admin d.5.2, construit l'URL publique sans propager le paramètre d'accès Admin, tente de la copier dans le presse-papiers et ouvre le suivi client dans un nouvel onglet. Un lien cliquable reste affiché si l'ouverture ou la copie automatique est bloquée. Tant que la carte n'est pas rechargée, les clics suivants réutilisent le même lien au lieu de créer de nouveaux jetons. Les erreurs restent sur la carte concernée. Les versions du contrôleur et de la feuille de styles sont renouvelées pour le déploiement.
+
+29/08/2026 = Avancement d.5 — étape d.5.2 : infrastructure D1 des liens de suivi secondaires.
+Réalisation locale validée : une migration ajoute une table rattachant plusieurs empreintes de jetons secondaires à une demande, avec suppression en cascade. Le Worker expose une route Admin protégée qui génère cryptographiquement un nouveau lien, n'enregistre que son empreinte SHA-256 et renvoie le jeton en clair une seule fois avec une réponse non mise en cache. La lecture du suivi, l'acceptation d'une proposition et l'annulation reconnaissent désormais indifféremment le jeton client original ou chacun des jetons secondaires ; aucun lien existant n'est invalidé. Les tests vérifient la coexistence du lien original et de deux liens secondaires, leur lecture publique et l'absence des jetons en clair dans D1. Migration et Worker non déployés à cette étape.
+
+29/08/2026 = Avancement d.5 — étape d.5.1 : restauration locale d'un suivi client masqué.
+Réalisation locale validée : après le chargement réussi d'un lien privé dans 'suivi-commande.html', son jeton est retiré de la liste locale des demandes masquées puis la demande est replacée en tête de la liste de suivi du panier. Les autres demandes masquées restent intactes. Un lien invalide ou une demande introuvable ne modifie toujours pas le stockage local. La version du contrôleur de suivi est renouvelée pour le futur déploiement. Le test de page part d'un jeton effectivement masqué, ouvre son suivi valide et vérifie simultanément sa réapparition et la conservation d'un autre jeton masqué. Aucun service distant n'est modifié à cette étape.
 
 28/08/2026 = Correctif d'affichage post-d.11 — terminé et publié.
 Réalisation : l'historique de la Console Admin affiche désormais les événements du plus récent au plus ancien tout en utilisant une liste ordonnée inversée, de sorte que chaque événement conserve son numéro chronologique réel. Dans le tableau Admin, la colonne 'Estimation vente' devient 'Prix de vente' uniquement lorsque le statut global des prix est confirmé. Le suivi client applique la même règle à la colonne 'Estimation', avec 'Prix de vente' en français et 'Sale price' en anglais ; son total devient alors 'Prix de Vente total' ou 'Total sale price', au lieu de l'intitulé d'estimation. Les versions des deux contrôleurs HTML ont été renouvelées pour éviter un ancien cache. Les tests de page couvrent l'ordre et la numérotation de l'historique ainsi que les intitulés Admin et client confirmés ; les 157 tests du projet réussissent. Le correctif frontend est publié par GitHub Pages et contrôlé en production. Aucun changement D1, Worker, GAS ou Google Sheet n'a été nécessaire.

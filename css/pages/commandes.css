@@ -23,6 +23,14 @@ body { max-width: 1250px; margin: 0 auto; padding: 78px 18px 40px; box-sizing: b
     .order-total { margin: 10px 0 0; text-align: right; font-size: 1.05rem; }
     .order-comment { margin: 10px 0 0; padding: 8px; background: #f1ece3; white-space: pre-wrap; }
     .order-status { padding: 6px; border-radius: 5px; }
+    .order-header-actions { display: grid; justify-items: end; gap: 8px; min-width: 185px; }
+    .order-tracking-control { display: grid; justify-items: end; gap: 5px; }
+    .order-tracking-button { padding: 7px 11px; border: 1px solid #55708d; border-radius: 6px; background: #e8f0f7; cursor: pointer; font-weight: 700; }
+    .order-tracking-button:disabled { cursor: wait; opacity: .65; }
+    .order-tracking-feedback { max-width: 310px; margin: 0; color: #675e51; font-size: .78rem; text-align: right; }
+    .order-tracking-feedback.success { color: #287142; }
+    .order-tracking-feedback.error { color: #a02323; }
+    .order-tracking-feedback a { color: inherit; font-weight: 800; }
     .line-editor { white-space: nowrap; }
     .line-editor > * + * { margin-left: 5px; }
     .line-editor input { width: 78px; padding: 5px; }
@@ -54,5 +62,8 @@ body { max-width: 1250px; margin: 0 auto; padding: 78px 18px 40px; box-sizing: b
       body { padding-top: 125px; }
       .order-card { overflow-x: auto; }
       .orders-header { align-items: flex-start; }
+      .order-card header { align-items: stretch; flex-direction: column; }
+      .order-header-actions, .order-tracking-control { justify-items: stretch; }
+      .order-tracking-feedback { max-width: none; text-align: left; }
       .order-history-controls { align-items: stretch; flex-direction: column; }
     }

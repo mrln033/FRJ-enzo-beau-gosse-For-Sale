@@ -153,7 +153,10 @@
       select.appendChild(option);
     });
     select.addEventListener("change", () => updateStatus(order.id, select));
-    header.append(identity, select);
+    const headerActions = document.createElement("div");
+    headerActions.className = "order-header-actions";
+    headerActions.append(select, createTrackingControl(order));
+    header.append(identity, headerActions);
     article.appendChild(header);
 
     if (order.status === "awaiting_approval") {
@@ -305,6 +308,89 @@
     }
     article.appendChild(createHistoryPanel(order));
     return article;
+  }
+
+  function createTrackingControl(order) {
+    const control = document.createElement("div");
+    control.className = "order-tracking-control";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "order-tracking-button";
+    button.textContent = "Suivre la demande";
+    const feedback = document.createElement("p");
+    feedback.className = "order-tracking-feedback";
+    feedback.hidden = true;
+    let trackingUrl = "";
+
+    button.addEventListener("click", async () => {
+      const trackingWindow = openTrackingWindow();
+      button.disabled = true;
+      button.textContent = trackingUrl ? "Ouverture…" : "Création du lien…";
+      feedback.hidden = true;
+      try {
+        if (!trackingUrl) {
+          const response = await global.FRJ_API.fetchD1Admin(
+            `/admin/orders/${encodeURIComponent(order.id)}/tracking-link`,
+            { method: "POST", cache: "no-store" }
+          );
+          const result = await response.json();
+          if (!result.trackingPath || !result.accessToken) {
+            throw new Error("Le Worker n’a pas renvoyé de lien de suivi valide.");
+          }
+          trackingUrl = new URL(result.trackingPath, global.location.href).href;
+        }
+
+        const copied = await copyTrackingUrl(trackingUrl);
+        if (trackingWindow) {
+          trackingWindow.opener = null;
+          trackingWindow.location.href = trackingUrl;
+        }
+        const message = document.createElement("span");
+        message.textContent = trackingWindow && copied
+          ? "Lien ouvert et copié. "
+          : (trackingWindow
+            ? "Lien ouvert ; copie automatique indisponible. "
+            : (copied ? "Lien copié. " : "Lien prêt. "));
+        const link = document.createElement("a");
+        link.href = trackingUrl;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = "Ouvrir le suivi client";
+        feedback.className = "order-tracking-feedback success";
+        feedback.replaceChildren(message, link);
+        feedback.hidden = false;
+        button.textContent = "Ouvrir à nouveau";
+      } catch (error) {
+        if (trackingWindow && typeof trackingWindow.close === "function") trackingWindow.close();
+        feedback.className = "order-tracking-feedback error";
+        feedback.textContent = `Lien indisponible : ${error.message}`;
+        feedback.hidden = false;
+        button.textContent = "Suivre la demande";
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    control.append(button, feedback);
+    return control;
+  }
+
+  function openTrackingWindow() {
+    try {
+      return typeof global.open === "function" ? global.open("about:blank", "_blank") : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function copyTrackingUrl(trackingUrl) {
+    try {
+      if (typeof global.navigator?.clipboard?.writeText !== "function") return false;
+      await global.navigator.clipboard.writeText(trackingUrl);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   function createHistoryPanel(order) {

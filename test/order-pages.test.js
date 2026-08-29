@@ -187,6 +187,83 @@ test("la Console Admin enregistre la précision autorisée puis recharge D1", as
   assert.equal(requests.filter((request) => request.path === "/admin/orders").length, 2);
 });
 
+test("d.5 ouvre et copie un lien de suivi Admin sans multiplier les jetons", async () => {
+  const ids = ["ordersList", "ordersSummary", "ordersError", "ordersFilters", "refreshOrders"];
+  const elements = new Map(ids.map((id) => [id, new FakeElement(id)]));
+  const created = [];
+  const requests = [];
+  const copied = [];
+  const popups = [];
+  const order = {
+    id: "123e4567-e89b-42d3-a456-426614174000",
+    publicReference: "FRJ-20260829-ABC123",
+    buyerAvatar: "Test Player",
+    status: "submitted",
+    pricingStatus: "estimated",
+    createdAt: "2026-08-29T10:00:00Z",
+    updatedAt: "2026-08-29T10:00:00Z",
+    totalSalePed: 10,
+    items: []
+  };
+  const accessToken = `${"a".repeat(36)}-${"b".repeat(36)}`;
+  const trackingPath = `suivi-commande.html?token=${accessToken}`;
+  const document = {
+    getElementById: (id) => elements.get(id),
+    createElement: () => {
+      const element = new FakeElement();
+      created.push(element);
+      return element;
+    }
+  };
+  const window = {
+    location: { href: "https://example.test/commandes.html?backend=d1" },
+    FRJ_ADMIN: { require: () => true },
+    FRJ_API: {
+      fetchD1Admin: async (path, options) => {
+        requests.push({ path, options });
+        if (path === "/admin/orders") {
+          return { json: async () => ({ orders: [order], enabled: true, generatedAt: order.updatedAt }) };
+        }
+        return { json: async () => ({ ok: true, accessToken, trackingPath }) };
+      }
+    },
+    localStorage: createStorage(),
+    navigator: { clipboard: { writeText: async (value) => copied.push(value) } },
+    open: () => {
+      const popup = { location: { href: "about:blank" }, opener: window, close: () => {} };
+      popups.push(popup);
+      return popup;
+    },
+    alert: () => {}
+  };
+  const context = vm.createContext({ window, document, console, URL });
+  vm.runInContext(commonSource, context);
+  vm.runInContext(adminSource, context);
+  await settle();
+
+  const button = created.find((element) => element.className === "order-tracking-button");
+  await button.listeners.get("click")();
+  await settle();
+  const trackingRequests = requests.filter((request) => request.path.endsWith("/tracking-link"));
+  const expectedUrl = `https://example.test/${trackingPath}`;
+  assert.equal(trackingRequests.length, 1);
+  assert.equal(trackingRequests[0].path, `/admin/orders/${order.id}/tracking-link`);
+  assert.equal(trackingRequests[0].options.method, "POST");
+  assert.equal(popups[0].location.href, expectedUrl);
+  assert.equal(popups[0].opener, null);
+  assert.deepEqual(copied, [expectedUrl]);
+  assert.equal(button.textContent, "Ouvrir à nouveau");
+  const feedback = created.find((element) => element.className === "order-tracking-feedback success");
+  assert.equal(feedback.hidden, false);
+  assert.equal(feedback.children[1].href, expectedUrl);
+
+  await button.listeners.get("click")();
+  await settle();
+  assert.equal(requests.filter((request) => request.path.endsWith("/tracking-link")).length, 1);
+  assert.deepEqual(copied, [expectedUrl, expectedUrl]);
+  assert.equal(popups[1].location.href, expectedUrl);
+});
+
 test("la Console Admin charge l'historique à la demande et modifie un commentaire", async () => {
   const ids = ["ordersList", "ordersSummary", "ordersError", "ordersFilters", "refreshOrders"];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id)]));
@@ -283,7 +360,11 @@ test("le suivi public rend une demande et la mémorise localement", async () => 
   const token = "a".repeat(72);
   const ids = ["catalogReturnLink", "catalogLink", "pageTitle", "pageSubtitle", "trackingContent"];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id)]));
-  const storage = createStorage({ lang: "EN" });
+  const otherHiddenToken = "b".repeat(72);
+  const storage = createStorage({
+    lang: "EN",
+    FRJ_HIDDEN_PURCHASE_REQUESTS_V1: JSON.stringify([otherHiddenToken, token])
+  });
   const document = {
     hidden: false,
     title: "",
@@ -336,6 +417,7 @@ test("le suivi public rend une demande et la mémorise localement", async () => 
   const remembered = JSON.parse(storage.getItem("FRJ_PURCHASE_REQUESTS_V1"));
   assert.equal(remembered[0].accessToken, token);
   assert.equal(remembered[0].status, "submitted");
+  assert.deepEqual(JSON.parse(storage.getItem("FRJ_HIDDEN_PURCHASE_REQUESTS_V1")), [otherHiddenToken]);
 });
 
 test("un lien de suivi incomplet affiche l'erreur sans appeler l'API", async () => {

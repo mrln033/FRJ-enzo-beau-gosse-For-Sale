@@ -8,6 +8,7 @@ import {
   handleAdminPost,
   handlePublicOrderAcceptance,
   handlePublicOrderCancellation,
+  handlePublicOrderGet,
   handleSyncGet,
   handleSyncPost
 } from "../src/application.js";
@@ -251,6 +252,7 @@ test("l'acceptation et l'annulation client écrivent leur événement dans le m�
   applyMigration(database, "0008_order_discord_notifications.sql");
   applyMigration(database, "0009_order_proposals.sql");
   applyMigration(database, "0016_purchase_order_history.sql");
+  applyMigration(database, "0018_purchase_order_tracking_tokens.sql");
   insertOrder(database);
   const token = "b".repeat(72);
   const tokenHash = createHash("sha256").update(token).digest("hex");
@@ -279,6 +281,68 @@ test("l'acceptation et l'annulation client écrivent leur événement dans le m�
   assert.equal(database.prepare(`SELECT status FROM purchase_orders WHERE id = ?`).get(ORDER_ID).status, "cancelled");
   assert.equal(database.prepare(`SELECT action FROM purchase_order_events ORDER BY id DESC LIMIT 1`).get().action,
     "client-cancelled");
+});
+
+test("d.5 crée des liens de suivi secondaires sans invalider les précédents", async () => {
+  const database = new DatabaseSync(":memory:");
+  applyMigration(database, "0007_purchase_requests.sql");
+  applyMigration(database, "0008_order_discord_notifications.sql");
+  applyMigration(database, "0009_order_proposals.sql");
+  applyMigration(database, "0016_purchase_order_history.sql");
+  applyMigration(database, "0018_purchase_order_tracking_tokens.sql");
+  insertOrder(database);
+  insertOrderItem(database);
+
+  const originalToken = "c".repeat(72);
+  const originalHash = createHash("sha256").update(originalToken).digest("hex");
+  database.prepare(`UPDATE purchase_orders SET access_token_hash = ? WHERE id = ?`)
+    .run(originalHash, ORDER_ID);
+  const env = { DB: makeD1(database), CART_ENABLED: "true" };
+  const adminUrl = new URL(`https://api.example/admin/orders/${ORDER_ID}/tracking-link`);
+
+  const firstResponse = await handleAdminPost(new Request(adminUrl, { method: "POST" }), adminUrl, env);
+  const first = await firstResponse.json();
+  const secondResponse = await handleAdminPost(new Request(adminUrl, { method: "POST" }), adminUrl, env);
+  const second = await secondResponse.json();
+
+  assert.equal(firstResponse.status, 201);
+  assert.equal(firstResponse.headers.get("Cache-Control"), "no-store");
+  assert.match(first.accessToken, /^[a-f0-9-]{73}$/);
+  assert.equal(first.trackingPath, `suivi-commande.html?token=${first.accessToken}`);
+  assert.notEqual(second.accessToken, first.accessToken);
+  const stored = database.prepare(`
+    SELECT token_hash FROM purchase_order_tracking_tokens WHERE order_id = ? ORDER BY created_at
+  `).all(ORDER_ID);
+  assert.equal(stored.length, 2);
+  assert.equal(stored.some((row) => row.token_hash === first.accessToken), false);
+  assert.equal(stored.some((row) => row.token_hash === createHash("sha256").update(first.accessToken).digest("hex")), true);
+
+  for (const token of [originalToken, first.accessToken, second.accessToken]) {
+    const response = await handlePublicOrderGet(
+      new URL(`https://api.example/orders/status/${token}`),
+      env
+    );
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).order.id, ORDER_ID);
+  }
+
+  database.prepare(`
+    UPDATE purchase_orders SET approval_required = 1, proposal_version = 2 WHERE id = ?
+  `).run(ORDER_ID);
+  const acceptUrl = new URL(`https://api.example/orders/status/${first.accessToken}/accept`);
+  const acceptResponse = await handlePublicOrderAcceptance(
+    new Request(acceptUrl, { method: "POST", body: JSON.stringify({ proposalVersion: 2 }) }),
+    acceptUrl,
+    env
+  );
+  assert.equal(acceptResponse.status, 200);
+  assert.equal(database.prepare(`SELECT approval_required FROM purchase_orders WHERE id = ?`).get(ORDER_ID)
+    .approval_required, 0);
+
+  const cancelUrl = new URL(`https://api.example/orders/status/${second.accessToken}/cancel`);
+  const cancelResponse = await handlePublicOrderCancellation(cancelUrl, env);
+  assert.equal(cancelResponse.status, 200);
+  assert.equal(database.prepare(`SELECT status FROM purchase_orders WHERE id = ?`).get(ORDER_ID).status, "cancelled");
 });
 
 test("l'historique GAS met à jour D1 puis revient par le curseur sans doublon", async () => {

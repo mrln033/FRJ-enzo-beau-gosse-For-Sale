@@ -1567,6 +1567,31 @@ export async function handleAdminPost(request, url, env) {
     return json(await updateContainerConfig(env, payload));
   }
 
+  const orderTrackingLinkMatch = url.pathname.match(
+    /^\/admin\/orders\/([a-f0-9-]{36})\/tracking-link$/i
+  );
+  if (orderTrackingLinkMatch) {
+    if (!isCartEnabled(env)) throw new ApiError(503, "Suivi de panier désactivé");
+    const orderId = orderTrackingLinkMatch[1].toLowerCase();
+    const existing = await env.DB.prepare(`SELECT id FROM purchase_orders WHERE id = ?`)
+      .bind(orderId).first();
+    if (!existing) throw new ApiError(404, "Demande introuvable");
+
+    const accessToken = `${crypto.randomUUID()}-${crypto.randomUUID()}`;
+    await env.DB.prepare(`
+      INSERT INTO purchase_order_tracking_tokens (token_hash, order_id)
+      VALUES (?, ?)
+    `).bind(await sha256(accessToken), orderId).run();
+    const response = json({
+      ok: true,
+      orderId,
+      accessToken,
+      trackingPath: `suivi-commande.html?token=${encodeURIComponent(accessToken)}`
+    }, 201);
+    response.headers.set("Cache-Control", "no-store");
+    return response;
+  }
+
   const historyCommentMatch = url.pathname.match(
     /^\/admin\/orders\/([a-f0-9-]{36})\/history\/(\d+)\/comment$/i
   );
@@ -1813,13 +1838,14 @@ export async function handlePublicOrderGet(url, env) {
   const match = url.pathname.match(/^\/orders\/status\/([a-f0-9-]{70,80})$/i);
   if (!match) throw new ApiError(404, "Demande introuvable");
   const tokenHash = await sha256(match[1]);
+  const orderId = await resolveOrderIdByTrackingToken(env, tokenHash);
+  if (!orderId) throw new ApiError(404, "Demande introuvable");
   const order = await env.DB.prepare(`
     SELECT id, public_reference, status, approval_required, proposal_version, buyer_avatar, language, frj_member,
            total_tt_ped, total_sale_ped, pricing_status, created_at, updated_at
     FROM purchase_orders
-    WHERE access_token_hash = ?
-  `).bind(tokenHash).first();
-  if (!order) throw new ApiError(404, "Demande introuvable");
+    WHERE id = ?
+  `).bind(orderId).first();
   const items = await env.DB.prepare(`
     SELECT line_no, item_name, storage, aisle, quantity, stock_at_submission,
            unit_tt_ped, markup_kind, markup_value, markup_display, unit_sale_ped,
@@ -1839,11 +1865,12 @@ export async function handlePublicOrderAcceptance(request, url, env) {
     throw new ApiError(400, "Version de proposition invalide");
   }
   const tokenHash = await sha256(match[1]);
+  const orderId = await resolveOrderIdByTrackingToken(env, tokenHash);
+  if (!orderId) throw new ApiError(404, "Demande introuvable");
   const order = await env.DB.prepare(`
     SELECT id, status, approval_required, proposal_version
-    FROM purchase_orders WHERE access_token_hash = ?
-  `).bind(tokenHash).first();
-  if (!order) throw new ApiError(404, "Demande introuvable");
+    FROM purchase_orders WHERE id = ?
+  `).bind(orderId).first();
   if (Number(order.approval_required || 0) !== 1) {
     return json({ ok: true, noChange: true, status: order.status });
   }
@@ -1879,11 +1906,12 @@ export async function handlePublicOrderCancellation(url, env) {
   const match = url.pathname.match(/^\/orders\/status\/([a-f0-9-]{70,80})\/cancel$/i);
   if (!match) throw new ApiError(404, "Demande introuvable");
   const tokenHash = await sha256(match[1]);
+  const orderId = await resolveOrderIdByTrackingToken(env, tokenHash);
+  if (!orderId) throw new ApiError(404, "Demande introuvable");
   const order = await env.DB.prepare(`
     SELECT id, status, approval_required
-    FROM purchase_orders WHERE access_token_hash = ?
-  `).bind(tokenHash).first();
-  if (!order) throw new ApiError(404, "Demande introuvable");
+    FROM purchase_orders WHERE id = ?
+  `).bind(orderId).first();
   if (!canClientCancelOrder(order.status, order.approval_required)) {
     throw new ApiError(409, "Cette demande ne peut plus être annulée par le client");
   }
@@ -2539,6 +2567,20 @@ async function orderSubmitterHash(request, env) {
 
 function isCartEnabled(env) {
   return String(env.CART_ENABLED ?? "true").toLowerCase() !== "false";
+}
+
+async function resolveOrderIdByTrackingToken(env, tokenHash) {
+  const row = await env.DB.prepare(`
+    SELECT id
+    FROM purchase_orders
+    WHERE access_token_hash = ?
+    UNION ALL
+    SELECT order_id AS id
+    FROM purchase_order_tracking_tokens
+    WHERE token_hash = ?
+    LIMIT 1
+  `).bind(tokenHash, tokenHash).first();
+  return row?.id || null;
 }
 
 async function runImmediateGasAudit(env, payload) {
