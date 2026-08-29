@@ -42,6 +42,20 @@ test("protège la création d'un lien de suivi secondaire", async () => {
   assert.deepEqual(await response.json(), { error: "Unauthorized" });
 });
 
+test("protège le catalogue et la création directe d.12", async () => {
+  for (const request of [
+    new Request("https://api.example/admin/orders/catalog", { headers: { Origin: "https://mrln033.github.io" } }),
+    new Request("https://api.example/admin/orders", {
+      method: "POST",
+      headers: { Origin: "https://mrln033.github.io" }
+    })
+  ]) {
+    const response = await worker.fetch(request, {});
+    assert.equal(response.status, 401);
+    assert.deepEqual(await response.json(), { error: "Unauthorized" });
+  }
+});
+
 test("protège les statistiques détaillées des visites", async () => {
   const request = new Request("https://api.example/admin/visit-statistics", {
     headers: { Origin: "https://mrln033.github.io" }

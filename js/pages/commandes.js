@@ -13,6 +13,10 @@
     system: "Système"
   });
   let selectedStatuses = readSelectedStatuses();
+  let orderCatalog = [];
+  let lastOrdersReport = null;
+  let lastOrders = [];
+  let newOrderEditors = [];
 
   function hasAtMostDecimals(value, decimals) {
     const factor = 10 ** decimals;
@@ -56,6 +60,8 @@
       const response = await global.FRJ_API.fetchD1Admin("/admin/orders", { cache: "no-store" });
       const report = await response.json();
       const orders = report.orders || [];
+      lastOrdersReport = report;
+      lastOrders = orders;
       renderStatusFilters(orders, () => renderOrderResults(report, orders));
       renderOrderResults(report, orders);
     } catch (loadError) {
@@ -63,6 +69,29 @@
       summary.textContent = "Chargement impossible";
       error.textContent = loadError.message;
       error.hidden = false;
+    }
+  }
+
+  async function loadOrderCatalog() {
+    const toggle = document.getElementById("newOrderToggle");
+    if (!toggle) return;
+    toggle.disabled = true;
+    toggle.textContent = "Chargement du catalogue…";
+    try {
+      const response = await global.FRJ_API.fetchD1Admin("/admin/orders/catalog", { cache: "no-store" });
+      const result = await response.json();
+      orderCatalog = Array.isArray(result.items) ? result.items : [];
+      if (!orderCatalog.length) throw new Error("Aucun article avec un stock positif n’est disponible.");
+      toggle.disabled = false;
+      toggle.textContent = "Ajouter une nouvelle demande";
+      if (lastOrdersReport) renderOrderResults(lastOrdersReport, lastOrders);
+    } catch (error) {
+      toggle.textContent = "Création directe indisponible";
+      const feedback = document.getElementById("newOrderFeedback");
+      if (feedback) {
+        feedback.className = "new-order-feedback error";
+        feedback.textContent = error.message;
+      }
     }
   }
 
@@ -127,7 +156,9 @@
     meta.className = "order-meta";
     [
       ui.formatDate(order.createdAt),
-      order.sourceBackend === "gas-fallback" ? "Reçue par secours GAS" : "Reçue par D1",
+      order.sourceBackend === "gas-fallback"
+        ? "Reçue par secours GAS"
+        : (order.sourceBackend === "d1-admin" ? "Demande directe" : "Reçue par D1"),
       order.frjMember ? "Membre FRJ" : "Public",
       order.buyerContact || "Pas de contact"
     ].forEach((value) => {
@@ -226,6 +257,8 @@
     });
     table.appendChild(body);
     article.appendChild(table);
+    const addItemControl = createAddItemControl(order);
+    if (addItemControl) article.appendChild(addItemControl);
 
     const total = document.createElement("p");
     total.className = "order-total";
@@ -308,6 +341,310 @@
     }
     article.appendChild(createHistoryPanel(order));
     return article;
+  }
+
+  function createDirectLineEditor(catalogItems, options = {}) {
+    const root = document.createElement("div");
+    root.className = "direct-order-line";
+    const articleLabel = document.createElement("label");
+    articleLabel.textContent = "Article";
+    const article = document.createElement("select");
+    article.setAttribute("aria-label", "Article de la demande directe");
+    catalogItems.forEach((item, index) => {
+      const option = document.createElement("option");
+      option.value = String(index);
+      option.textContent = `${item.itemName} — ${item.storage} / ${item.aisle} — stock ${ui.formatQuantity(item.availableStock)}`;
+      article.appendChild(option);
+    });
+    article.value = catalogItems.length ? "0" : "";
+    articleLabel.appendChild(article);
+
+    const quantityLabel = document.createElement("label");
+    quantityLabel.textContent = "Quantité";
+    const quantity = document.createElement("input");
+    quantity.type = "number";
+    quantity.min = "1";
+    quantity.step = "1";
+    quantity.value = "1";
+    quantity.required = true;
+    quantity.setAttribute("aria-label", "Quantité de la demande directe");
+    quantityLabel.appendChild(quantity);
+
+    const markupLabel = document.createElement("label");
+    markupLabel.textContent = "MU";
+    const markupFields = document.createElement("span");
+    markupFields.className = "direct-markup-fields";
+    const kind = document.createElement("select");
+    [["percent", "%"], ["ped", "PED"]].forEach(([value, label]) => {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      kind.appendChild(option);
+    });
+    kind.value = "percent";
+    kind.setAttribute("aria-label", "Type de MU de la demande directe");
+    const amount = document.createElement("input");
+    amount.type = "number";
+    amount.min = "0";
+    amount.max = "1000000";
+    amount.step = "0.01";
+    amount.value = "100.00";
+    amount.required = true;
+    amount.setAttribute("aria-label", "Valeur de MU de la demande directe");
+    markupFields.append(kind, amount);
+    markupLabel.appendChild(markupFields);
+
+    const output = document.createElement("div");
+    output.className = "direct-order-line-output";
+    const stock = document.createElement("span");
+    const displayedPrice = document.createElement("span");
+    const estimate = document.createElement("strong");
+    output.append(stock, displayedPrice, estimate);
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "direct-order-remove";
+    remove.textContent = "Retirer";
+
+    const read = () => {
+      const item = catalogItems[Number(article.value)] || null;
+      const itemQuantity = Number(quantity.value);
+      const markupAmount = Number(amount.value);
+      const valid = Boolean(item)
+        && Number.isInteger(itemQuantity)
+        && itemQuantity > 0
+        && itemQuantity <= Number(item.availableStock || 0)
+        && Number.isFinite(markupAmount)
+        && markupAmount >= 0
+        && markupAmount <= 1_000_000
+        && hasAtMostDecimals(markupAmount, 2);
+      let unitSale = Number(item?.unitTtPed || 0);
+      if (valid && kind.value === "percent") unitSale *= markupAmount / 100;
+      if (valid && kind.value === "ped") unitSale += markupAmount;
+      const lineSale = valid ? ui.roundPed(unitSale * itemQuantity) : null;
+      return {
+        valid,
+        lineSale,
+        key: item ? `${item.itemName}\u001f${item.storage}\u001f${item.aisle}`.toLocaleLowerCase("en-US") : "",
+        payload: item ? {
+          itemName: item.itemName,
+          storage: item.storage,
+          aisle: item.aisle,
+          quantity: itemQuantity,
+          markupKind: kind.value,
+          markupAmount
+        } : null
+      };
+    };
+    const refresh = () => {
+      const item = catalogItems[Number(article.value)] || null;
+      if (item) quantity.max = String(item.availableStock);
+      const value = read();
+      stock.textContent = item ? `Stock : ${ui.formatQuantity(item.availableStock)}` : "Stock : —";
+      displayedPrice.textContent = item ? `Prix affiché : ${ui.formatPed(item.unitTtPed)} PED` : "Prix affiché : —";
+      estimate.textContent = value.valid ? `Estimation : ${ui.formatPed(value.lineSale)} PED` : "Estimation : —";
+      options.onChange?.();
+      return value;
+    };
+    article.addEventListener("change", refresh);
+    quantity.addEventListener("input", refresh);
+    amount.addEventListener("input", refresh);
+    kind.addEventListener("change", () => {
+      amount.value = kind.value === "percent" ? "100.00" : "0.00";
+      refresh();
+    });
+    root.append(articleLabel, quantityLabel, markupLabel, output, remove);
+    const editor = { root, read, refresh, remove };
+    remove.addEventListener("click", () => options.onRemove?.(editor));
+    refresh();
+    return editor;
+  }
+
+  function initializeNewOrderForm() {
+    const toggle = document.getElementById("newOrderToggle");
+    const panel = document.getElementById("newOrderPanel");
+    const form = document.getElementById("newOrderForm");
+    if (!toggle || !panel || !form) return;
+    toggle.addEventListener("click", () => {
+      panel.hidden = !panel.hidden;
+      toggle.textContent = panel.hidden ? "Ajouter une nouvelle demande" : "Masquer le formulaire";
+      if (!panel.hidden && !newOrderEditors.length) addNewOrderLine();
+    });
+    document.getElementById("newOrderAddLine").addEventListener("click", addNewOrderLine);
+    document.getElementById("newOrderCancel").addEventListener("click", () => {
+      resetNewOrderForm();
+      panel.hidden = true;
+      toggle.textContent = "Ajouter une nouvelle demande";
+    });
+    form.addEventListener("submit", submitNewOrder);
+  }
+
+  function addNewOrderLine() {
+    if (!orderCatalog.length || newOrderEditors.length >= 10) return;
+    let editor;
+    editor = createDirectLineEditor(orderCatalog, {
+      onChange: updateNewOrderForm,
+      onRemove: () => {
+        newOrderEditors = newOrderEditors.filter((candidate) => candidate !== editor);
+        renderNewOrderLines();
+      }
+    });
+    newOrderEditors.push(editor);
+    renderNewOrderLines();
+  }
+
+  function renderNewOrderLines() {
+    const container = document.getElementById("newOrderLines");
+    if (!container) return;
+    container.replaceChildren(...newOrderEditors.map((editor) => editor.root));
+    newOrderEditors.forEach((editor) => { editor.remove.hidden = newOrderEditors.length === 1; });
+    updateNewOrderForm();
+  }
+
+  function updateNewOrderForm() {
+    const total = document.getElementById("newOrderTotal");
+    const save = document.getElementById("newOrderSave");
+    const add = document.getElementById("newOrderAddLine");
+    if (!total || !save || !add) return [];
+    const values = newOrderEditors.map((editor) => editor.read());
+    const keys = values.map((value) => value.key).filter(Boolean);
+    const duplicates = new Set(keys).size !== keys.length;
+    const valid = values.length > 0 && values.every((value) => value.valid) && !duplicates;
+    total.textContent = valid
+      ? `Estimation totale : ${ui.formatPed(values.reduce((sum, value) => sum + value.lineSale, 0))} PED`
+      : (duplicates ? "Un même article ne peut pas être ajouté deux fois." : "Estimation totale : —");
+    save.disabled = !valid;
+    add.disabled = newOrderEditors.length >= 10;
+    return values;
+  }
+
+  function resetNewOrderForm() {
+    document.getElementById("newOrderForm")?.reset();
+    newOrderEditors = [];
+    document.getElementById("newOrderLines")?.replaceChildren();
+    const feedback = document.getElementById("newOrderFeedback");
+    if (feedback) {
+      feedback.textContent = "";
+      feedback.className = "new-order-feedback";
+    }
+  }
+
+  async function submitNewOrder(event) {
+    event.preventDefault();
+    const values = updateNewOrderForm();
+    const save = document.getElementById("newOrderSave");
+    const feedback = document.getElementById("newOrderFeedback");
+    const resultPanel = document.getElementById("newOrderResult");
+    if (!values.length || values.some((value) => !value.valid)) return;
+    save.disabled = true;
+    save.textContent = "Enregistrement…";
+    feedback.className = "new-order-feedback";
+    feedback.textContent = "Création de la demande et publication Discord…";
+    resultPanel.hidden = true;
+    try {
+      const response = await global.FRJ_API.fetchD1Admin("/admin/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          buyerAvatar: document.getElementById("newOrderAvatar").value,
+          frjMember: document.getElementById("newOrderProfile").value === "frj",
+          items: values.map((value) => value.payload)
+        })
+      });
+      const result = await response.json();
+      const trackingUrl = new URL(result.trackingPath, global.location.href).href;
+      const copied = await copyTrackingUrl(trackingUrl);
+      const message = document.createElement("p");
+      message.textContent = `${result.order.publicReference} créée au statut À valider.${copied ? " Lien copié." : ""}`;
+      const link = document.createElement("a");
+      link.href = trackingUrl;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = "Ouvrir le suivi client";
+      resultPanel.replaceChildren(message, link);
+      resultPanel.hidden = false;
+      feedback.textContent = "Demande enregistrée.";
+      resetNewOrderForm();
+      await loadOrders();
+    } catch (error) {
+      feedback.className = "new-order-feedback error";
+      feedback.textContent = error.message;
+    } finally {
+      save.textContent = "Enregistrer la demande";
+      updateNewOrderForm();
+    }
+  }
+
+  function createAddItemControl(order) {
+    if (!ui.canEditProposal(order.status) || (order.items || []).length >= 10) return null;
+    const section = document.createElement("section");
+    section.className = "order-add-item";
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "order-add-item-toggle";
+    toggle.textContent = orderCatalog.length ? "Ajouter un article" : "Chargement du catalogue…";
+    toggle.disabled = !orderCatalog.length;
+    const form = document.createElement("div");
+    form.className = "order-add-item-form";
+    form.hidden = true;
+    toggle.addEventListener("click", () => {
+      form.hidden = !form.hidden;
+      toggle.textContent = form.hidden ? "Ajouter un article" : "Masquer l’ajout";
+      if (form.children.length) return;
+      const existing = new Set((order.items || []).map((item) => (
+        `${item.itemName}\u001f${item.storage}\u001f${item.aisle}`.toLocaleLowerCase("en-US")
+      )));
+      const available = orderCatalog.filter((item) => !existing.has(
+        `${item.itemName}\u001f${item.storage}\u001f${item.aisle}`.toLocaleLowerCase("en-US")
+      ));
+      const feedback = document.createElement("p");
+      feedback.className = "new-order-feedback";
+      if (!available.length) {
+        feedback.textContent = "Tous les articles disponibles sont déjà présents dans cette demande.";
+        form.appendChild(feedback);
+        return;
+      }
+      const save = document.createElement("button");
+      save.type = "button";
+      save.textContent = "Ajouter à la proposition";
+      let editor;
+      editor = createDirectLineEditor(available, {
+        onChange: () => { if (editor) save.disabled = !editor.read().valid; }
+      });
+      editor.remove.hidden = true;
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.textContent = "Annuler";
+      cancel.addEventListener("click", () => {
+        form.hidden = true;
+        toggle.textContent = "Ajouter un article";
+      });
+      const actions = document.createElement("div");
+      actions.className = "order-add-item-actions";
+      actions.append(cancel, save);
+      save.addEventListener("click", async () => {
+        const value = editor.read();
+        if (!value.valid) return;
+        save.disabled = true;
+        save.textContent = "Ajout…";
+        feedback.textContent = "";
+        try {
+          await global.FRJ_API.fetchD1Admin(`/admin/orders/${encodeURIComponent(order.id)}/items`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(value.payload)
+          });
+          await loadOrders();
+        } catch (error) {
+          feedback.className = "new-order-feedback error";
+          feedback.textContent = error.message;
+          save.disabled = false;
+          save.textContent = "Ajouter à la proposition";
+        }
+      });
+      form.append(editor.root, actions, feedback);
+    });
+    section.append(toggle, form);
+    return section;
   }
 
   function createTrackingControl(order) {
@@ -578,5 +915,6 @@
   }
 
   document.getElementById("refreshOrders").addEventListener("click", loadOrders);
-  loadOrders();
+  initializeNewOrderForm();
+  loadOrders().then(loadOrderCatalog);
 })(window);

@@ -29,6 +29,11 @@ test("affiche explicitement une proposition à valider", () => {
   assert.match(payload.embeds[0].description, /À valider par le client/);
 });
 
+test("identifie une demande créée directement par l'administrateur", () => {
+  const payload = buildDiscordOrderPayload({ ...order, sourceBackend: "d1-admin" }, items);
+  assert.equal(payload.embeds[0].fields.find((field) => field.name === "Origine").value, "Demande directe");
+});
+
 test("publie avec wait=true et récupère l'identifiant Discord", async () => {
   let request;
   const result = await sendOrUpdateDiscordOrder({

@@ -11,13 +11,17 @@ const STATUS_LABELS = Object.freeze({
 });
 
 const CLIENT_ACTIONS = new Set(["submitted", "proposal-accepted", "client-cancelled"]);
-const ADMIN_ACTIONS = new Set(["status-changed", "proposal-changed", "proposal-line-changed"]);
+const ADMIN_ACTIONS = new Set([
+  "admin-created", "status-changed", "proposal-changed", "proposal-line-changed", "proposal-line-added"
+]);
 const HIDDEN_ACTIONS = new Set(["history-comment-updated", "pricing-confirmed-backfill"]);
 const SYNCED_ACTIONS = new Set([
   "submitted",
   "gas-fallback-synchronized",
+  "admin-created",
   "proposal-changed",
   "proposal-line-changed",
+  "proposal-line-added",
   "status-changed",
   "proposal-accepted",
   "client-cancelled"
@@ -40,11 +44,17 @@ export function isVisibleOrderHistoryAction(action) {
 export function automaticOrderHistoryComment(action, details = {}) {
   if (action === "submitted") return "Demande transmise par le client.";
   if (action === "gas-fallback-synchronized") return "Demande reçue depuis le secours GAS.";
+  if (action === "admin-created") return "Demande directe créée par l’administrateur.";
   if (action === "proposal-changed") return "Proposition modifiée par l’administrateur.";
   if (action === "proposal-line-changed") {
     return details.itemName
       ? `Proposition modifiée pour « ${details.itemName} ».`
       : "Une ligne de la proposition a été modifiée.";
+  }
+  if (action === "proposal-line-added") {
+    return details.itemName
+      ? `Article « ${details.itemName} » ajouté par l’administrateur.`
+      : "Un article a été ajouté par l’administrateur.";
   }
   if (action === "proposal-accepted") return "Proposition acceptée par le client.";
   if (action === "client-cancelled") return "Demande annulée par le client.";

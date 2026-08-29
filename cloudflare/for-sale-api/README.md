@@ -136,6 +136,12 @@ La session activée par `admin=1` contrôle seulement l’affichage du menu et l
 jeton. GAS remonte dans `sync_audit` le résultat global de chaque exécution, tandis que D1 conserve les 500
 derniers événements par dataset.
 
+Depuis d.12, la Console Admin peut aussi créer une demande directement dans D1 et ajouter une ligne à une
+proposition encore modifiable. `GET /admin/orders/catalog`, `POST /admin/orders` et
+`POST /admin/orders/:id/items` exigent tous `ADMIN_TOKEN`. Les références, dates et jetons de suivi sont
+générés côté Worker ; seule l'empreinte du jeton est stockée. Chaque création ou ajout repasse la proposition
+en attente de validation du client, maintient `purchase_order_events` et actualise le message Discord.
+
 ## Statistiques de fréquentation
 
 Le frontend enregistre une vue au chargement de chaque page avec un identifiant visiteur et une session de

@@ -11,9 +11,9 @@
   <script defer src="./js/visit-tracking.js?v=20260829-1"></script>
   <script defer src="./js/common/order-ui.js?v=20260828-1"></script>
   <script defer src="./js/admin-menu.js?v=20260829-1"></script>
-  <script defer src="./js/pages/commandes.js?v=20260829-1"></script>
+  <script defer src="./js/pages/commandes.js?v=20260829-2"></script>
   <title>[FRJ] — Demandes d'achat</title>
-  <link rel="stylesheet" href="./css/pages/commandes.css?v=20260829-1">
+  <link rel="stylesheet" href="./css/pages/commandes.css?v=20260829-2">
 </head>
 <body data-visit-module="admin-orders">
   <section class="orders-header">
@@ -22,7 +22,42 @@
       <div id="ordersFilters" class="orders-filters" aria-label="Filtrer les demandes par statut"></div>
       <p class="orders-summary" id="ordersSummary">Chargement…</p>
     </div>
-    <button type="button" id="refreshOrders">Actualiser</button>
+    <div class="orders-page-actions">
+      <button type="button" id="newOrderToggle" disabled>Ajouter une nouvelle demande</button>
+      <button type="button" id="refreshOrders">Actualiser</button>
+    </div>
+  </section>
+  <section id="newOrderPanel" class="new-order-panel" hidden>
+    <h2>Nouvelle demande directe</h2>
+    <p class="new-order-intro">La référence et la date seront générées lors de l’enregistrement. La proposition sera placée au statut « À valider ».</p>
+    <form id="newOrderForm">
+      <div class="new-order-identity">
+        <label>
+          Nom d’avatar
+          <input type="text" id="newOrderAvatar" name="buyerAvatar" maxlength="80" required>
+        </label>
+        <label>
+          Profil de joueur
+          <select id="newOrderProfile" name="profile">
+            <option value="public">Public</option>
+            <option value="frj">Membre FRJ</option>
+          </select>
+        </label>
+        <p><strong>Origine :</strong> Demande directe</p>
+        <p><strong>Statut :</strong> À valider</p>
+      </div>
+      <div id="newOrderLines" class="direct-order-lines"></div>
+      <div class="new-order-toolbar">
+        <button type="button" id="newOrderAddLine">Ajouter un article</button>
+        <strong id="newOrderTotal">Estimation totale : —</strong>
+      </div>
+      <p id="newOrderFeedback" class="new-order-feedback" aria-live="polite"></p>
+      <div class="new-order-actions">
+        <button type="button" id="newOrderCancel" class="secondary">Annuler</button>
+        <button type="submit" id="newOrderSave">Enregistrer la demande</button>
+      </div>
+    </form>
+    <div id="newOrderResult" class="new-order-result" hidden></div>
   </section>
   <p id="ordersError" class="orders-error" hidden></p>
   <main id="ordersList" class="orders-list"></main>

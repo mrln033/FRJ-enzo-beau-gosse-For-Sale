@@ -70,6 +70,45 @@ export function normalizeOrderSubmission(payload) {
   };
 }
 
+export function normalizeAdminOrderDraft(payload) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new Error("Demande directe invalide");
+  }
+  const buyerAvatar = cleanText(payload.buyerAvatar, 80);
+  if (!buyerAvatar) throw new Error("L'avatar en jeu est obligatoire");
+  const sourceItems = Array.isArray(payload.items) ? payload.items : [];
+  if (sourceItems.length < 1 || sourceItems.length > 10) {
+    throw new Error("La demande directe doit contenir entre 1 et 10 articles");
+  }
+  const items = sourceItems.map(normalizeAdminOrderLine);
+  const keys = new Set(items.map(orderItemKey));
+  if (keys.size !== items.length) throw new Error("Un article ne peut apparaître qu'une seule fois");
+  return {
+    buyerAvatar,
+    frjMember: payload.frjMember === true,
+    items
+  };
+}
+
+export function normalizeAdminOrderLine(payload) {
+  const itemName = cleanText(payload?.itemName, 180);
+  const storage = cleanText(payload?.storage, 80).toUpperCase();
+  const aisle = cleanText(payload?.aisle, 120).toUpperCase();
+  const quantity = Number(payload?.quantity);
+  if (!itemName || !storage || !aisle) throw new Error("Article de demande directe incomplet");
+  validateOrderQuantity(quantity, itemName);
+  const markupKind = String(payload?.markupKind || "").trim().toLowerCase();
+  if (!["percent", "ped"].includes(markupKind)) throw new Error(`Type de MU invalide pour ${itemName}`);
+  const markupAmount = Number(payload?.markupAmount);
+  if (!Number.isFinite(markupAmount) || markupAmount < 0 || markupAmount > 1_000_000) {
+    throw new Error(`MU invalide pour ${itemName}`);
+  }
+  if (!hasAtMostDecimals(markupAmount, 2)) {
+    throw new Error(`La MU de ${itemName} est limitée à 2 décimales`);
+  }
+  return { itemName, storage, aisle, quantity, markupKind, markupAmount };
+}
+
 export function priceOrderLines(requestedItems, catalogRows, options = {}) {
   const frjMember = options.frjMember === true;
   const catalog = new Map(catalogRows.map((row) => [orderItemKey(row), row]));

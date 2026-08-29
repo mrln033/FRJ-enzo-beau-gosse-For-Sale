@@ -50,6 +50,8 @@ class FakeElement {
   setAttribute(name, value) {
     this.attributes.set(name, value);
   }
+
+  reset() {}
 }
 
 function createStorage(initial = {}) {
@@ -354,6 +356,143 @@ test("la Console Admin charge l'historique à la demande et modifie un commentai
   const post = requests.find((request) => request.options?.method === "POST");
   assert.equal(post.path, `/admin/orders/${order.id}/history/${historyEvent.id}/comment`);
   assert.deepEqual(JSON.parse(post.options.body), { comment: "Client prévenu" });
+});
+
+test("d.12 crée une demande directe et propose son lien de suivi", async () => {
+  const ids = [
+    "ordersList", "ordersSummary", "ordersError", "ordersFilters", "refreshOrders",
+    "newOrderToggle", "newOrderPanel", "newOrderForm", "newOrderAvatar", "newOrderProfile",
+    "newOrderLines", "newOrderAddLine", "newOrderTotal", "newOrderFeedback", "newOrderCancel",
+    "newOrderSave", "newOrderResult"
+  ];
+  const elements = new Map(ids.map((id) => [id, new FakeElement(id)]));
+  elements.get("newOrderPanel").hidden = true;
+  elements.get("newOrderAvatar").value = "Direct Buyer";
+  elements.get("newOrderProfile").value = "frj";
+  const created = [];
+  const requests = [];
+  const token = `${"a".repeat(36)}-${"b".repeat(36)}`;
+  const catalog = [{ itemName: "Item A", storage: "ARMORS", aisle: "PARTS", availableStock: 5, unitTtPed: 10 }];
+  const document = {
+    getElementById: (id) => elements.get(id),
+    createElement: () => {
+      const element = new FakeElement();
+      created.push(element);
+      return element;
+    }
+  };
+  const window = {
+    location: { href: "https://example.test/commandes.html" },
+    FRJ_ADMIN: { require: () => true },
+    FRJ_API: {
+      fetchD1Admin: async (path, options) => {
+        requests.push({ path, options });
+        if (path === "/admin/orders/catalog") return { json: async () => ({ items: catalog }) };
+        if (path === "/admin/orders" && options?.method === "POST") {
+          return { json: async () => ({
+            order: { id: "123e4567-e89b-42d3-a456-426614174000", publicReference: "FRJ-20260829-ABC123" },
+            accessToken: token,
+            trackingPath: `suivi-commande.html?token=${token}`
+          }) };
+        }
+        return { json: async () => ({ orders: [], enabled: true, generatedAt: "2026-08-29T12:00:00Z" }) };
+      }
+    },
+    localStorage: createStorage(),
+    navigator: { clipboard: { writeText: async () => {} } },
+    alert: () => {}
+  };
+  const context = vm.createContext({ window, document, console, URL });
+  vm.runInContext(commonSource, context);
+  vm.runInContext(adminSource, context);
+  await settle();
+  await settle();
+
+  elements.get("newOrderToggle").listeners.get("click")();
+  const amount = created.find((element) => element.attributes.get("aria-label") === "Valeur de MU de la demande directe");
+  assert.equal(amount.step, "0.01");
+  await elements.get("newOrderForm").listeners.get("submit")({ preventDefault() {} });
+  await settle();
+
+  const post = requests.find((request) => request.path === "/admin/orders" && request.options?.method === "POST");
+  const body = JSON.parse(post.options.body);
+  assert.equal(body.buyerAvatar, "Direct Buyer");
+  assert.equal(body.frjMember, true);
+  assert.equal(body.items.length, 1);
+  assert.equal(body.items[0].markupKind, "percent");
+  assert.equal(body.items[0].markupAmount, 100);
+  assert.equal(elements.get("newOrderResult").hidden, false);
+  assert.match(elements.get("newOrderResult").children[0].textContent, /FRJ-20260829-ABC123/);
+  assert.match(elements.get("newOrderResult").children[1].href, /suivi-commande\.html\?token=/);
+});
+
+test("d.12 ajoute un article à une proposition existante", async () => {
+  const ids = [
+    "ordersList", "ordersSummary", "ordersError", "ordersFilters", "refreshOrders",
+    "newOrderToggle", "newOrderPanel", "newOrderForm", "newOrderAvatar", "newOrderProfile",
+    "newOrderLines", "newOrderAddLine", "newOrderTotal", "newOrderFeedback", "newOrderCancel",
+    "newOrderSave", "newOrderResult"
+  ];
+  const elements = new Map(ids.map((id) => [id, new FakeElement(id)]));
+  const created = [];
+  const requests = [];
+  const order = {
+    id: "123e4567-e89b-42d3-a456-426614174000",
+    publicReference: "FRJ-20260829-ABC123",
+    buyerAvatar: "Direct Buyer",
+    status: "submitted",
+    pricingStatus: "estimated",
+    createdAt: "2026-08-29T12:00:00Z",
+    updatedAt: "2026-08-29T12:00:00Z",
+    totalSalePed: 10,
+    items: [{
+      lineNo: 1, itemName: "Item A", storage: "ARMORS", aisle: "PARTS", quantity: 1,
+      unitTtPed: 10, markupKind: "percent", markupValue: 1, lineSalePed: 10
+    }]
+  };
+  const catalog = [
+    { itemName: "Item A", storage: "ARMORS", aisle: "PARTS", availableStock: 5, unitTtPed: 10 },
+    { itemName: "Item B", storage: "MATERIALS", aisle: "MINERALS", availableStock: 3, unitTtPed: 5 }
+  ];
+  const document = {
+    getElementById: (id) => elements.get(id),
+    createElement: () => {
+      const element = new FakeElement();
+      created.push(element);
+      return element;
+    }
+  };
+  const window = {
+    FRJ_ADMIN: { require: () => true },
+    FRJ_API: {
+      fetchD1Admin: async (path, options) => {
+        requests.push({ path, options });
+        if (path === "/admin/orders/catalog") return { json: async () => ({ items: catalog }) };
+        if (path.endsWith("/items") && options?.method === "POST") return { json: async () => ({ ok: true }) };
+        return { json: async () => ({ orders: [order], enabled: true, generatedAt: order.updatedAt }) };
+      }
+    },
+    localStorage: createStorage(),
+    alert: () => {}
+  };
+  const context = vm.createContext({ window, document, console, URL });
+  vm.runInContext(commonSource, context);
+  vm.runInContext(adminSource, context);
+  await settle();
+  await settle();
+
+  const toggle = created.filter((element) => element.className === "order-add-item-toggle").at(-1);
+  assert.equal(toggle.disabled, false);
+  toggle.listeners.get("click")();
+  const save = created.filter((element) => element.textContent === "Ajouter à la proposition").at(-1);
+  await save.listeners.get("click")();
+  await settle();
+  const post = requests.find((request) => request.path.endsWith(`/admin/orders/${order.id}/items`) || request.path === `/admin/orders/${order.id}/items`);
+  assert.equal(post.path, `/admin/orders/${order.id}/items`);
+  assert.equal(post.options.method, "POST");
+  const body = JSON.parse(post.options.body);
+  assert.equal(body.itemName, "Item B");
+  assert.equal(body.markupAmount, 100);
 });
 
 test("le suivi public rend une demande et la mémorise localement", async () => {

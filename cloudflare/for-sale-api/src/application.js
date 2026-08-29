@@ -20,7 +20,10 @@ import {
   canReviseOrder,
   confirmsOrderPricing,
   hasSameOrderTerms,
+  normalizeAdminOrderDraft,
+  normalizeAdminOrderLine,
   normalizeOrderSubmission,
+  orderItemKey,
   priceOrderLines,
   reviseOrderLine,
   validateOrderStatus
@@ -155,6 +158,9 @@ export async function handleGet(url, env) {
 export async function handleAdminGet(url, env) {
   if (url.pathname === "/admin/orders") {
     return json(await readAdminOrders(env));
+  }
+  if (url.pathname === "/admin/orders/catalog") {
+    return json(await readAdminOrderCatalog(env));
   }
   const orderHistoryMatch = url.pathname.match(/^\/admin\/orders\/([a-f0-9-]{36})\/history$/i);
   if (orderHistoryMatch) {
@@ -1567,6 +1573,11 @@ export async function handleAdminPost(request, url, env) {
     return json(await updateContainerConfig(env, payload));
   }
 
+  if (url.pathname === "/admin/orders") {
+    const payload = parseJsonBody(await readTextBody(request, 100_000));
+    return json(await createAdminOrder(env, payload), 201);
+  }
+
   const orderTrackingLinkMatch = url.pathname.match(
     /^\/admin\/orders\/([a-f0-9-]{36})\/tracking-link$/i
   );
@@ -1616,6 +1627,12 @@ export async function handleAdminPost(request, url, env) {
       throw new ApiError(400, "La proposition doit contenir entre 1 et 30 articles");
     }
     return json(await updateOrderProposal(env, orderProposalMatch[1].toLowerCase(), requestedItems));
+  }
+
+  const orderItemAdditionMatch = url.pathname.match(/^\/admin\/orders\/([a-f0-9-]{36})\/items$/i);
+  if (orderItemAdditionMatch) {
+    const payload = parseJsonBody(await readTextBody(request, 20_000));
+    return json(await addAdminOrderItem(env, orderItemAdditionMatch[1].toLowerCase(), payload), 201);
   }
 
   const orderItemMatch = url.pathname.match(/^\/admin\/orders\/([a-f0-9-]{36})\/items\/(\d+)$/i);
@@ -2068,15 +2085,16 @@ async function storePurchaseOrder(env, order, items, eventAction, syncedEvent = 
         id, public_reference, access_token_hash, status, buyer_avatar, buyer_contact,
         buyer_comment, language, frj_member, source_backend, total_tt_ped,
         total_sale_ped, pricing_status, submitter_hash, client_created_at,
-        discord_message_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        discord_message_id, approval_required, proposal_version
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       order.id, order.publicReference, order.accessTokenHash, order.status || "submitted",
       order.buyerAvatar, order.buyerContact || null, order.buyerComment || null,
       order.language || "EN", order.frjMember ? 1 : 0, order.sourceBackend || "d1",
       Number(order.totalTtPed || 0), Number(order.totalSalePed || 0),
       order.pricingStatus || "estimated", order.submitterHash || null, order.clientCreatedAt || null,
-      order.discordMessageId || null
+      order.discordMessageId || null, order.approvalRequired ? 1 : 0,
+      Number(order.proposalVersion || 0)
     ),
     ...items.map((item, index) => env.DB.prepare(`
       INSERT INTO purchase_order_items (
@@ -2096,7 +2114,8 @@ async function storePurchaseOrder(env, order, items, eventAction, syncedEvent = 
       : prepareOrderHistoryEvent(env, {
         orderId: order.id,
         action: eventAction,
-        details: { sourceBackend: order.sourceBackend || "d1", to: order.status || "submitted" }
+        actor: order.eventActor,
+        details: order.eventDetails || { sourceBackend: order.sourceBackend || "d1", to: order.status || "submitted" }
       })
   ];
   await env.DB.batch(statements);
@@ -2319,6 +2338,203 @@ function publicDiscordResult(result) {
     action: result?.action || null,
     skipped: result?.skipped === true
   };
+}
+
+async function readAdminOrderCatalog(env) {
+  const result = await env.DB.prepare(`
+    WITH stock AS (
+      SELECT item_name, SUM(quantity) AS available_stock
+      FROM saleable_inventory
+      WHERE avatar_id = 'enzo'
+      GROUP BY item_name COLLATE NOCASE
+    )
+    SELECT l.item_name, l.storage, l.aisle, c.unit_price_ped, stock.available_stock
+    FROM catalog_listings l
+    JOIN catalog_items c ON c.name = l.item_name COLLATE NOCASE
+    JOIN stock ON stock.item_name = l.item_name COLLATE NOCASE
+    WHERE l.enabled = 1
+      AND stock.available_stock > 0
+      AND c.unit_price_ped IS NOT NULL
+    ORDER BY l.storage, l.aisle, l.item_name COLLATE NOCASE
+  `).all();
+  return {
+    generatedAt: new Date().toISOString(),
+    items: result.results.map((row) => ({
+      itemName: row.item_name,
+      storage: row.storage,
+      aisle: row.aisle,
+      availableStock: Number(row.available_stock || 0),
+      unitTtPed: Number(row.unit_price_ped || 0)
+    }))
+  };
+}
+
+async function createAdminOrder(env, payload) {
+  if (!isCartEnabled(env)) throw new ApiError(503, "Transmission des paniers désactivée");
+  const draft = parseOrderValue(() => normalizeAdminOrderDraft(payload));
+  const catalog = await readAdminOrderCatalog(env);
+  const lines = priceAdminOrderLines(draft.items, catalog.items);
+  const totals = orderLineTotals(lines);
+  const now = new Date().toISOString();
+  const identity = await createUniqueAdminOrderIdentity(env);
+  const accessToken = `${crypto.randomUUID()}-${crypto.randomUUID()}`;
+  const order = {
+    id: identity.id,
+    publicReference: identity.publicReference,
+    accessTokenHash: await sha256(accessToken),
+    status: "submitted",
+    approvalRequired: true,
+    proposalVersion: 1,
+    buyerAvatar: draft.buyerAvatar,
+    buyerContact: null,
+    buyerComment: null,
+    language: "FR",
+    frjMember: draft.frjMember,
+    sourceBackend: "d1-admin",
+    totalTtPed: totals.totalTtPed,
+    totalSalePed: totals.totalSalePed,
+    pricingStatus: totals.pricingStatus,
+    submitterHash: null,
+    clientCreatedAt: now,
+    eventActor: "admin",
+    eventDetails: { sourceBackend: "d1-admin", approvalRequired: true, proposalVersion: 1 }
+  };
+  await storePurchaseOrder(env, order, lines, "admin-created");
+  const discord = await synchronizeDiscordOrder(env, order.id);
+  return {
+    ok: true,
+    order: mapPublicOrder(order, lines),
+    accessToken,
+    trackingPath: `suivi-commande.html?token=${encodeURIComponent(accessToken)}`,
+    discord: publicDiscordResult(discord)
+  };
+}
+
+async function addAdminOrderItem(env, orderId, payload) {
+  if (!isCartEnabled(env)) throw new ApiError(503, "Transmission des paniers désactivée");
+  const requested = parseOrderValue(() => normalizeAdminOrderLine(payload));
+  const [orderResult, itemsResult] = await env.DB.batch([
+    env.DB.prepare(`
+      SELECT id, status, approval_required, proposal_version
+      FROM purchase_orders WHERE id = ?
+    `).bind(orderId),
+    env.DB.prepare(`
+      SELECT line_no, item_name, storage, aisle
+      FROM purchase_order_items WHERE order_id = ? ORDER BY line_no
+    `).bind(orderId)
+  ]);
+  const order = orderResult.results[0];
+  if (!order) throw new ApiError(404, "Demande introuvable");
+  if (!canReviseOrder(order.status, order.approval_required)) {
+    throw new ApiError(409, "Un article ne peut être ajouté qu'aux demandes À valider, Transmises ou Vues");
+  }
+  if (itemsResult.results.length >= 10) throw new ApiError(409, "La demande contient déjà le maximum de 10 articles");
+  const requestedKey = orderItemKey(requested);
+  if (itemsResult.results.some((item) => orderItemKey({
+    itemName: item.item_name,
+    storage: item.storage,
+    aisle: item.aisle
+  }) === requestedKey)) {
+    throw new ApiError(409, "Cet article est déjà présent : modifie sa ligne existante");
+  }
+  const catalog = await readAdminOrderCatalog(env);
+  const line = priceAdminOrderLines([requested], catalog.items)[0];
+  const lineNo = Math.max(0, ...itemsResult.results.map((item) => Number(item.line_no || 0))) + 1;
+  line.lineNo = lineNo;
+  const nextVersion = Number(order.proposal_version || 0) + 1;
+  await env.DB.batch([
+    env.DB.prepare(`
+      INSERT INTO purchase_order_items (
+        order_id, line_no, item_name, storage, aisle, quantity, stock_at_submission,
+        unit_tt_ped, markup_kind, markup_value, markup_display, unit_sale_ped,
+        line_tt_ped, line_sale_ped, price_status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      orderId, lineNo, line.itemName, line.storage, line.aisle, line.quantity,
+      line.stockAtSubmission, line.unitTtPed, line.markupKind, line.markupValue,
+      line.markupDisplay, line.unitSalePed, line.lineTtPed, line.lineSalePed, line.priceStatus
+    ),
+    env.DB.prepare(`
+      UPDATE purchase_orders
+      SET status = 'submitted', approval_required = 1,
+          proposal_version = proposal_version + 1,
+          total_tt_ped = (SELECT ROUND(COALESCE(SUM(line_tt_ped), 0), 2) FROM purchase_order_items WHERE order_id = ?),
+          total_sale_ped = (SELECT ROUND(COALESCE(SUM(line_sale_ped), 0), 2) FROM purchase_order_items WHERE order_id = ?),
+          pricing_status = CASE WHEN EXISTS (
+            SELECT 1 FROM purchase_order_items WHERE order_id = ? AND price_status = 'to-confirm'
+          ) THEN 'to-confirm' ELSE 'estimated' END,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(orderId, orderId, orderId, orderId),
+    prepareOrderHistoryEvent(env, {
+      orderId,
+      action: "proposal-line-added",
+      actor: "admin",
+      details: { lineNo, itemName: line.itemName, proposalVersion: nextVersion }
+    })
+  ]);
+  const discord = await synchronizeDiscordOrder(env, orderId);
+  return {
+    ok: true,
+    status: "awaiting_approval",
+    proposalVersion: nextVersion,
+    line,
+    discord: publicDiscordResult(discord)
+  };
+}
+
+function priceAdminOrderLines(requestedItems, catalogItems) {
+  const catalog = new Map(catalogItems.map((item) => [orderItemKey(item), item]));
+  return requestedItems.map((requested, index) => {
+    const current = catalog.get(orderItemKey(requested));
+    if (!current) throw new ApiError(409, `Article indisponible : ${requested.itemName}`);
+    const revised = parseOrderValue(() => reviseOrderLine(
+      { itemName: current.itemName, unitTtPed: current.unitTtPed },
+      requested,
+      current.availableStock
+    ));
+    return {
+      lineNo: index + 1,
+      itemName: current.itemName,
+      storage: current.storage,
+      aisle: current.aisle,
+      unitTtPed: current.unitTtPed,
+      ...revised
+    };
+  });
+}
+
+function orderLineTotals(lines) {
+  return {
+    totalTtPed: roundOrderPed(lines.reduce((sum, line) => sum + line.lineTtPed, 0)),
+    totalSalePed: roundOrderPed(lines.reduce((sum, line) => sum + line.lineSalePed, 0)),
+    pricingStatus: lines.some((line) => line.priceStatus === "to-confirm") ? "to-confirm" : "estimated"
+  };
+}
+
+async function createUniqueAdminOrderIdentity(env) {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const id = crypto.randomUUID();
+    const publicReference = `FRJ-${currentParisDateKey()}-${id.replace(/-/g, "").slice(0, 6).toUpperCase()}`;
+    const existing = await env.DB.prepare(`SELECT id FROM purchase_orders WHERE public_reference = ?`)
+      .bind(publicReference).first();
+    if (!existing) return { id, publicReference };
+  }
+  throw new ApiError(503, "Impossible de générer une référence de demande unique");
+}
+
+function currentParisDateKey(date = new Date()) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("fr-FR", {
+    timeZone: "Europe/Paris",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date).map((part) => [part.type, part.value]));
+  return `${parts.year}${parts.month}${parts.day}`;
+}
+
+function roundOrderPed(value) {
+  return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 }
 
 async function readAdminOrders(env) {

@@ -2,6 +2,8 @@
 body { max-width: 1250px; margin: 0 auto; padding: 78px 18px 40px; box-sizing: border-box; }
     .orders-header { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
     .orders-header button { padding: 8px 13px; cursor: pointer; }
+    .orders-page-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+    .orders-page-actions button:disabled { cursor: wait; opacity: .6; }
     .orders-summary { margin: 8px 0 20px; color: #5e5547; }
     .orders-filters { display: flex; flex-wrap: wrap; gap: 7px 13px; margin: 8px 0 4px; padding: 10px 12px; border: 1px solid #d3c9b8; border-radius: 8px; background: rgba(255,253,247,.72); }
     .orders-filters-label { flex-basis: 100%; color: #5e5547; font-size: .82rem; font-weight: 700; }
@@ -57,11 +59,44 @@ body { max-width: 1250px; margin: 0 auto; padding: 78px 18px 40px; box-sizing: b
     .order-history-feedback.success { color: #287142; }
     .order-history-feedback.error, .order-history-message.error { color: #a02323; }
     .order-history-message { margin: 0; }
+    .new-order-panel { margin: 0 0 18px; padding: 16px; border: 2px solid #b89962; border-radius: 10px; background: #fffaf0; box-shadow: 0 3px 10px rgba(70,50,20,.1); }
+    .new-order-panel h2 { margin: 0 0 6px; }
+    .new-order-intro { margin: 0 0 14px; color: #675e51; }
+    .new-order-identity { display: grid; grid-template-columns: repeat(2, minmax(180px, 1fr)); gap: 10px 16px; align-items: end; }
+    .new-order-identity label { display: grid; gap: 5px; font-weight: 700; }
+    .new-order-identity input, .new-order-identity select { min-width: 0; padding: 7px; }
+    .new-order-identity p { margin: 0; padding: 7px 0; }
+    .direct-order-lines { display: grid; gap: 10px; margin-top: 14px; }
+    .direct-order-line { display: grid; grid-template-columns: minmax(240px, 2.4fr) minmax(90px, .7fr) minmax(145px, 1fr) minmax(110px, .8fr) auto; gap: 8px; align-items: end; padding: 10px; border: 1px solid #d7ccb8; border-radius: 8px; background: #fff; }
+    .direct-order-line label { display: grid; gap: 4px; min-width: 0; font-size: .82rem; font-weight: 700; }
+    .direct-order-line select, .direct-order-line input { min-width: 0; padding: 7px; box-sizing: border-box; }
+    .direct-order-line .direct-markup-fields { display: grid; grid-template-columns: 70px minmax(70px, 1fr); gap: 5px; }
+    .direct-order-line-output { display: grid; gap: 3px; min-width: 105px; font-size: .8rem; }
+    .direct-order-line-output strong { font-size: .92rem; }
+    .direct-order-remove { padding: 7px 10px; border: 1px solid #a94b43; border-radius: 6px; color: #8c241d; background: #fff1ef; cursor: pointer; }
+    .new-order-toolbar, .new-order-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; }
+    .new-order-toolbar button, .new-order-actions button { padding: 8px 13px; }
+    .new-order-actions { justify-content: flex-end; }
+    .new-order-actions button[type="submit"] { border: 1px solid #735117; border-radius: 6px; background: #d5aa54; font-weight: 800; }
+    .new-order-actions .secondary { background: #f3eee5; }
+    .new-order-feedback { min-height: 1.2em; margin: 10px 0 0; color: #675e51; }
+    .new-order-feedback.error { color: #a02323; }
+    .new-order-result { margin-top: 14px; padding: 12px; border-radius: 8px; color: #185b32; background: #e1f3e6; }
+    .new-order-result p { margin: 0 0 7px; }
+    .new-order-result a { color: inherit; font-weight: 800; }
+    .order-add-item { margin-top: 12px; padding-top: 12px; border-top: 1px dashed #c9bfae; }
+    .order-add-item-toggle { padding: 7px 11px; border: 1px solid #55708d; border-radius: 6px; background: #e8f0f7; cursor: pointer; font-weight: 700; }
+    .order-add-item-form { display: grid; gap: 9px; margin-top: 9px; }
+    .order-add-item-actions { display: flex; justify-content: flex-end; gap: 8px; }
+    .order-add-item-actions button { padding: 7px 11px; }
     .orders-error { color: #a02323; white-space: pre-line; }
     @media (max-width: 650px) {
       body { padding-top: 125px; }
       .order-card { overflow-x: auto; }
       .orders-header { align-items: flex-start; }
+      .orders-page-actions { flex-direction: column; }
+      .new-order-identity { grid-template-columns: 1fr; }
+      .direct-order-line { grid-template-columns: 1fr; }
       .order-card header { align-items: stretch; flex-direction: column; }
       .order-header-actions, .order-tracking-control { justify-items: stretch; }
       .order-tracking-feedback { max-width: none; text-align: left; }
