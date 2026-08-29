@@ -27,6 +27,9 @@ d.9/ GAS et D1  ==> je voudrais implémenter un système de "Promotions" quotidi
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
 
+29/08/2026 = Correctif suivi client post-d.5 — unicité d'une demande rouverte.
+Réalisation : une demande peut disposer de plusieurs liens de suivi secondaires, donc de plusieurs jetons valides. La liste locale du panier ne se contente plus de dédupliquer les entrées par jeton : elle utilise prioritairement la référence publique de la demande. Rouvrir une même demande avec un autre lien remplace son ancienne entrée par le lien courant au lieu d'ajouter un doublon ; les doublons déjà présents pour cette référence sont également nettoyés. Les demandes dépourvues de référence restent identifiées par leur jeton. Le dernier suivi mémorisé est actualisé avec le lien rouvert. Les 177 tests réussissent ; aucun changement Worker, D1 ou GAS n'est nécessaire.
+
 29/08/2026 = Correctif interface post-d.12 — fermeture du formulaire d'ajout d'article.
 Réalisation : dans une demande existante, les boutons 'Masquer l'ajout' et 'Annuler' positionnaient correctement l'état masqué en JavaScript, mais la règle CSS imposant l'affichage en grille pouvait continuer à rendre le formulaire visible. Une règle explicite et prioritaire masque maintenant le formulaire lorsqu'il porte l'attribut 'hidden'. Les deux parcours de fermeture sont couverts par le test de page et la feuille de styles est versionnée pour invalider le cache du navigateur. Les 177 tests du projet réussissent ; aucun changement Worker, D1 ou GAS n'est nécessaire.
 

@@ -623,7 +623,7 @@
   }
 
   function mergeRequests(...groups) {
-    const byToken = new Map();
+    const byRequest = new Map();
     groups.flat().forEach((request) => {
       const accessToken = String(request?.accessToken || "");
       if (!/^[a-f0-9-]{70,80}$/i.test(accessToken)) return;
@@ -635,12 +635,20 @@
         updatedAt: String(request.updatedAt || ""),
         status: String(request.status || "")
       };
-      const existing = byToken.get(accessToken);
-      if (!existing || Date.parse(normalized.updatedAt || normalized.submittedAt || 0) >= Date.parse(existing.updatedAt || existing.submittedAt || 0)) {
-        byToken.set(accessToken, normalized);
+      const normalizedReference = normalized.reference.toLocaleUpperCase("en-US");
+      const requestKey = normalizedReference ? `reference:${normalizedReference}` : `token:${accessToken}`;
+      const existing = byRequest.get(requestKey);
+      const normalizedTime = Date.parse(normalized.updatedAt || normalized.submittedAt || 0);
+      const existingTime = Date.parse(existing?.updatedAt || existing?.submittedAt || 0);
+      if (
+        !existing
+        || normalizedTime > existingTime
+        || (normalizedTime === existingTime && existing.backend === "gas" && normalized.backend === "d1")
+      ) {
+        byRequest.set(requestKey, normalized);
       }
     });
-    const sorted = [...byToken.values()]
+    const sorted = [...byRequest.values()]
       .sort((left, right) => Date.parse(right.submittedAt || 0) - Date.parse(left.submittedAt || 0));
     const active = sorted.filter((request) => !CLOSED_REQUEST_STATUSES.has(request.status));
     const closed = sorted.filter((request) => CLOSED_REQUEST_STATUSES.has(request.status))

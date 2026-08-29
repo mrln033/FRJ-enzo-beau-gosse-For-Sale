@@ -94,10 +94,16 @@
         updatedAt: String(order.updatedAt || ""),
         status: String(order.status || "submitted")
       };
+      const currentReference = current.reference.trim().toLocaleUpperCase("en-US");
       global.localStorage.setItem(REQUESTS_KEY, JSON.stringify([
         current,
-        ...requests.filter((request) => request?.accessToken !== token)
+        ...requests.filter((request) => {
+          if (request?.accessToken === token) return false;
+          const reference = String(request?.reference || "").trim().toLocaleUpperCase("en-US");
+          return !currentReference || reference !== currentReference;
+        })
       ]));
+      global.localStorage.setItem("FRJ_LAST_PURCHASE_REQUEST", JSON.stringify(current));
     } catch {
       // Le suivi reste utilisable même si le stockage local est bloqué.
     }

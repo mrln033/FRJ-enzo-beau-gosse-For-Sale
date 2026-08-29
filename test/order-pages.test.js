@@ -519,14 +519,26 @@ test("d.12 ajoute un article à une proposition existante", async () => {
   assert.equal(body.markupAmount, 1.25);
 });
 
-test("le suivi public rend une demande et la mémorise localement", async () => {
+test("le suivi public rend une demande et la mémorise une seule fois malgré plusieurs liens", async () => {
   const token = "a".repeat(72);
   const ids = ["catalogReturnLink", "catalogLink", "pageTitle", "pageSubtitle", "trackingContent"];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id)]));
   const otherHiddenToken = "b".repeat(72);
+  const duplicateToken = "c".repeat(72);
+  const otherRequestToken = "d".repeat(72);
   const storage = createStorage({
     lang: "EN",
-    FRJ_HIDDEN_PURCHASE_REQUESTS_V1: JSON.stringify([otherHiddenToken, token])
+    FRJ_HIDDEN_PURCHASE_REQUESTS_V1: JSON.stringify([otherHiddenToken, token]),
+    FRJ_PURCHASE_REQUESTS_V1: JSON.stringify([
+      {
+        reference: "FRJ-20260820-ABC123", accessToken: duplicateToken, backend: "d1",
+        submittedAt: "2026-08-20T10:00:00Z", updatedAt: "2026-08-20T11:00:00Z", status: "submitted"
+      },
+      {
+        reference: "FRJ-20260819-OTHER1", accessToken: otherRequestToken, backend: "d1",
+        submittedAt: "2026-08-19T10:00:00Z", updatedAt: "2026-08-19T11:00:00Z", status: "viewed"
+      }
+    ])
   });
   const document = {
     hidden: false,
@@ -578,8 +590,11 @@ test("le suivi public rend une demande et la mémorise localement", async () => 
   assert.equal(note.textContent, "The prices in this request are confirmed. Stock is not reserved by this request.");
   assert.equal(document.documentElement.lang, "en");
   const remembered = JSON.parse(storage.getItem("FRJ_PURCHASE_REQUESTS_V1"));
+  assert.equal(remembered.length, 2);
   assert.equal(remembered[0].accessToken, token);
   assert.equal(remembered[0].status, "submitted");
+  assert.equal(remembered.filter((request) => request.reference === order.publicReference).length, 1);
+  assert.equal(JSON.parse(storage.getItem("FRJ_LAST_PURCHASE_REQUEST")).accessToken, token);
   assert.deepEqual(JSON.parse(storage.getItem("FRJ_HIDDEN_PURCHASE_REQUESTS_V1")), [otherHiddenToken]);
 });
 
