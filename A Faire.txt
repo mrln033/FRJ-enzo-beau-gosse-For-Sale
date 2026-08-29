@@ -14,10 +14,12 @@ Ordre recommandé déjà réalisé et validé : d.1 -> d.2 -> d.3 -> d.7 -> d.8 
 La demande d.13 est terminée et déployée : compteur public discret, suivi anonyme partagé et statistiques détaillées réservées à l'administration.
 
 Les demandes encore ouvertes sont d.4, d.9 et d.12. Leur priorité devra être réévaluée avant la prochaine réalisation.
+D.4 est mise en attente à la demande du 29/08/2026 : son périmètre doit être mieux cadré avant toute analyse définitive ou implémentation.
 
 -------------------------------
 DEMANDES  => CE QUI EST A FAIRE
 
+[EN ATTENTE DE CADRAGE]
 d.4/ Console Admin "Demandes d'Achat" ==> ajouter un bouton 'Supprimer' à chaque demande avec message de confirmation. Celà supprimerais l'enregistrement complet dans D1. Propagation Discord avec modification du statut en 'SUPPRIMEE' pour archivage.
 
 d.9/ GAS et D1  ==> je voudrais implémenter un système de "Promotions" quotidiennes (concernant un couple CATEGORIE/RAYON pour une date) et de "Soldes" (concernant tous les articles sur une période). Bien sur, les 2 ne peuvent pas être appliqués ensemble, du moins ne pas se cumuler : un Solde oblitère une Promotion si ça se chevauche. Il faudrait je pense une table dédiée pour les 'Promotions' et peut etre une également pour les 'Soldes'. 'Promotions' contiendrait : une date (de la promotion), Catégorie, Rayon, Taux applicable. La table Solde contiendrait : Date de début, Date de fin, Taux applicable). Les tuiles d'article aurait une 'étiquette' 'Promo' dans un coin (il y a un fichier déjà présent dans ./img/storage/Sticker Promo.png , mais j'aimerai que le taux appliqués soit également indiqué sur ce sticker), et afficherait le MU / Prix de vente 'normal' barré suivi du MU / Prix de vente remisés. Coté GAS, j'ai déjà ajouté une colonne Remise_Promo censée indiquer le taux aappliqué à l'article. Actuellement, ce taux est récupéré dans ma feuille 'PROMOS' non exploitée'. J'ai également ajouté une formule dans la dernière colonne (sans nom pour l'instant) pour m'assurer que le calcul fonctionne. Le but final serait d'automatiser (par un choix aléatoire) la 'classe' (CATEGORIE+RAYON) à remiser chaque jour, avec un taux par défaut défini (5% par exemple) qui serait modifiable via HTML+JS. Il faut donc prévoir cette fonctionnalité qui doit tourner des 2 côté (GAS et D1) à l'identique ! FAIT MOI UNE ANALYSE/ETUDE DE LA MISE EN PLACE ET UNE PROPOSITION REALISABLE.
