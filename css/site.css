@@ -333,7 +333,7 @@ html[data-frj-backend="d1"] .backend-status-dot {
   background: url("../img/storage/Sticker Solde - EN.png") center/contain no-repeat;
 }
 .promo-sticker span {
-  color: #4e4e4e; font-weight: 800; font-size: 1rem;
+  color: #3c3a3a; font-weight: 800; font-size: 1rem;
   text-shadow: 0 1px 3px #000; transform: rotate(10deg);
 }
 .MU-style del, #calcSell del { opacity: .65; margin-right: 4px; }
