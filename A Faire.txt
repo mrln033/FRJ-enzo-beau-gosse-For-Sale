@@ -25,6 +25,9 @@ d.4/ Console Admin "Demandes d'Achat" ==> ajouter un bouton 'Supprimer' à chaqu
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
 
+30/08/2026 = Correctif Admin post-d.9 — campagnes passées en lecture seule.
+Réalisation : dans 'Admin > Promotions et soldes', seules les campagnes du jour ou futures peuvent désormais être modifiées. Une période de soldes en cours reste modifiable jusqu'à sa date de fin ; dès le lendemain de cette date, elle devient historique. Le Worker calcule cet état selon la date métier Europe/Paris, l'expose à l'interface et refuse avec une erreur de conflit toute tentative directe de modifier une campagne terminée. L'interface désactive ses dates, couple, taux, activation et bouton d'enregistrement, puis l'identifie explicitement comme 'terminée — lecture seule'. Les versions du contrôleur et de la feuille de style sont renouvelées pour invalider le cache navigateur. Les 203 tests réussissent, le dry-run Wrangler est valide et le Worker est publié sous la version 'dd917979-c4cc-4563-9c07-5d92e32c105b'.
+
 30/08/2026 = Correctif d'affichage post-d.9 — géométrie historique des tuiles.
 Réalisation : la règle ajoutée pour ancrer le sticker promotionnel redéfinissait par erreur '.card-front' en 'position: relative', écrasant son positionnement absolu historique. La face avant participait alors au flux Flex, se rétrécissait selon son contenu et changeait indirectement la largeur de l'image, les retours à la ligne ainsi que le repère du bouton de calcul. Cette redéfinition est retirée : le sticker reste correctement ancré sur la face avant, qui remplit à nouveau exactement la tuile comme avant d.9. Aucune dimension ni taille de police historique n'est modifiée. Un test interdit le retour de cette surcharge et vérifie le positionnement absolu partagé des faces avant et arrière. La version de la feuille CSS du catalogue est renouvelée pour invalider le cache navigateur.
 

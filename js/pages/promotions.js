@@ -62,6 +62,7 @@
   function render() {
     const host = $("#discountCampaigns"); host.replaceChildren(...state.campaigns.map((campaign) => {
       const row=document.createElement("div"); row.className=`discount-row ${campaign.type}`;
+      const editable=campaign.editable === true; row.classList.toggle("past", !editable);
       const type=document.createElement("strong"); type.textContent=campaign.type === "sale" ? "Soldes" : "Promotion";
       const first=document.createElement("input"); first.type="date"; first.value=campaign.startsOn;
       let second;
@@ -87,7 +88,10 @@
       })), "Campagne modifiée."));
       const label=document.createElement("span"); label.append(type, document.createElement("br"));
       const meta=document.createElement("span"); meta.className="discount-origin";
-      meta.textContent=campaign.type==="daily_promo"?`${campaign.storage} — ${campaign.aisle} · ${campaign.origin}`:campaign.origin; label.append(meta);
+      meta.textContent=(campaign.type==="daily_promo"?`${campaign.storage} — ${campaign.aisle} · ${campaign.origin}`:campaign.origin)
+        + (editable ? "" : " · terminée — lecture seule"); label.append(meta);
+      [first,second,rate,enabled,save].forEach((control) => { control.disabled=!editable; });
+      if (!editable) { save.textContent="Lecture seule"; row.title="Cette campagne passée ne peut plus être modifiée"; }
       row.append(label,first,second,rate,enabled,save); return row;
     }));
   }

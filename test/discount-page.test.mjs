@@ -17,6 +17,8 @@ test("d.9 fournit une page Admin séparée pour promotions et soldes", () => {
   assert.doesNotMatch(html, /<script>(?:.|\n)*<\/script>/);
   assert.match(controller, /\/admin\/discounts\/generate/);
   assert.match(controller, /\/admin\/discounts\/campaigns/);
+  assert.match(controller, /campaign\.editable === true/);
+  assert.match(controller, /terminée — lecture seule/);
   assert.match(menu, /section: "discounts"/);
   assert.match(menu, /pathname\.includes\("promotions"\)/);
 });

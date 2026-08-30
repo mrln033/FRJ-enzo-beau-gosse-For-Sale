@@ -124,6 +124,20 @@ test("d.9.2 crée et modifie une promotion manuelle éligible", async () => {
   db.close();
 });
 
+test("une campagne passée est exposée en lecture seule et ne peut plus être modifiée", async () => {
+  const db = setup();
+  const env = { DB: makeD1(db) };
+  const administration = await (await handleAdminGet(new URL("https://api.example/admin/discounts"), env)).json();
+  const legacy = administration.campaigns.find((campaign) => campaign.id === "legacy-promo-1");
+  assert.equal(legacy.editable, false);
+  await assert.rejects(
+    () => post(env, "/admin/discounts/campaigns/legacy-promo-1", { discountRate: 0.09 }),
+    /terminée.*lecture seule/
+  );
+  assert.equal(db.prepare("SELECT discount_rate FROM discount_campaigns WHERE id = 'legacy-promo-1'").get().discount_rate, 0.05);
+  db.close();
+});
+
 test("d.9.2 refuse couple inéligible, répétition et soldes chevauchantes", async () => {
   const db = setup();
   const env = { DB: makeD1(db) };

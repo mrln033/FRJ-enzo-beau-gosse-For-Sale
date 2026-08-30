@@ -23,9 +23,13 @@ export async function readDiscountAdministration(env) {
     `).all(),
     readAllPromotableItems(env)
   ]);
+  const businessDate = businessDateInParis();
   return {
     config: mapDiscountConfig(config),
-    campaigns: campaigns.results.map(mapDiscountCampaign),
+    campaigns: campaigns.results.map((row) => {
+      const campaign = mapDiscountCampaign(row);
+      return { ...campaign, editable: campaign.endsOn >= businessDate };
+    }),
     eligiblePairs: collectEligiblePromotionPairs(items).map(({ storage, aisle, promotableItems }) => ({
       storage, aisle, promotableItems
     }))
@@ -66,6 +70,9 @@ export async function createDiscountCampaign(env, payload) {
 export async function updateDiscountCampaign(env, id, payload) {
   const existing = await readCampaign(env, id);
   if (!existing) throw new ApiError(404, "Campagne de remise introuvable");
+  if (existing.endsOn < businessDateInParis()) {
+    throw new ApiError(409, "Une campagne terminée est conservée en lecture seule");
+  }
   if (payload?.type && normalizeCampaignType(payload.type) !== existing.type) {
     throw new ApiError(400, "Le type d'une campagne ne peut pas être modifié");
   }

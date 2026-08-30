@@ -8,6 +8,8 @@
 .discounts-admin input, .discounts-admin select, .discounts-admin button { padding:8px; }
 .discount-row { display:grid; grid-template-columns:1.1fr 1fr 1fr .65fr auto auto; gap:8px; align-items:center; padding:9px 0; border-top:1px solid #eee; }
 .discount-row.sale { grid-template-columns:1.1fr 1fr 1fr .65fr auto auto; }
+.discount-row.past { opacity:.68; }
+.discount-row.past input, .discount-row.past select, .discount-row.past button { cursor:not-allowed; }
 .discount-origin { color:#666; font-size:.85rem; }
 #discountStatus.error { color:#b00020; }
 @media (max-width:800px) { .discount-row, .discount-row.sale { grid-template-columns:1fr 1fr; } }
