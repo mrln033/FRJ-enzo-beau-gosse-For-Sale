@@ -25,6 +25,8 @@ test("d.9 fournit une page Admin séparée pour promotions et soldes", () => {
 
 test("d.9 affiche la remise et la transmet avec le panier", () => {
   assert.match(styles, /Sticker Promo\.png/);
+  assert.match(styles, /Sticker Solde\.png/);
+  assert.match(catalog, /promo-sticker \$\{item\.REMISE_TYPE === "sale" \? "sale" : "daily-promo"\}/);
   assert.match(styles, /\.card-front,\s*\r?\n\.card-back\s*{\s*\r?\n\s*position:\s*absolute/);
   assert.doesNotMatch(styles, /\.card-front\s*{\s*position:\s*relative/);
   assert.match(catalog, /applyItemDiscountToMU/);
