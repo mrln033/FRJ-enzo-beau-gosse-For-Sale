@@ -697,7 +697,7 @@ function applyItemDiscountToMU(muStr, item) {
 			
 			card.innerHTML = `
 				<div class="card-front">
-					${getItemDiscountRate(item) ? `<div class="promo-sticker ${item.REMISE_TYPE === "sale" ? "sale" : "daily-promo"}" aria-label="${item.REMISE_TYPE === "sale" ? (currentLang === "FR" ? "Soldes" : "Sale") : (currentLang === "FR" ? "Promotion" : "Promotion")} -${Math.round(getItemDiscountRate(item) * 100)} %"><span>-${Math.round(getItemDiscountRate(item) * 100)}%</span></div>` : ""}
+					${getItemDiscountRate(item) ? `<div class="promo-sticker ${item.REMISE_TYPE === "sale" ? "sale" : "daily-promo"} ${currentLang === "FR" ? "fr" : "en"}" aria-label="${item.REMISE_TYPE === "sale" ? (currentLang === "FR" ? "Soldes" : "Sale") : (currentLang === "FR" ? "Promotion" : "Promotion")} -${Math.round(getItemDiscountRate(item) * 100)} %"><span>-${Math.round(getItemDiscountRate(item) * 100)}%</span></div>` : ""}
 					${imgHTML}
 					<h3>${itemTitle}</h3>
 					${rayonHTML}

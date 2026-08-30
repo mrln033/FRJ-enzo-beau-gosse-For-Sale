@@ -320,11 +320,17 @@ html[data-frj-backend="d1"] .backend-status-dot {
   width: 78px; height: 78px;
   display: grid; place-items: center; pointer-events: none;
 }
-.promo-sticker.daily-promo {
-  background: url("../img/storage/Sticker Promo.png") center/contain no-repeat;
+.promo-sticker.daily-promo.fr {
+  background: url("../img/storage/Sticker Promo - FR.png") center/contain no-repeat;
 }
-.promo-sticker.sale {
-  background: url("../img/storage/Sticker Solde.png") center/contain no-repeat;
+.promo-sticker.daily-promo.en {
+  background: url("../img/storage/Sticker Promo - EN.png") center/contain no-repeat;
+}
+.promo-sticker.sale.fr {
+  background: url("../img/storage/Sticker Solde - FR.png") center/contain no-repeat;
+}
+.promo-sticker.sale.en {
+  background: url("../img/storage/Sticker Solde - EN.png") center/contain no-repeat;
 }
 .promo-sticker span {
   color: #b8b8b8; font-weight: 800; font-size: 1rem;

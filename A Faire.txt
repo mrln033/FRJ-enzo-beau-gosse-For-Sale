@@ -25,6 +25,9 @@ d.4/ Console Admin "Demandes d'Achat" ==> ajouter un bouton 'Supprimer' à chaqu
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
 
+30/08/2026 = Correctif visuel post-d.9 — stickers bilingues selon la campagne.
+Réalisation : les quatre illustrations fournies sont sélectionnées selon le type de campagne et la langue active : 'Sticker Promo - FR.png', 'Sticker Promo - EN.png', 'Sticker Solde - FR.png' ou 'Sticker Solde - EN.png'. Le changement FR/EN réutilise le nouveau rendu existant du catalogue et remplace donc immédiatement le sticker. Le taux, les dimensions et le positionnement restent inchangés. Les versions du contrôleur et de la feuille CSS sont renouvelées pour invalider le cache navigateur.
+
 30/08/2026 = Correctif visuel post-d.9 — sticker adapté au type de campagne.
 Réalisation : le catalogue associe désormais explicitement le fichier 'Sticker Promo.png' aux promotions quotidiennes et 'Sticker Solde.png' aux périodes de soldes. Le taux, les dimensions et le positionnement restent identiques dans les deux cas. Les versions du contrôleur et de la feuille CSS du catalogue sont renouvelées pour invalider le cache navigateur.
 
