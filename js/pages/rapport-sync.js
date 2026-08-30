@@ -49,6 +49,8 @@
       catalog: "Catalogue",
       mu: "MU",
       containers: "Configuration des conteneurs",
+      discounts: "Promotions et soldes",
+      "discount-config": "Configuration des promotions",
       "inventory:enzo": "Inventaire Enzo",
       "inventory:arkaman": "Inventaire ArkaMan",
       "inventory:kenza": "Inventaire Kenza",

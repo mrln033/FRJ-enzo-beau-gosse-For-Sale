@@ -65,6 +65,19 @@ test("protège les statistiques détaillées des visites", async () => {
   assert.deepEqual(await response.json(), { error: "Unauthorized" });
 });
 
+test("protège aussi la gestion des promotions et soldes", async () => {
+  for (const request of [
+    new Request("https://api.example/admin/discounts", { headers: { Origin: "https://mrln033.github.io" } }),
+    new Request("https://api.example/admin/discounts/campaigns", {
+      method: "POST", headers: { Origin: "https://mrln033.github.io" }
+    })
+  ]) {
+    const response = await worker.fetch(request, {});
+    assert.equal(response.status, 401);
+    assert.deepEqual(await response.json(), { error: "Unauthorized" });
+  }
+});
+
 test("refuse l'enregistrement public d'une visite depuis une origine inconnue", async () => {
   const request = new Request("https://api.example/visits", {
     method: "POST",

@@ -3,6 +3,8 @@ import {
   catalogContentHash,
   catalogRowsWithKeys,
   containerContentHash,
+  discountCampaignContentHash,
+  discountConfigContentHash,
   inventoryContentHash,
   inventoryRowsWithKeys,
   mapCatalogDbRow,
@@ -30,6 +32,14 @@ import {
 } from "./orders.js";
 import { sendOrUpdateDiscordOrder } from "./discord.js";
 import { diffContainerConfig, mapContainerConfigRow, normalizeContainerConfigPayload } from "./containers.js";
+import { businessDateInParis } from "./discounts.js";
+import {
+  createDiscountCampaign,
+  generateDailyPromotion,
+  readDiscountAdministration,
+  updateDiscountCampaign,
+  updateDiscountConfig
+} from "./discount-admin.js";
 import {
   isVisibleOrderHistoryAction,
   mapOrderHistoryEvent,
@@ -114,6 +124,7 @@ export async function handleGet(url, env) {
   const category = String(url.searchParams.get("category") || "").trim().toUpperCase();
   if (!category) return publicJson([]);
 
+  const businessDate = businessDateInParis();
   const result = await env.DB.prepare(`
     SELECT
       l.storage AS STORAGE,
@@ -125,7 +136,11 @@ export async function handleGet(url, env) {
       c.wiki_url AS LIEN_WIKI,
       mo.observed_at AS DATE_MU_ISO,
       mo.weighted_display AS MU,
-      COALESCE(p.discount_rate, '') AS Remise_Promo
+      COALESCE(s.discount_rate, p.discount_rate, '') AS Remise_Promo,
+      COALESCE(s.campaign_type, p.campaign_type, '') AS REMISE_TYPE,
+      COALESCE(s.id, p.id, '') AS REMISE_ID,
+      COALESCE(s.starts_on, p.starts_on, '') AS REMISE_DEBUT,
+      COALESCE(s.ends_on, p.ends_on, '') AS REMISE_FIN
     FROM catalog_listings l
     JOIN catalog_items c ON c.name = l.item_name COLLATE NOCASE
     JOIN saleable_inventory ii
@@ -134,18 +149,24 @@ export async function handleGet(url, env) {
     LEFT JOIN market_current mo
       ON mo.item_name = c.name COLLATE NOCASE
      AND datetime(mo.observed_at) >= datetime('now', '-7 days')
-    LEFT JOIN promotions p
-      ON p.promotion_date = date('now')
-      AND p.storage = l.storage
-      AND p.aisle = l.aisle
+    LEFT JOIN discount_campaigns s
+      ON s.campaign_type = 'sale' AND s.enabled = 1
+     AND ? BETWEEN s.starts_on AND s.ends_on
+    LEFT JOIN discount_campaigns p
+      ON p.campaign_type = 'daily_promo' AND p.enabled = 1
+     AND p.starts_on = ?
+     AND p.storage = l.storage
+     AND p.aisle = l.aisle
     WHERE l.enabled = 1
       AND l.storage = ? COLLATE NOCASE
     GROUP BY
       l.storage, l.aisle, c.name, c.unit_price_ped, c.image, c.wiki_url,
-      mo.observed_at, mo.weighted_display, p.discount_rate
+      mo.observed_at, mo.weighted_display,
+      s.discount_rate, s.campaign_type, s.id, s.starts_on, s.ends_on,
+      p.discount_rate, p.campaign_type, p.id, p.starts_on, p.ends_on
     HAVING SUM(ii.quantity) > 0
     ORDER BY c.name COLLATE NOCASE
-  `).bind(category).all();
+  `).bind(businessDate, businessDate, category).all();
 
   const rows = result.results.map(({ DATE_MU_ISO, ...row }) => ({
     ...row,
@@ -156,6 +177,9 @@ export async function handleGet(url, env) {
 }
 
 export async function handleAdminGet(url, env) {
+  if (url.pathname === "/admin/discounts") {
+    return json(await readDiscountAdministration(env));
+  }
   if (url.pathname === "/admin/orders") {
     return json(await readAdminOrders(env));
   }
@@ -459,6 +483,13 @@ export async function handleSyncGet(url, env) {
     return json(snapshot);
   }
 
+  if (url.pathname === "/sync/discounts") {
+    return json(await readDiscountSyncSnapshot(env, url.searchParams.get("hash")));
+  }
+  if (url.pathname === "/sync/discount-config") {
+    return json(await readDiscountConfigSyncSnapshot(env, url.searchParams.get("hash")));
+  }
+
   return json({ error: "Endpoint de synchronisation inconnu" }, 404);
 }
 
@@ -584,6 +615,15 @@ export async function handleSyncPost(request, url, env) {
       contentHash
     });
     return json({ ok: true, noChange: false, state: result.state, rowsWritten: result.rowsWritten });
+  }
+
+  if (url.pathname === "/sync/discounts") {
+    await assertExpectedHash(env, "discounts", expectedHash);
+    return json(await storeDiscountSyncSnapshot(env, payload));
+  }
+  if (url.pathname === "/sync/discount-config") {
+    await assertExpectedHash(env, "discount-config", expectedHash);
+    return json(await storeDiscountConfigSyncSnapshot(env, payload));
   }
 
   if (url.pathname === "/sync/ack") {
@@ -963,6 +1003,18 @@ async function storeCatalogSnapshot(env, options) {
   };
 }
 
+// Le cron doit publier le même signal de synchronisation qu'une génération
+// lancée depuis l'Admin. Sans cela, la campagne existerait dans D1 mais GAS ne
+// la découvrirait qu'au prochain audit complet.
+export async function handleScheduledDiscountGeneration(env) {
+  const result = await generateDailyPromotion(env);
+  if (result.reason === "GENERATED") {
+    await readDiscountSyncSnapshot(env);
+    await notifyGasDataChanged(env, "discounts", "generation-promotion-planifiee-d1");
+  }
+  return result;
+}
+
 async function storeContainerSnapshot(env, options) {
   const importedAt = new Date().toISOString();
   const importId = crypto.randomUUID();
@@ -1156,6 +1208,78 @@ async function readContainerSnapshot(env, requestedHash = null) {
   return { state, rows };
 }
 
+async function readDiscountSyncSnapshot(env, requestedHash = null) {
+  if (requestedHash) return readBaselineSnapshot(env, "discounts", requestedHash);
+  const result = await env.DB.prepare(`SELECT id, campaign_type, starts_on, ends_on, storage, aisle,
+    discount_rate, enabled, origin, eligible_pair_count, candidate_pair_count, updated_at
+    FROM discount_campaigns ORDER BY id`).all();
+  const rows = result.results.map((row) => ({
+    id: row.id, type: row.campaign_type, startsOn: row.starts_on, endsOn: row.ends_on,
+    storage: row.storage, aisle: row.aisle, discountRate: Number(row.discount_rate), enabled: Number(row.enabled) === 1,
+    origin: row.origin, eligiblePairCount: row.eligible_pair_count == null ? null : Number(row.eligible_pair_count),
+    candidatePairCount: row.candidate_pair_count == null ? null : Number(row.candidate_pair_count),
+    updatedAt: normalizeSyncTimestamp(row.updated_at)
+  }));
+  const hash = await discountCampaignContentHash(rows);
+  let state = await readStoredSyncState(env, "discounts");
+  if (!state) state = await bootstrapCurrentState(env, "discounts", rows, hash, "d1-seed");
+  else if (state.hash !== hash || state.rowCount !== rows.length) {
+    state = { dataset: "discounts", hash, updatedAt: new Date().toISOString(), origin: "d1", importId: `current:${crypto.randomUUID()}`, rowCount: rows.length };
+    await syncStateStatement(env, { datasetKey: state.dataset, hash, updatedAt: state.updatedAt, origin: state.origin, importId: state.importId, rowCount: rows.length }).run();
+  }
+  return { state, rows };
+}
+
+async function readDiscountConfigSyncSnapshot(env, requestedHash = null) {
+  if (requestedHash) return readBaselineSnapshot(env, "discount-config", requestedHash);
+  const row = await env.DB.prepare(`SELECT automatic_promotions_enabled, default_promotion_rate, selection_seed, updated_at
+    FROM discount_config WHERE singleton = 1`).first();
+  const rows = [{ id: "config", automaticPromotionsEnabled: Number(row.automatic_promotions_enabled) === 1,
+    defaultPromotionRate: Number(row.default_promotion_rate), selectionSeed: row.selection_seed,
+    updatedAt: normalizeSyncTimestamp(row.updated_at) }];
+  const hash = await discountConfigContentHash(rows);
+  let state = await readStoredSyncState(env, "discount-config");
+  if (!state) state = await bootstrapCurrentState(env, "discount-config", rows, hash, "d1-seed", rows[0].updatedAt);
+  else if (state.hash !== hash) {
+    state = { dataset: "discount-config", hash, updatedAt: rows[0].updatedAt, origin: "d1", importId: `current:${crypto.randomUUID()}`, rowCount: 1 };
+    await syncStateStatement(env, { datasetKey: state.dataset, hash, updatedAt: state.updatedAt, origin: state.origin, importId: state.importId, rowCount: 1 }).run();
+  }
+  return { state, rows };
+}
+
+async function storeDiscountSyncSnapshot(env, payload) {
+  const rows = Array.isArray(payload.rows) ? payload.rows : [];
+  const updatedAt = normalizeSyncTimestamp(payload.updatedAt);
+  const hash = await discountCampaignContentHash(rows);
+  const statements = [env.DB.prepare(`DELETE FROM discount_campaigns`)];
+  rows.forEach((row) => statements.push(env.DB.prepare(`INSERT INTO discount_campaigns
+    (id,campaign_type,starts_on,ends_on,storage,aisle,discount_rate,enabled,origin,eligible_pair_count,candidate_pair_count,updated_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).bind(row.id,row.type,row.startsOn,row.endsOn,row.storage||null,row.aisle||null,
+      Number(row.discountRate),row.enabled?1:0,row.origin||"manual",row.eligiblePairCount??null,row.candidatePairCount??null,
+      normalizeSyncTimestamp(row.updatedAt))));
+  const state = { dataset:"discounts", hash, updatedAt, origin:"gas", importId:`sync:${crypto.randomUUID()}`, rowCount:rows.length };
+  statements.push(syncStateStatement(env,{datasetKey:state.dataset,hash,updatedAt,origin:"gas",importId:state.importId,rowCount:rows.length}));
+  statements.push(baselineStatement(env,state,rows));
+  await env.DB.batch(statements);
+  return { ok:true, noChange:false, state };
+}
+
+async function storeDiscountConfigSyncSnapshot(env, payload) {
+  const row = Array.isArray(payload.rows) ? payload.rows[0] : null;
+  if (!row) throw new ApiError(400,"Configuration des promotions absente");
+  const updatedAt = normalizeSyncTimestamp(payload.updatedAt);
+  const rows = [{...row,id:"config",updatedAt:normalizeSyncTimestamp(row.updatedAt)}];
+  const hash = await discountConfigContentHash(rows);
+  const state = { dataset:"discount-config",hash,updatedAt,origin:"gas",importId:`sync:${crypto.randomUUID()}`,rowCount:1 };
+  await env.DB.batch([
+    env.DB.prepare(`UPDATE discount_config SET automatic_promotions_enabled=?,default_promotion_rate=?,selection_seed=?,updated_at=? WHERE singleton=1`)
+      .bind(row.automaticPromotionsEnabled?1:0,Number(row.defaultPromotionRate),row.selectionSeed||"frj-daily-promo",rows[0].updatedAt),
+    syncStateStatement(env,{datasetKey:state.dataset,hash,updatedAt,origin:"gas",importId:state.importId,rowCount:1}),
+    baselineStatement(env,state,rows)
+  ]);
+  return {ok:true,noChange:false,state};
+}
+
 async function bootstrapCurrentState(env, datasetKey, rows, hash, origin, updatedAt = new Date().toISOString()) {
   const state = {
     dataset: datasetKey,
@@ -1213,6 +1337,8 @@ async function readCurrentDatasetSnapshot(env, datasetKey) {
   if (datasetKey === "catalog") return readCatalogSnapshot(env);
   if (datasetKey === "mu") return readMarketSnapshot(env);
   if (datasetKey === "containers") return readContainerSnapshot(env);
+  if (datasetKey === "discounts") return readDiscountSyncSnapshot(env);
+  if (datasetKey === "discount-config") return readDiscountConfigSyncSnapshot(env);
   return readInventorySnapshot(env, datasetKey.slice("inventory:".length));
 }
 
@@ -1257,12 +1383,16 @@ async function readAllSyncStates(env) {
   // dernière écriture de sync_state.
   const containerSnapshot = await readContainerSnapshot(env);
   if (containerSnapshot.state) states.containers = containerSnapshot.state;
+  states.discounts = (await readDiscountSyncSnapshot(env)).state;
+  states["discount-config"] = (await readDiscountConfigSyncSnapshot(env)).state;
 
   return states;
 }
 
 async function readSyncState(env, datasetKey) {
   if (datasetKey === "containers") return (await readContainerSnapshot(env)).state;
+  if (datasetKey === "discounts") return (await readDiscountSyncSnapshot(env)).state;
+  if (datasetKey === "discount-config") return (await readDiscountConfigSyncSnapshot(env)).state;
   const state = await readStoredSyncState(env, datasetKey);
   if (state) return state;
 
@@ -1568,6 +1698,42 @@ async function updateOrderProposal(env, orderId, requestedItems) {
 }
 
 export async function handleAdminPost(request, url, env) {
+  if (url.pathname === "/admin/discounts/generate") {
+    const payload = parseJsonBody(await readTextBody(request, 20_000));
+    const result = payload.date
+      ? await generateDailyPromotion(env, payload.date)
+      : await handleScheduledDiscountGeneration(env);
+    await readDiscountSyncSnapshot(env);
+    if (payload.date && result.reason === "GENERATED") {
+      await notifyGasDataChanged(env, "discounts", "generation-promotion-d1");
+    }
+    return json(result);
+  }
+  if (url.pathname === "/admin/discounts/config") {
+    const payload = parseJsonBody(await readTextBody(request, 20_000));
+    const result = await updateDiscountConfig(env, payload);
+    await readDiscountConfigSyncSnapshot(env);
+    await notifyGasDataChanged(env, "discount-config", "configuration-remises-d1");
+    return json(result);
+  }
+
+  if (url.pathname === "/admin/discounts/campaigns") {
+    const payload = parseJsonBody(await readTextBody(request, 20_000));
+    const result = await createDiscountCampaign(env, payload);
+    await readDiscountSyncSnapshot(env);
+    await notifyGasDataChanged(env, "discounts", "creation-campagne-d1");
+    return json(result, 201);
+  }
+
+  const discountCampaignMatch = url.pathname.match(/^\/admin\/discounts\/campaigns\/([a-z0-9_-]{1,180})$/i);
+  if (discountCampaignMatch) {
+    const payload = parseJsonBody(await readTextBody(request, 20_000));
+    const result = await updateDiscountCampaign(env, discountCampaignMatch[1], payload);
+    await readDiscountSyncSnapshot(env);
+    await notifyGasDataChanged(env, "discounts", "modification-campagne-d1");
+    return json(result);
+  }
+
   if (url.pathname === "/admin/containers") {
     const payload = parseJsonBody(await readTextBody(request, 100_000));
     return json(await updateContainerConfig(env, payload));
@@ -2035,6 +2201,7 @@ export async function handlePublicOrderPost(request, env) {
 
 async function readOrderCatalogRows(env, requestedItems) {
   const requestedJson = JSON.stringify(requestedItems);
+  const businessDate = businessDateInParis();
   const result = await env.DB.prepare(`
     WITH requested AS (
       SELECT
@@ -2055,7 +2222,10 @@ async function readOrderCatalogRows(env, requestedItems) {
       inventory.stock,
       c.unit_price_ped,
       CASE WHEN datetime(mc.observed_at) >= datetime('now', '-7 days') THEN mc.weighted_kind ELSE NULL END AS markup_kind,
-      CASE WHEN datetime(mc.observed_at) >= datetime('now', '-7 days') THEN mc.weighted_value ELSE NULL END AS markup_value
+       CASE WHEN datetime(mc.observed_at) >= datetime('now', '-7 days') THEN mc.weighted_value ELSE NULL END AS markup_value,
+       COALESCE(s.campaign_type, p.campaign_type) AS discount_kind,
+       COALESCE(s.id, p.id) AS discount_campaign_id,
+       COALESCE(s.discount_rate, p.discount_rate) AS discount_rate
     FROM requested r
     JOIN catalog_listings l
       ON l.item_name = r.item_name COLLATE NOCASE
@@ -2065,8 +2235,13 @@ async function readOrderCatalogRows(env, requestedItems) {
     JOIN catalog_items c ON c.name = l.item_name COLLATE NOCASE
     JOIN inventory ON inventory.item_name = c.name COLLATE NOCASE
     LEFT JOIN market_current mc ON mc.item_name = c.name COLLATE NOCASE
+    LEFT JOIN discount_campaigns s
+      ON s.campaign_type = 'sale' AND s.enabled = 1 AND ? BETWEEN s.starts_on AND s.ends_on
+    LEFT JOIN discount_campaigns p
+      ON p.campaign_type = 'daily_promo' AND p.enabled = 1 AND p.starts_on = ?
+     AND p.storage = l.storage AND p.aisle = l.aisle
     WHERE inventory.stock > 0
-  `).bind(requestedJson).all();
+  `).bind(requestedJson, businessDate, businessDate).all();
   return result.results.map((row) => ({
     itemName: row.item_name,
     storage: row.storage,
@@ -2074,7 +2249,10 @@ async function readOrderCatalogRows(env, requestedItems) {
     stock: Number(row.stock || 0),
     unitTtPed: Number(row.unit_price_ped || 0),
     markupKind: row.markup_kind || "none",
-    markupValue: row.markup_value === null || row.markup_value === undefined ? null : Number(row.markup_value)
+    markupValue: row.markup_value === null || row.markup_value === undefined ? null : Number(row.markup_value),
+    discountKind: row.discount_kind || null,
+    discountCampaignId: row.discount_campaign_id || null,
+    discountRate: row.discount_rate === null || row.discount_rate === undefined ? null : Number(row.discount_rate)
   }));
 }
 
@@ -2100,14 +2278,17 @@ async function storePurchaseOrder(env, order, items, eventAction, syncedEvent = 
       INSERT INTO purchase_order_items (
         order_id, line_no, item_name, storage, aisle, quantity, stock_at_submission,
         unit_tt_ped, markup_kind, markup_value, markup_display, unit_sale_ped,
-        line_tt_ped, line_sale_ped, price_status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        line_tt_ped, line_sale_ped, price_status, base_markup_kind, base_markup_value,
+        discount_campaign_id, discount_kind, discount_rate
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       order.id, Number(item.lineNo || index + 1), item.itemName, item.storage, item.aisle,
       Number(item.quantity), Number(item.stockAtSubmission), Number(item.unitTtPed),
       item.markupKind || "none", item.markupValue ?? null, item.markupDisplay || null,
       Number(item.unitSalePed), Number(item.lineTtPed), Number(item.lineSalePed),
-      item.priceStatus || "estimated"
+      item.priceStatus || "estimated", item.baseMarkupKind || item.markupKind || "none",
+      item.baseMarkupValue ?? item.markupValue ?? null, item.discountCampaignId || null,
+      item.discountKind || null, item.discountRate ?? null
     )),
     syncedEvent
       ? prepareSyncedOrderHistoryEvent(env, syncedEvent)
@@ -2775,7 +2956,12 @@ function mapOrderItem(item) {
     lineSalePed: Number(item.line_sale_ped ?? item.lineSalePed ?? 0),
     priceStatus: item.price_status || item.priceStatus || "estimated",
     markupKind: item.markup_kind || item.markupKind || "none",
-    markupValue: item.markup_value ?? item.markupValue ?? null
+    markupValue: item.markup_value ?? item.markupValue ?? null,
+    baseMarkupKind: item.base_markup_kind || item.baseMarkupKind || item.markup_kind || item.markupKind || "none",
+    baseMarkupValue: item.base_markup_value ?? item.baseMarkupValue ?? item.markup_value ?? item.markupValue ?? null,
+    discountCampaignId: item.discount_campaign_id || item.discountCampaignId || null,
+    discountKind: item.discount_kind || item.discountKind || null,
+    discountRate: item.discount_rate ?? item.discountRate ?? null
   };
 }
 

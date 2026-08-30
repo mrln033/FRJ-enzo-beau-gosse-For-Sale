@@ -7,6 +7,7 @@ Ce dossier contient la totalité du projet Apps Script autonome. Apps Script cha
 - `Code.gs` : `doGet` et répartition des écritures ;
 - `WebApp.gs` : `doPost` ;
 - `Catalog.gs` : catalogue, catégories et date d'inventaire ;
+- `Discounts.gs` et `DiscountSheets.gs` : règles, feuilles, génération et synchronisation des promotions et soldes ;
 - `Containers.gs` : configuration multi-avatar des conteneurs et formules de quantité ;
 - `Imports.gs` : imports MU et inventaires ;
 - `OrderHistory.gs` : modèle, capture et miroir de l'historique des demandes ;
@@ -45,4 +46,4 @@ Le dataset `containers` fait ensuite partie de la synchronisation bidirectionnel
 6. Mettre à jour le déploiement Web App existant avec son `deploymentId`, afin de conserver la même URL `/exec`.
 7. Cloner à nouveau le projet et comparer les empreintes des fichiers, puis tester les routes publiques sans écriture métier.
 
-Le déploiement de production actuel est la version 24. Son URL est référencée par `js/api-client.js` pour le secours des demandes et par le Worker pour la synchronisation ; elle doit rester stable.
+Le déploiement de production actuel est la version 25. Son URL est référencée par `js/api-client.js` pour le secours des demandes et par le Worker pour la synchronisation ; elle doit rester stable.

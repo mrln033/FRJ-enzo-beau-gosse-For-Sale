@@ -56,7 +56,31 @@ function getBDDAppData(category = null) {
     result.push(obj);
   }
 
-  return result;
+  return frjApplyDiscountsToCatalogRows_(result);
+}
+
+// Ajoute la campagne effective au contrat catalogue GAS. Une solde active est
+// prioritaire sur la promotion quotidienne, comme dans la requête D1.
+function frjApplyDiscountsToCatalogRows_(rows) {
+  if (typeof frjReadLocalDiscountCampaigns_ !== "function") return rows;
+  var date = Utilities.formatDate(new Date(), "Europe/Paris", "yyyy-MM-dd");
+  var campaigns = frjReadLocalDiscountCampaigns_().rows.filter(function(campaign) {
+    return campaign.enabled === true && campaign.startsOn <= date && campaign.endsOn >= date;
+  });
+  var sale = campaigns.find(function(campaign) { return campaign.type === "sale"; }) || null;
+  var promotions = {};
+  campaigns.filter(function(campaign) { return campaign.type === "daily_promo"; }).forEach(function(campaign) {
+    promotions[String(campaign.storage || "").toUpperCase() + "\u001f" + String(campaign.aisle || "").toUpperCase()] = campaign;
+  });
+  rows.forEach(function(row) {
+    var campaign = sale || promotions[String(row.STORAGE || "").toUpperCase() + "\u001f" + String(row.RAYON || "").toUpperCase()] || null;
+    row.Remise_Promo = campaign ? Number(campaign.discountRate) : "";
+    row.REMISE_TYPE = campaign ? campaign.type : "";
+    row.REMISE_ID = campaign ? campaign.id : "";
+    row.REMISE_DEBUT = campaign ? campaign.startsOn : "";
+    row.REMISE_FIN = campaign ? campaign.endsOn : "";
+  });
+  return rows;
 }
 
 function getDataFast(category) {

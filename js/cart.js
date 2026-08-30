@@ -107,6 +107,9 @@
       existing.markupKind = normalized.markupKind;
       existing.markupValue = normalized.markupValue;
       existing.markupDisplay = normalized.markupDisplay;
+      existing.discountKind = normalized.discountKind;
+      existing.discountCampaignId = normalized.discountCampaignId;
+      existing.discountRate = normalized.discountRate;
       existing.quantity = clampQuantity(existing.quantity + requestedQuantity, existing.stock);
     } else {
       cart.items.push({ ...normalized, key, quantity: requestedQuantity });
@@ -128,6 +131,9 @@
       markupKind: parsedMarkup.kind,
       markupValue: parsedMarkup.value,
       markupDisplay: String(item.MU || "").trim() || null,
+      discountKind: item.REMISE_TYPE === "sale" || item.REMISE_TYPE === "daily_promo" ? item.REMISE_TYPE : null,
+      discountCampaignId: String(item.REMISE_ID || "").trim() || null,
+      discountRate: Number(item.Remise_Promo) > 0 ? Number(item.Remise_Promo) : null,
       image: String(item.IMAGE || "").trim() || null,
       observedBackend: global.FRJ_API?.activeBackend || "gas"
     };
@@ -147,13 +153,13 @@
   }
 
   function effectiveMarkup(item) {
-    if (!isFrjMember() || !Number.isFinite(item.markupValue)) {
-      return { kind: item.markupKind, value: item.markupValue };
-    }
+    if (!Number.isFinite(item.markupValue)) return { kind: item.markupKind, value: item.markupValue };
+    const profileFactor = isFrjMember() ? 0.5 : 1;
+    const campaignFactor = Number.isFinite(item.discountRate) ? 1 - item.discountRate : 1;
     return item.markupKind === "percent"
-      ? { kind: "percent", value: 1 + ((item.markupValue - 1) / 2) }
+      ? { kind: "percent", value: 1 + ((item.markupValue - 1) * profileFactor * campaignFactor) }
       : (item.markupKind === "ped"
-        ? { kind: "ped", value: item.markupValue / 2 }
+        ? { kind: "ped", value: item.markupValue * profileFactor * campaignFactor }
         : { kind: "none", value: null });
   }
 
@@ -450,7 +456,10 @@
         quantity: item.quantity,
         unitTtPed: item.unitTtPed,
         markupKind: item.markupKind,
-        markupValue: item.markupValue
+        markupValue: item.markupValue,
+        discountKind: item.discountKind,
+        discountCampaignId: item.discountCampaignId,
+        discountRate: item.discountRate
       }))
     };
     try {
@@ -503,6 +512,9 @@
           ? Number(difference.markupValue)
           : null;
         item.markupDisplay = difference.markupDisplay || null;
+        item.discountKind = difference.discountKind || null;
+        item.discountCampaignId = difference.discountCampaignId || null;
+        item.discountRate = Number(difference.discountRate) > 0 ? Number(difference.discountRate) : null;
       }
     });
     cart.items = cart.items.filter((item) => item.stock > 0 && item.quantity > 0);

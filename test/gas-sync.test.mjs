@@ -6,6 +6,8 @@ import vm from "node:vm";
 import {
   catalogContentHash,
   containerContentHash,
+  discountCampaignContentHash,
+  discountConfigContentHash,
   inventoryContentHash,
   marketContentHash
 } from "../cloudflare/for-sale-api/src/sync.js";
@@ -46,6 +48,7 @@ const context = {
 vm.createContext(context);
 [
   "Containers.gs",
+  "DiscountSheets.gs",
   "SyncD1.gs",
   "SyncOrders.gs",
   "SyncEngine.gs",
@@ -98,6 +101,23 @@ test("GAS et Worker calculent la même empreinte de conteneurs", async () => {
   assert.equal(context.frjHashContainerConfig_(rows), await containerContentHash(rows));
 });
 
+test("GAS et Worker calculent la même empreinte des campagnes de remise", async () => {
+  const rows = [{
+    id: "daily-promo-2026-08-30", type: "daily_promo", startsOn: "2026-08-30", endsOn: "2026-08-30",
+    storage: "ARMORS", aisle: "PARTS", discountRate: 0.05, enabled: true, origin: "automatic",
+    eligiblePairCount: 8, candidatePairCount: 2, updatedAt: "2026-08-30T00:05:00.000Z"
+  }];
+  assert.equal(context.frjHashDiscountCampaigns_(rows), await discountCampaignContentHash(rows));
+});
+
+test("GAS et Worker calculent la même empreinte de configuration des remises", async () => {
+  const rows = [{
+    id: "config", automaticPromotionsEnabled: true, defaultPromotionRate: 0.05,
+    selectionSeed: "frj-daily-promo", updatedAt: "2026-08-30T00:00:00.000Z"
+  }];
+  assert.equal(context.frjHashDiscountConfig_(rows), await discountConfigContentHash(rows));
+});
+
 test("la fusion à trois voies conserve les changements indépendants", () => {
   const base = [
     { sourceId: "1", itemName: "A", quantity: 1 },
@@ -148,6 +168,11 @@ test("la fusion des conteneurs conserve les lignes absentes d'un seul côté", (
 
 test("le moteur GAS suit la configuration des conteneurs", () => {
   assert.equal(context.frjDatasetKeys_().includes("containers"), true);
+});
+
+test("le moteur GAS synchronise les campagnes et leur configuration", () => {
+  assert.equal(context.frjDatasetKeys_().includes("discounts"), true);
+  assert.equal(context.frjDatasetKeys_().includes("discount-config"), true);
 });
 
 test("une modification récente programme la synchronisation cinq minutes plus tard", () => {

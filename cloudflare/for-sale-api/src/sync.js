@@ -23,6 +23,23 @@ export async function containerContentHash(rows) {
   return sha256(canonicalContainerPayload(rows));
 }
 
+export async function discountCampaignContentHash(rows) {
+  return sha256(rows.map((row) => JSON.stringify([
+    cleanText(row.id), cleanText(row.type), cleanText(row.startsOn), cleanText(row.endsOn),
+    cleanText(row.storage), cleanText(row.aisle), cleanNumber(row.discountRate),
+    row.enabled === true || Number(row.enabled) === 1 ? "1" : "0", cleanText(row.origin || "manual"),
+    cleanNullableNumber(row.eligiblePairCount), cleanNullableNumber(row.candidatePairCount), cleanTimestamp(row.updatedAt)
+  ])).sort().join("\n"));
+}
+
+export async function discountConfigContentHash(rows) {
+  const row = rows[0] || {};
+  return sha256(JSON.stringify([
+    row.automaticPromotionsEnabled === true || Number(row.automaticPromotionsEnabled) === 1 ? "1" : "0",
+    cleanNumber(row.defaultPromotionRate), cleanText(row.selectionSeed || "frj-daily-promo"), cleanTimestamp(row.updatedAt)
+  ]));
+}
+
 export function shouldSignalSyncAfterImport(pairedBackend) {
   return String(pairedBackend || "").toLowerCase() !== "gas";
 }

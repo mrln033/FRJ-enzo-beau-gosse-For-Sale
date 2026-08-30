@@ -39,7 +39,7 @@ function frjRequestSynchronization_(reason, dataset, changedAt, skipRemoteEvent)
 function frjDatasetKeys_() {
   return Object.keys(FRJ_SYNC_CONFIG.inventorySheets).map(function(avatar) {
     return "inventory:" + avatar;
-  }).concat(["mu", "catalog", "containers"]);
+  }).concat(["mu", "catalog", "containers", "discounts", "discount-config"]);
 }
 
 function frjReadGasOutbox_() {
@@ -272,6 +272,8 @@ function frjRunSync_(forceAudit) {
       summary.push(frjSynchronizeDataset_("mu", remoteStates.mu, forceAudit, 0));
       summary.push(frjSynchronizeDataset_("catalog", remoteStates.catalog, forceAudit, 0));
       summary.push(frjSynchronizeDataset_("containers", remoteStates.containers, forceAudit, 0));
+      summary.push(frjSynchronizeDataset_("discounts", remoteStates.discounts, forceAudit, 0));
+      summary.push(frjSynchronizeDataset_("discount-config", remoteStates["discount-config"], forceAudit, 0));
 
       var completedAt = new Date().toISOString();
       frjPublishSyncSummary_(summary, completedAt);
@@ -445,6 +447,8 @@ function frjReadLocalDataset_(dataset) {
   if (dataset === "catalog") return frjReadLocalCatalog_();
   if (dataset === "mu") return frjReadLocalMarket_();
   if (dataset === "containers") return frjReadLocalContainerConfig_();
+  if (dataset === "discounts") return frjReadLocalDiscountCampaigns_();
+  if (dataset === "discount-config") return frjReadLocalDiscountConfig_();
   return frjReadLocalInventory_(dataset.slice("inventory:".length));
 }
 
@@ -452,6 +456,8 @@ function frjReadRemoteDataset_(dataset) {
   if (dataset === "catalog") return frjD1Request_("/sync/catalog");
   if (dataset === "mu") return frjD1Request_("/sync/mu");
   if (dataset === "containers") return frjD1Request_("/sync/containers");
+  if (dataset === "discounts") return frjD1Request_("/sync/discounts");
+  if (dataset === "discount-config") return frjD1Request_("/sync/discount-config");
   return frjD1Request_("/sync/inventory?avatar=" + encodeURIComponent(dataset.slice("inventory:".length)));
 }
 
@@ -459,6 +465,8 @@ function frjReadRemoteDatasetByHash_(dataset, hash) {
   if (dataset === "catalog") return frjD1Request_("/sync/catalog?hash=" + encodeURIComponent(hash));
   if (dataset === "mu") return frjD1Request_("/sync/mu?hash=" + encodeURIComponent(hash));
   if (dataset === "containers") return frjD1Request_("/sync/containers?hash=" + encodeURIComponent(hash));
+  if (dataset === "discounts") return frjD1Request_("/sync/discounts?hash=" + encodeURIComponent(hash));
+  if (dataset === "discount-config") return frjD1Request_("/sync/discount-config?hash=" + encodeURIComponent(hash));
   return frjD1Request_(
     "/sync/inventory?avatar=" + encodeURIComponent(dataset.slice("inventory:".length)) +
     "&hash=" + encodeURIComponent(hash)
@@ -469,6 +477,8 @@ function frjWriteLocalDataset_(dataset, snapshot) {
   if (dataset === "catalog") throw new Error("BDD_APP est actuellement le référentiel maître du catalogue");
   if (dataset === "mu") return frjWriteLocalMarket_(snapshot);
   if (dataset === "containers") return frjWriteLocalContainerConfig_(snapshot);
+  if (dataset === "discounts") return frjWriteLocalDiscountCampaigns_(snapshot);
+  if (dataset === "discount-config") return frjWriteLocalDiscountConfig_(snapshot);
   return frjWriteLocalInventory_(dataset.slice("inventory:".length), snapshot);
 }
 
@@ -479,7 +489,9 @@ function frjPushDataset_(dataset, local, expectedHash) {
       ? "/sync/mu"
       : (dataset === "containers"
         ? "/sync/containers"
-        : "/sync/inventory?avatar=" + encodeURIComponent(dataset.slice("inventory:".length))));
+        : (dataset === "discounts" ? "/sync/discounts"
+          : (dataset === "discount-config" ? "/sync/discount-config"
+            : "/sync/inventory?avatar=" + encodeURIComponent(dataset.slice("inventory:".length))))));
   return frjD1Request_(path, {
     method: "post",
     expectedHash: expectedHash,
@@ -560,6 +572,8 @@ function frjRowsByStableKey_(dataset, rows) {
         frjText_(row.avatar).toLowerCase(),
         frjText_(row.containerKey || row.container).toLowerCase()
       ].join("\u001f");
+    } else if (dataset === "discounts" || dataset === "discount-config") {
+      baseKey = dataset + ":" + frjText_(row.id);
     } else {
       baseKey = "inventory:" + [
         frjText_(row.itemName).toLowerCase(),
@@ -600,6 +614,16 @@ function frjRowSignature_(dataset, row) {
       row.enabled === true || Number(row.enabled) === 1 ? "1" : "0"
     ]);
   }
+  if (dataset === "discounts") return JSON.stringify([
+    row.id, row.type, row.startsOn, row.endsOn, row.storage || "", row.aisle || "",
+    String(Number(row.discountRate)), row.enabled === true ? "1" : "0", row.origin || "manual",
+    row.eligiblePairCount == null ? "" : String(row.eligiblePairCount),
+    row.candidatePairCount == null ? "" : String(row.candidatePairCount), frjToIso_(row.updatedAt, "")
+  ]);
+  if (dataset === "discount-config") return JSON.stringify([
+    row.id, row.automaticPromotionsEnabled === true ? "1" : "0", String(Number(row.defaultPromotionRate)),
+    row.selectionSeed || "frj-daily-promo", frjToIso_(row.updatedAt, "")
+  ]);
   return JSON.stringify([
     frjText_(row.itemName), frjNumber_(row.quantity),
     frjNullableNumberText_(row.valuePed), frjText_(row.container)

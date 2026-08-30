@@ -8,7 +8,7 @@ Ce projet est volontairement séparé de `../worker.js`, qui gère Discord pour 
 - `src/application.js` : traitements catalogue, imports, synchronisation et demandes ;
 - `src/config.js` : limites, origines autorisées et constantes D1 ;
 - `src/http.js` : réponses HTTP, lecture bornée, empreintes et erreurs API ;
-- `src/domain.js`, `src/orders.js`, `src/sync.js`, `src/discord.js` : règles métier spécialisées.
+- `src/domain.js`, `src/orders.js`, `src/sync.js`, `src/discord.js`, `src/discounts.js` et `src/discount-admin.js` : règles métier spécialisées.
 
 Le point d'entrée déclaré dans `wrangler.jsonc` et tous les contrats HTTP restent inchangés.
 
@@ -96,8 +96,8 @@ arrière du code ; D1 Time Travel reste disponible pour une restauration de la b
 
 ## Synchronisation GAS ↔ D1
 
-Les modules `../../gas/Sync*.gs` synchronisent sept datasets : catalogue, MU, configuration des conteneurs et
-les quatre inventaires.
+Les modules `../../gas/Sync*.gs` synchronisent neuf datasets : catalogue, MU, configuration des conteneurs,
+promotions et soldes, configuration des promotions, et les quatre inventaires.
 Une modification demande une synchronisation dans un délai maximal de cinq minutes. Toute synchronisation
 ayant corrigé des données programme un audit d’intégrité 30 minutes plus tard. Un audit quotidien est aussi
 exécuté vers 02 h 00, et le signal D1 est contrôlé toutes les cinq minutes.
@@ -112,6 +112,12 @@ dans `CONFIG_CONTAINER` ou via l'interface D1. Les changements indépendants son
 avatar/conteneur et une ligne absente d'un seul côté est conservée, conformément à la règle sans suppression.
 Lors du premier raccordement, les choix historiques de Google Sheets initialisent la base commune.
 
+Les campagnes de remise et leur configuration sont elles aussi bidirectionnelles. Le Worker les conserve dans
+`discount_campaigns` et `discount_config`, tandis que GAS utilise `CAMPAGNES_REMISE` et `CONFIG_REMISES`.
+Le cron Worker `5 22,23 * * *` couvre 00 h 05 à Paris en été comme en hiver ; son second passage est idempotent.
+Le déclencheur quotidien GAS exécute le même tirage déterministe et toute création signale immédiatement la
+synchronisation. Le taux automatique initial est de 5 %.
+
 Le catalogue est inclus afin de garantir la même liste d’articles vendables, mais `BDD_APP` reste
 provisoirement sa source maîtresse : les colonnes prix/image/wiki dépendent encore de formules
 `IMPORTRANGE`. D1 en reçoit un miroir complet sans écraser ces formules Google Sheets.
@@ -123,7 +129,7 @@ Cloudflare et les propriétés du script, puis exécuter `installFrjBidirectiona
 
 L'entrée discrète `?admin=1` active le menu commun dans `sessionStorage` pour l'onglet courant, puis le paramètre
 est immédiatement retiré de l'URL. Le menu permet d’ouvrir explicitement les catalogues et les pages d’import
-GAS ou D1 sans propager ce paramètre. La page `rapport-sync.html` affiche l’état des sept datasets et les 100
+GAS ou D1 sans propager ce paramètre. La page `rapport-sync.html` affiche l’état des neuf datasets et les 100
 derniers événements du journal croisé GAS ↔ D1 lorsque la session Admin est active.
 
 Le bouton « Auditer maintenant » appelle `POST /admin/sync-audit-now`. Le Worker authentifie le jeton
@@ -141,6 +147,11 @@ proposition encore modifiable. `GET /admin/orders/catalog`, `POST /admin/orders`
 `POST /admin/orders/:id/items` exigent tous `ADMIN_TOKEN`. Les références, dates et jetons de suivi sont
 générés côté Worker ; seule l'empreinte du jeton est stockée. Chaque création ou ajout repasse la proposition
 en attente de validation du client, maintient `purchase_order_events` et actualise le message Discord.
+
+La page `promotions.html` utilise `GET /admin/discounts` et les routes `POST /admin/discounts/*`, toutes
+protégées par `ADMIN_TOKEN`, pour gérer l'automatisation, générer la promotion du jour, modifier les promotions
+et configurer les soldes. Une solde active est toujours prioritaire sur une promotion. Les lignes de commande
+conservent le MU de base et l'identifiant, le type et le taux de la campagne réellement appliquée.
 
 ## Statistiques de fréquentation
 

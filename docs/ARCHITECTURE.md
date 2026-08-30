@@ -66,7 +66,7 @@ La gestion des conteneurs conserve elle aussi une séparation complète entre `c
 
 Le point d'entrée Cloudflare reste `cloudflare/for-sale-api/src/index.js`. Il se limite désormais au routage HTTP, à l'authentification, au contrôle des origines et à la conversion uniforme des erreurs.
 
-Les traitements applicatifs sont regroupés dans `application.js`. La configuration statique et les limites sont centralisées dans `config.js`, tandis que `http.js` porte les réponses, CORS, lecture bornée des corps, empreintes et comparaisons de jetons. Les modules métier `domain.js`, `orders.js`, `order-history.js`, `sync.js`, `discord.js` et `containers.js` restent indépendants ; `order-history.js` valide les événements partagés avant écriture D1 et `containers.js` valide les choix de conteneurs. Cette séparation ne change pas le nom du Worker ni ses protections HTTP.
+Les traitements applicatifs sont regroupés dans `application.js`. La configuration statique et les limites sont centralisées dans `config.js`, tandis que `http.js` porte les réponses, CORS, lecture bornée des corps, empreintes et comparaisons de jetons. Les modules métier `domain.js`, `orders.js`, `order-history.js`, `discounts.js`, `sync.js`, `discord.js` et `containers.js` restent indépendants ; `order-history.js` valide les événements partagés avant écriture D1, `discounts.js` porte le contrat tarifaire des promotions et `containers.js` valide les choix de conteneurs. Cette séparation ne change pas le nom du Worker ni ses protections HTTP.
 
 ## Organisation du backend GAS
 
@@ -76,6 +76,8 @@ Les points d'entrée restent stables : `doGet` et le répartiteur `frjMainDoPost
 gas/
 ├── Code.gs             entrées HTTP GAS
 ├── Catalog.gs          lecture du catalogue et des catégories
+├── Discounts.gs        contrat tarifaire et sélection des promotions
+├── DiscountSheets.gs   feuilles, génération et empreintes des remises
 ├── Imports.gs          imports MU et inventaires
 ├── OrderHistory.gs     historique partagé des demandes
 ├── PurchaseOrders.gs   demandes, miroir et publication Discord
@@ -88,8 +90,22 @@ gas/
 ```
 
 Ce rangement ne change aucune fonction publique appelée par le frontend ou par les déclencheurs déjà installés.
-Il est publié dans le projet Apps Script de production sur la version 16 du déploiement Web App existant ; l'URL `/exec` reste inchangée.
+Il est publié dans le projet Apps Script de production sur la version 25 du déploiement Web App existant ; l'URL `/exec` reste inchangée.
 Comme ce projet GAS est autonome, les routes de catalogue ouvrent explicitement le classeur BDD_APP par son identifiant et ne dépendent pas de `SpreadsheetApp.getActiveSpreadsheet()`.
+
+## Promotions et soldes — d.9
+
+Le Worker et GAS disposent du même moteur de domaine. Une date métier est exprimée en `YYYY-MM-DD` dans le fuseau `Europe/Paris`. D1 conserve les campagnes dans `discount_campaigns` et leur configuration singleton dans `discount_config` ; GAS utilise les feuilles propres `CAMPAGNES_REMISE` et `CONFIG_REMISES`. Les datasets `discounts` et `discount-config` participent à la fusion bidirectionnelle ordinaire et au Rapport de synchronisation.
+
+Une promotion quotidienne peut être générée si au moins sept couples catégorie/rayon sont éligibles. Un couple est éligible lorsqu'il contient au moins un article possédant une quantité vendable strictement positive et un MU exploitable : coefficient supérieur ou égal à 100 % ou supplément PED positif ou nul. Un couple sélectionné à la date J redevient disponible à J+7. La sélection est pseudo-aléatoire, stable pour une même date, une même graine et une même liste canonique de candidats, afin que GAS et D1 prennent la même décision.
+
+Le taux automatique vaut 5 % quand l'Admin n'a défini aucune autre valeur. La promotion est créée immédiatement sans confirmation, puis son couple, sa date, son taux et son activation restent modifiables dans `promotions.html`. Une relance conserve l'enregistrement déjà matérialisé. Les modifications Admin respectent l'éligibilité, la fenêtre glissante de sept jours et les périodes de soldes. Le cron D1 couvre minuit à Paris en heure d'été comme en heure d'hiver ; son second passage est volontairement idempotent. Le déclencheur quotidien GAS exécute le même moteur et chaque création signale la synchronisation.
+
+Les soldes sont exclusivement configurés par l'Admin, avec des dates inclusives, un taux et un état actif. Deux périodes actives ne peuvent pas se chevaucher. Aucune promotion quotidienne n'est générée pendant des soldes et, lorsqu'une promotion déjà créée chevauche une période ajoutée ultérieurement, les soldes déterminent seuls le tarif actif.
+
+La remise réduit la marge, pas le prix TT. Le facteur de profil FRJ (50 % de la marge) reste applicable : pour un MU en pourcentage, le coefficient final vaut `1 + (MU - 1) × facteurProfil × (1 - taux)` ; pour un MU en PED, il vaut `MU × facteurProfil × (1 - taux)`.
+
+Les catalogues D1 et GAS exposent `Remise_Promo`, `REMISE_TYPE`, `REMISE_ID`, `REMISE_DEBUT` et `REMISE_FIN`. Le frontend affiche le sticker existant, le taux et les valeurs normales barrées. Au dépôt d'une demande, le panier transmet la campagne observée ; D1 et le secours GAS la revérifient puis enregistrent son identifiant, son type, son taux et le MU de base afin que l'historique tarifaire ne dépende pas d'une modification ultérieure de la campagne.
 
 ## Organisation des styles
 

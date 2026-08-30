@@ -540,6 +540,21 @@ function getEffectiveMU(muStr) {
   return muStr;
 }
 
+function getItemDiscountRate(item) {
+  if (item?.Remise_Promo === "" || item?.Remise_Promo === null || item?.Remise_Promo === undefined) return 0;
+  const rate = Number(item.Remise_Promo);
+  return Number.isFinite(rate) && rate > 0 && rate <= 1 ? rate : 0;
+}
+
+function applyItemDiscountToMU(muStr, item) {
+  const rate = getItemDiscountRate(item);
+  if (!rate) return muStr;
+  const mu = parseMU(muStr);
+  if (mu.type === "percent") return `${formatMUValue((1 + ((mu.value - 1) * (1 - rate))) * 100)} %`;
+  if (mu.type === "ped") return `${formatMUValue(mu.value * (1 - rate))} PED`;
+  return muStr;
+}
+
 	// Génère les cartes et branche leurs interactions après création du HTML.
 	function renderCards(items) {
         const container = document.getElementById('cardContainer');
@@ -637,13 +652,15 @@ function getEffectiveMU(muStr) {
 				const color = getMUColor(item.DATE_MU);
 
 				const dateFormatted = formatDateMU(item.DATE_MU);
-				const effectiveMU = getEffectiveMU(item.MU);
+				const normalMU = getEffectiveMU(item.MU);
+				const effectiveMU = applyItemDiscountToMU(normalMU, item);
 				const muLabel = currentLang === "FR" && isFRJMember() ? "MU FRJ" : "MU";
+				const discounted = getItemDiscountRate(item) > 0;
 
 				muHTML = `
 					<p title="${dateFormatted?.display || ""}">
 					<span class="MU-style" style="color:${color}">
-						${muLabel}: ${effectiveMU}
+						${muLabel}: ${discounted ? `<del>${normalMU}</del> <strong>${effectiveMU}</strong>` : effectiveMU}
 					</span>
 					</p>
 				`;
@@ -680,6 +697,7 @@ function getEffectiveMU(muStr) {
 			
 			card.innerHTML = `
 				<div class="card-front">
+					${getItemDiscountRate(item) ? `<div class="promo-sticker" aria-label="${item.REMISE_TYPE === "sale" ? (currentLang === "FR" ? "Soldes" : "Sale") : (currentLang === "FR" ? "Promotion" : "Promotion")} -${Math.round(getItemDiscountRate(item) * 100)} %"><span>-${Math.round(getItemDiscountRate(item) * 100)}%</span></div>` : ""}
 					${imgHTML}
 					<h3>${itemTitle}</h3>
 					${rayonHTML}
@@ -763,7 +781,8 @@ function openCalculator(event, iconEl, item) {
   openCard = card;
 
   const prix = parseFloat(item.PRIX_UNITAIRE) || 0;
-  const mu = getEffectiveMU(item.MU || "");
+  const normalMu = getEffectiveMU(item.MU || "");
+  const mu = applyItemDiscountToMU(normalMu, item);
   const muParsed = parseMU(mu);
   const muLabel = currentLang === "FR" && isFRJMember() ? "MU FRJ" : "MU";
   const availableQuantity = Math.max(0, Math.floor(Number(item.QUANTITE) || 0));
@@ -820,13 +839,13 @@ function openCalculator(event, iconEl, item) {
   setTimeout(() => {
     const qtyInput = back.querySelector("#calcQty");
     qtyInput.addEventListener("input", () => {
-      updateCalc(card, prix, mu, muLabel);
+      updateCalc(card, prix, mu, muLabel, normalMu);
     });
 
-    updateCalc(card, prix, mu, muLabel);
+    updateCalc(card, prix, mu, muLabel, normalMu);
   }, 0);
 }
-function updateCalc(card, prix, muStr, muLabel = "MU") {
+function updateCalc(card, prix, muStr, muLabel = "MU", normalMuStr = muStr) {
   const qty = Math.max(0, Math.floor(Number(card.querySelector("#calcQty").value) || 0));
 
   const tt = qty * prix;
@@ -856,7 +875,13 @@ function updateCalc(card, prix, muStr, muLabel = "MU") {
     muDisplay = "";
   }
 
-  card.querySelector("#calcSell").innerText = sell.toFixed(2);
+  const normalMu = parseMU(normalMuStr);
+  let normalSell = tt;
+  if (normalMu.type === "percent") normalSell = tt * normalMu.value;
+  if (normalMu.type === "ped") normalSell = tt + (qty * normalMu.value);
+  card.querySelector("#calcSell").innerHTML = normalMuStr !== muStr
+    ? `<del>${normalSell.toFixed(2)}</del> ${sell.toFixed(2)}`
+    : sell.toFixed(2);
 
   const muLineEl = card.querySelector("#muLine");
   if (muLineEl) {

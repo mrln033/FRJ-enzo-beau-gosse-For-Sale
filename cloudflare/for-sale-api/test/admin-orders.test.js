@@ -118,6 +118,7 @@ function setupDatabase() {
   applyMigration(database, "0009_order_proposals.sql");
   applyMigration(database, "0016_purchase_order_history.sql");
   applyMigration(database, "0018_purchase_order_tracking_tokens.sql");
+  applyMigration(database, "0021_purchase_order_discounts.sql");
   database.exec(`
     INSERT INTO avatars VALUES ('enzo', 'Enzo', 'Inventaire Enzo');
     INSERT INTO catalog_items (name, unit_price_ped) VALUES ('Item A', 10), ('Item B', 5), ('Sans stock', 2);

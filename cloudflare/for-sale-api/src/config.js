@@ -20,5 +20,7 @@ export const SYNC_DATASETS = new Set([
   "catalog",
   "mu",
   "containers",
+  "discounts",
+  "discount-config",
   ...Object.keys(AVATAR_SHEETS).map((avatar) => `inventory:${avatar}`)
 ]);

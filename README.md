@@ -11,6 +11,7 @@ Le frontend statique est publié par GitHub Pages. Il peut lire les données dep
 - `suivi-commande.html` : suivi client par lien privé.
 - `commandes.html` : console des demandes d'achat.
 - `conteneurs.html` : configuration D1 des conteneurs inclus dans les quantités.
+- `promotions.html` : gestion des promotions quotidiennes et des soldes.
 - `maj_mu.html` et `maj_inventaire-enzo.html` : imports administrateur.
 - `rapport-sync.html` : rapport de synchronisation GAS ↔ D1.
 - `statistiques-visites.html` : statistiques de fréquentation réservées à l'administration.

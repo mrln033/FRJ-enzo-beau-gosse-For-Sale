@@ -8,6 +8,7 @@ import {
   handlePublicOrderCancellation,
   handlePublicOrderGet,
   handlePublicOrderPost,
+  handleScheduledDiscountGeneration,
   handleSyncGet,
   handleSyncPost
 } from "./application.js";
@@ -95,5 +96,8 @@ export default {
       }));
       return withCors(json({ error: "Erreur interne" }, 500), origin);
     }
+  },
+  async scheduled(_controller, env) {
+    await handleScheduledDiscountGeneration(env);
   }
 };

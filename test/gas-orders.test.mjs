@@ -105,7 +105,10 @@ test("GAS et D1 produisent la même estimation de demande", () => {
     RAYON: "PARTS",
     QUANTITE: 1000,
     PRIX_UNITAIRE: 0.01,
-    MU: "115,12 %"
+    MU: "115,12 %",
+    Remise_Promo: 0.05,
+    REMISE_TYPE: "daily_promo",
+    REMISE_ID: "daily-promo-2026-08-30"
   }];
   const d1Catalog = [{
     itemName: "Item A",
@@ -114,12 +117,18 @@ test("GAS et D1 produisent la même estimation de demande", () => {
     stock: 1000,
     unitTtPed: 0.01,
     markupKind: "percent",
-    markupValue: 1.1512
+    markupValue: 1.1512,
+    discountRate: 0.05,
+    discountKind: "daily_promo",
+    discountCampaignId: "daily-promo-2026-08-30"
   }];
   const payload = validPayload(1000);
   payload.language = "FR";
   payload.frjMember = true;
   payload.items[0].markupValue = 1.1512;
+  payload.items[0].discountRate = 0.05;
+  payload.items[0].discountKind = "daily_promo";
+  payload.items[0].discountCampaignId = "daily-promo-2026-08-30";
 
   const context = loadPurchaseOrders(gasCatalog);
   const gasResult = context.pricePurchaseOrderFromSheet_(
@@ -135,4 +144,8 @@ test("GAS et D1 produisent la même estimation de demande", () => {
     JSON.parse(JSON.stringify(gasResult)),
     JSON.parse(JSON.stringify(d1Result))
   );
+  assert.equal(gasResult.lines[0].markupDisplay, "107,18 %");
+  assert.equal(gasResult.lines[0].lineSalePed, 10.72);
+  assert.equal(gasResult.lines[0].baseMarkupValue, 1.1512);
+  assert.equal(gasResult.lines[0].discountCampaignId, "daily-promo-2026-08-30");
 });

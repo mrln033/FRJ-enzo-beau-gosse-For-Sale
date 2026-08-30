@@ -56,11 +56,14 @@ export function normalizeOrderSubmission(payload) {
     const observedUnitTtPed = optionalNumber(item?.unitTtPed);
     const observedMarkupKind = normalizeMarkupKind(item?.markupKind);
     const observedMarkupValue = observedMarkupKind === "none" ? null : optionalNumber(item?.markupValue);
+    const observedDiscountKind = ["daily_promo", "sale"].includes(item?.discountKind) ? item.discountKind : null;
+    const observedDiscountCampaignId = cleanOptionalText(item?.discountCampaignId, 180);
+    const observedDiscountRate = optionalNumber(item?.discountRate);
     return {
       itemName, storage, aisle, quantity,
       observedUnitTtPed,
       observedMarkupKind,
-      observedMarkupValue
+      observedMarkupValue, observedDiscountKind, observedDiscountCampaignId, observedDiscountRate
     };
   });
 
@@ -151,6 +154,9 @@ export function priceOrderLines(requestedItems, catalogRows, options = {}) {
       !sameOptionalNumber(requested.observedUnitTtPed, unitTt)
       || requested.observedMarkupKind !== currentMarkupKind
       || !sameOptionalNumber(requested.observedMarkupValue, currentMarkupValue)
+      || requested.observedDiscountKind !== (current.discountKind || null)
+      || requested.observedDiscountCampaignId !== (current.discountCampaignId || null)
+      || !sameOptionalNumber(requested.observedDiscountRate, current.discountRate ?? null)
     ) {
       discrepancies.push({
         itemName: requested.itemName,
@@ -162,11 +168,17 @@ export function priceOrderLines(requestedItems, catalogRows, options = {}) {
         unitTtPed: roundPed(unitTt),
         markupKind: currentMarkupKind,
         markupValue: currentMarkupValue,
-        markupDisplay: formatMarkup(currentMarkupKind, currentMarkupValue)
+        markupDisplay: formatMarkup(currentMarkupKind, currentMarkupValue),
+        discountKind: current.discountKind || null,
+        discountCampaignId: current.discountCampaignId || null,
+        discountRate: current.discountRate ?? null
       });
       return;
     }
-    const effectiveMarkup = applyMemberDiscount(currentMarkupKind, currentMarkupValue, frjMember);
+    const effectiveMarkup = applyCampaignDiscount(
+      applyMemberDiscount(currentMarkupKind, currentMarkupValue, frjMember),
+      current.discountRate
+    );
     const prices = priceOrderLine(unitTt, requested.quantity, effectiveMarkup.kind, effectiveMarkup.value);
     lines.push({
       lineNo: index + 1,
@@ -179,6 +191,11 @@ export function priceOrderLines(requestedItems, catalogRows, options = {}) {
       markupKind: effectiveMarkup.kind,
       markupValue: effectiveMarkup.value,
       markupDisplay: formatMarkup(effectiveMarkup.kind, effectiveMarkup.value),
+      baseMarkupKind: currentMarkupKind,
+      baseMarkupValue: currentMarkupValue,
+      discountKind: current.discountKind || null,
+      discountCampaignId: current.discountCampaignId || null,
+      discountRate: current.discountRate ?? null,
       unitSalePed: prices.unitSalePed,
       lineTtPed: prices.lineTtPed,
       lineSalePed: prices.lineSalePed,
@@ -266,6 +283,14 @@ function applyMemberDiscount(kind, rawValue, member) {
   return normalizedKind === "percent"
     ? { kind: "percent", value: 1 + ((value - 1) / 2) }
     : { kind: "ped", value: value / 2 };
+}
+
+function applyCampaignDiscount(markup, rawRate) {
+  const rate = optionalNumber(rawRate);
+  if (rate === null || rate <= 0 || rate > 1 || markup.kind === "none") return markup;
+  return markup.kind === "percent"
+    ? { kind: "percent", value: 1 + ((markup.value - 1) * (1 - rate)) }
+    : { kind: "ped", value: markup.value * (1 - rate) };
 }
 
 function normalizeMarkupKind(kind) {

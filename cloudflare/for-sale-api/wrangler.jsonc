@@ -18,6 +18,9 @@
 		"GAS_SYNC_URL": "https://script.google.com/macros/s/AKfycbxa0B_4R6tsn8aQCLy1Y3LEqbDj4SY22xbascJfMRd1I1thQkCRPySAjszdHoxX1h2a/exec",
 		"CART_ENABLED": "true"
 	},
+	"triggers": {
+		"crons": ["5 22,23 * * *"]
+	},
 	"d1_databases": [
 		{
 			"binding": "DB",

@@ -185,7 +185,10 @@ function normalizePurchaseOrderPayload_(payload) {
         quantity: quantity,
         observedUnitTtPed: purchaseOptionalNumber_(item.unitTtPed),
         observedMarkupKind: item.markupKind === "percent" || item.markupKind === "ped" ? item.markupKind : "none",
-        observedMarkupValue: purchaseOptionalNumber_(item.markupValue)
+        observedMarkupValue: purchaseOptionalNumber_(item.markupValue),
+        observedDiscountKind: item.discountKind === "daily_promo" || item.discountKind === "sale" ? item.discountKind : null,
+        observedDiscountCampaignId: purchaseCleanText_(item.discountCampaignId, 180) || null,
+        observedDiscountRate: purchaseOptionalNumber_(item.discountRate)
       };
       if (!normalizedItem.itemName || !normalizedItem.storage || !normalizedItem.aisle) throw new Error("Article de panier incomplet");
       if (!Number.isInteger(quantity) || quantity <= 0 || quantity > 1000000) {
@@ -220,9 +223,16 @@ function pricePurchaseOrderFromSheet_(submission) {
     }
     var unitTt = Math.max(0, Number(current.PRIX_UNITAIRE) || 0);
     var markup = purchaseParseMarkup_(current.MU);
+    var discountKind = current.REMISE_TYPE === "daily_promo" || current.REMISE_TYPE === "sale" ? current.REMISE_TYPE : null;
+    var discountCampaignId = purchaseCleanText_(current.REMISE_ID, 180) || null;
+    var discountRate = purchaseOptionalNumber_(current.Remise_Promo);
+    if (!(discountRate > 0 && discountRate <= 1)) discountRate = null;
     if (!purchaseSameNumber_(requested.observedUnitTtPed, unitTt)
         || requested.observedMarkupKind !== markup.kind
-        || !purchaseSameNumber_(requested.observedMarkupValue, markup.value)) {
+        || !purchaseSameNumber_(requested.observedMarkupValue, markup.value)
+        || requested.observedDiscountKind !== discountKind
+        || requested.observedDiscountCampaignId !== discountCampaignId
+        || !purchaseSameNumber_(requested.observedDiscountRate, discountRate)) {
       discrepancies.push({
         itemName: requested.itemName,
         storage: requested.storage,
@@ -233,14 +243,20 @@ function pricePurchaseOrderFromSheet_(submission) {
         unitTtPed: purchaseRound_(unitTt),
         markupKind: markup.kind,
         markupValue: markup.value,
+        discountKind: discountKind,
+        discountCampaignId: discountCampaignId,
+        discountRate: discountRate,
         markupDisplay: markup.kind === "percent"
           ? (markup.value * 100).toFixed(2).replace(".", ",") + " %"
           : (markup.kind === "ped" ? markup.value.toFixed(2).replace(".", ",") + " PED" : null)
       });
       return;
     }
+    var baseMarkupKind = markup.kind;
+    var baseMarkupValue = markup.value;
     if (submission.frjMember && markup.kind === "percent") markup.value = 1 + ((markup.value - 1) / 2);
     if (submission.frjMember && markup.kind === "ped") markup.value = markup.value / 2;
+    markup = purchaseApplyCampaignDiscount_(markup, discountRate);
     var prices = purchasePriceOrderLine_(unitTt, requested.quantity, markup.kind, markup.value);
     lines.push({
       lineNo: index + 1,
@@ -252,6 +268,11 @@ function pricePurchaseOrderFromSheet_(submission) {
       unitTtPed: purchaseRound_(unitTt),
       markupKind: markup.kind,
       markupValue: markup.value,
+      baseMarkupKind: baseMarkupKind,
+      baseMarkupValue: baseMarkupValue,
+      discountKind: discountKind,
+      discountCampaignId: discountCampaignId,
+      discountRate: discountRate,
       markupDisplay: markup.kind === "percent"
         ? (markup.value * 100).toFixed(2).replace(".", ",") + " %"
         : (markup.kind === "ped" ? markup.value.toFixed(2).replace(".", ",") + " PED" : null),
@@ -490,6 +511,15 @@ function purchaseOptionalNumber_(value) {
 function purchaseSameNumber_(left, right) {
   if (left === null || right === null) return left === right;
   return Math.abs(left - right) <= 0.0001;
+}
+
+function purchaseApplyCampaignDiscount_(markup, discountRate) {
+  var rate = Number(discountRate);
+  if (!(rate > 0 && rate <= 1) || markup.kind === "none") return markup;
+  if (markup.kind === "percent") {
+    return { kind: "percent", value: 1 + ((markup.value - 1) * (1 - rate)) };
+  }
+  return { kind: "ped", value: markup.value * (1 - rate) };
 }
 
 function purchasePriceOrderLine_(unitTt, quantity, markupKind, markupValue) {

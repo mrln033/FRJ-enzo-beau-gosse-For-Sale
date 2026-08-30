@@ -192,6 +192,7 @@ function frjDeferredAuditTrigger() {
 }
 
 function frjDailyAuditTrigger() {
+  frjGenerateDailyPromotionFromGas_();
   frjEnsureSchedulerVersion_();
   return frjRunIntegrityAudit_("audit-quotidien-02h");
 }

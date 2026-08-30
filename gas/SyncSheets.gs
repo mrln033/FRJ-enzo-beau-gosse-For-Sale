@@ -148,6 +148,8 @@ function frjWriteLocalMarket_(snapshot) {
 function frjHashDataset_(dataset, rows) {
   if (dataset === "catalog") return frjHashCatalog_(rows);
   if (dataset === "containers") return frjHashContainerConfig_(rows);
+  if (dataset === "discounts") return frjHashDiscountCampaigns_(rows);
+  if (dataset === "discount-config") return frjHashDiscountConfig_(rows);
   return dataset === "mu" ? frjHashMarket_(rows) : frjHashInventory_(rows);
 }
 

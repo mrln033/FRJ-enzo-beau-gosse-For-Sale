@@ -1,0 +1,13 @@
+.discounts-page { padding: 30px 20px; }
+.discounts-admin { max-width: 1100px; margin: 0 auto; }
+.discounts-admin > header { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.discount-panel { margin:16px 0; padding:18px; border:1px solid #ddd; border-radius:8px; background:#fff; }
+.discount-panel h2 { margin-top:0; }
+.discount-grid, #discountConfigForm { display:flex; flex-wrap:wrap; align-items:end; gap:12px; }
+.discount-grid label, #discountConfigForm label { display:grid; gap:5px; }
+.discounts-admin input, .discounts-admin select, .discounts-admin button { padding:8px; }
+.discount-row { display:grid; grid-template-columns:1.1fr 1fr 1fr .65fr auto auto; gap:8px; align-items:center; padding:9px 0; border-top:1px solid #eee; }
+.discount-row.sale { grid-template-columns:1.1fr 1fr 1fr .65fr auto auto; }
+.discount-origin { color:#666; font-size:.85rem; }
+#discountStatus.error { color:#b00020; }
+@media (max-width:800px) { .discount-row, .discount-row.sale { grid-template-columns:1fr 1fr; } }
