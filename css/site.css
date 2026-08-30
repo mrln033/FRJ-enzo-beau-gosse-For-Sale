@@ -322,7 +322,7 @@ html[data-frj-backend="d1"] .backend-status-dot {
   display: grid; place-items: center; pointer-events: none;
 }
 .promo-sticker span {
-  color: #fff; font-weight: 800; font-size: 1rem;
+  color: #d6d6d6; font-weight: 800; font-size: 1rem;
   text-shadow: 0 1px 3px #000; transform: rotate(10deg);
 }
 .MU-style del, #calcSell del { opacity: .65; margin-right: 4px; }
