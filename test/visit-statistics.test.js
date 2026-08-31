@@ -148,8 +148,16 @@ test("d.13 réserve le tableau détaillé au menu Admin et rend ses indicateurs"
       { date: "2026-08-29", page: "catalog", audience: "PUBLIC", pageViews: 7, visits: 4, uniqueVisitors: 3 }
     ],
     categoryRows: [
-      { category: "ARMORS", views: 9, visits: 4, uniqueVisitors: 3 },
-      { category: "WEAPONS", views: 5, visits: 3, uniqueVisitors: 2 }
+      {
+        category: "ARMORS",
+        publicViews: 9, publicVisits: 4, publicUniqueVisitors: 3,
+        adminViews: 2, adminVisits: 1, adminUniqueVisitors: 1
+      },
+      {
+        category: "WEAPONS",
+        publicViews: 5, publicVisits: 3, publicUniqueVisitors: 2,
+        adminViews: 1, adminVisits: 1, adminUniqueVisitors: 1
+      }
     ]
   };
   const window = {
@@ -176,5 +184,7 @@ test("d.13 réserve le tableau détaillé au menu Admin et rend ses indicateurs"
   assert.equal(elements.get("visitStatisticsRows").children[0].className, "visit-statistics-total-row");
   assert.equal(elements.get("visitCategoryRows").children.length, 2);
   assert.equal(elements.get("visitCategoryRows").children[0].children[1].textContent, "ARMORS");
+  assert.equal(elements.get("visitCategoryRows").children[0].children[2].textContent, "9");
+  assert.equal(elements.get("visitCategoryRows").children[0].children[5].textContent, "2");
   assert.equal(elements.get("visitStatisticsContent").hidden, false);
 });

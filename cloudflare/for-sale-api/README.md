@@ -167,4 +167,5 @@ La page `statistiques-visites.html`, accessible depuis le menu Admin, interroge
 `GET /admin/visit-statistics`. Cette route exige `ADMIN_TOKEN` et fournit les vues, sessions et visiteurs
 uniques quotidiens, filtrables par période, audience et page. Les événements sont conservés dans D1 afin de
 permettre des statistiques historiques sans dépendance à GAS. Un classement séparé des catégories consultées,
-trié par nombre d'affichages, présente aussi les sessions et visiteurs uniques quotidiens de chacune d'elles.
+trié d'abord par intérêt public, présente côte à côte les affichages, sessions et visiteurs uniques quotidiens
+du Public et des administrateurs pour chacune d'elles.

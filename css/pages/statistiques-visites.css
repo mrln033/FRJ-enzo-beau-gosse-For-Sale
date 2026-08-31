@@ -22,6 +22,8 @@ body.visit-statistics-page { max-width: 1250px; margin: 0 auto; padding: 78px 18
 .visit-statistics-total-row { background: #f0eadf; font-weight: 800; }
 .visit-category-table th:first-child, .visit-category-table td:first-child { width: 55px; text-align: center; }
 .visit-category-table th:nth-child(n+3), .visit-category-table td:nth-child(n+3) { text-align: right; }
+.visit-category-table .visit-category-audience-public { background: #e7f0f7; text-align: center; }
+.visit-category-table .visit-category-audience-admin { background: #f3ead8; text-align: center; }
 .visit-statistics-empty { text-align: center !important; color: #625a4f; }
 @media (max-width: 800px) {
   body.visit-statistics-page { padding-top: 55px; }

@@ -85,10 +85,6 @@ export async function handleAdminVisitStatisticsGet(url, env) {
   const where = conditions.join(" AND ");
   const categoryConditions = ["event_type = 'category_view'", "event_day >= ?", "event_day <= ?"];
   const categoryValues = [filters.startDate, filters.endDate];
-  if (filters.audience !== "ALL") {
-    categoryConditions.push("audience = ?");
-    categoryValues.push(filters.audience);
-  }
   const categoryWhere = categoryConditions.join(" AND ");
   const [rowsResult, totalsResult, uniqueResult, counterResult, categoryResult] = await env.DB.batch([
     env.DB.prepare(`
@@ -144,31 +140,43 @@ export async function handleAdminVisitStatisticsGet(url, env) {
         SELECT event_day, session_hash, visitor_hash, category_key, audience
         FROM visit_events
         WHERE ${categoryWhere}
-      ), category_totals AS (
-        SELECT category_key,
+      ), audience_totals AS (
+        SELECT category_key, audience,
                COUNT(*) AS category_views,
                COUNT(DISTINCT session_hash) AS visits
         FROM filtered
-        GROUP BY category_key
+        GROUP BY category_key, audience
       ), daily_unique AS (
         SELECT category_key, event_day, audience,
                COUNT(DISTINCT visitor_hash) AS unique_visitors
         FROM filtered
         GROUP BY category_key, event_day, audience
-      ), unique_totals AS (
-        SELECT category_key, SUM(unique_visitors) AS unique_visitors
+      ), audience_unique AS (
+        SELECT category_key, audience, SUM(unique_visitors) AS unique_visitors
         FROM daily_unique
-        GROUP BY category_key
+        GROUP BY category_key, audience
+      ), metrics AS (
+        SELECT audience_totals.category_key,
+               audience_totals.audience,
+               audience_totals.category_views,
+               audience_totals.visits,
+               COALESCE(audience_unique.unique_visitors, 0) AS unique_visitors
+        FROM audience_totals
+        LEFT JOIN audience_unique
+          ON audience_unique.category_key = audience_totals.category_key
+         AND audience_unique.audience = audience_totals.audience
       )
-      SELECT category_totals.category_key,
-             category_totals.category_views,
-             category_totals.visits,
-             COALESCE(unique_totals.unique_visitors, 0) AS unique_visitors
-      FROM category_totals
-      LEFT JOIN unique_totals USING (category_key)
-      ORDER BY category_totals.category_views DESC,
-               category_totals.visits DESC,
-               category_totals.category_key
+      SELECT category_key,
+             SUM(CASE WHEN audience = 'PUBLIC' THEN category_views ELSE 0 END) AS public_views,
+             SUM(CASE WHEN audience = 'PUBLIC' THEN visits ELSE 0 END) AS public_visits,
+             SUM(CASE WHEN audience = 'PUBLIC' THEN unique_visitors ELSE 0 END) AS public_unique_visitors,
+             SUM(CASE WHEN audience = 'ADMIN' THEN category_views ELSE 0 END) AS admin_views,
+             SUM(CASE WHEN audience = 'ADMIN' THEN visits ELSE 0 END) AS admin_visits,
+             SUM(CASE WHEN audience = 'ADMIN' THEN unique_visitors ELSE 0 END) AS admin_unique_visitors
+      FROM metrics
+      GROUP BY category_key
+      ORDER BY public_views DESC, public_visits DESC,
+               admin_views DESC, admin_visits DESC, category_key
     `).bind(...categoryValues)
   ]);
   const totals = totalsResult.results[0] || {};
@@ -186,9 +194,12 @@ export async function handleAdminVisitStatisticsGet(url, env) {
     publicCounter: mapVisitCounter(publicCounter),
     categoryRows: categoryResult.results.map((row) => ({
       category: row.category_key,
-      views: Number(row.category_views || 0),
-      visits: Number(row.visits || 0),
-      uniqueVisitors: Number(row.unique_visitors || 0)
+      publicViews: Number(row.public_views || 0),
+      publicVisits: Number(row.public_visits || 0),
+      publicUniqueVisitors: Number(row.public_unique_visitors || 0),
+      adminViews: Number(row.admin_views || 0),
+      adminVisits: Number(row.admin_visits || 0),
+      adminUniqueVisitors: Number(row.admin_unique_visitors || 0)
     })),
     rows: rowsResult.results.map((row) => ({
       date: row.event_day,

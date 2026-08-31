@@ -89,7 +89,7 @@
     if (!rows.length) {
       const row = document.createElement("tr");
       const cell = document.createElement("td");
-      cell.colSpan = 5;
+      cell.colSpan = 8;
       cell.className = "visit-statistics-empty";
       cell.textContent = "Aucune catégorie enregistrée sur cette période.";
       row.appendChild(cell);
@@ -100,9 +100,12 @@
       const row = document.createElement("tr");
       appendCell(row, number(index + 1));
       appendCell(row, item.category);
-      appendCell(row, number(item.views));
-      appendCell(row, number(item.visits));
-      appendCell(row, number(item.uniqueVisitors));
+      appendCell(row, number(item.publicViews));
+      appendCell(row, number(item.publicVisits));
+      appendCell(row, number(item.publicUniqueVisitors));
+      appendCell(row, number(item.adminViews));
+      appendCell(row, number(item.adminVisits));
+      appendCell(row, number(item.adminUniqueVisitors));
       return row;
     }));
   }

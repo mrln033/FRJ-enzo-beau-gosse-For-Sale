@@ -149,20 +149,35 @@ test("les catégories affichées sont classées sans gonfler les pages vues", as
   await record(env, visitPayload({ eventType: "category_view", category: "ARMORS" }));
   await record(env, visitPayload({
     eventType: "category_view",
+    category: "ARMORS",
+    sessionId: "44444444-4444-4444-8444-444444444444",
+    visitorId: "55555555-5555-4555-8555-555555555555",
+    admin: true
+  }));
+  await record(env, visitPayload({
+    eventType: "category_view",
     category: "WEAPONS",
     sessionId: "33333333-3333-4333-8333-333333333333"
   }));
 
   const counter = await (await handleVisitCounterGet(env)).json();
   const report = await (await handleAdminVisitStatisticsGet(
-    new URL(`https://api.example/admin/visit-statistics?startDate=${counter.startDate}&endDate=${counter.startDate}`),
+    new URL(`https://api.example/admin/visit-statistics?startDate=${counter.startDate}&endDate=${counter.startDate}&audience=PUBLIC`),
     env
   )).json();
 
   assert.deepEqual(report.totals, { pageViews: 1, visits: 1, uniqueVisitors: 1 });
   assert.deepEqual(report.categoryRows, [
-    { category: "ARMORS", views: 2, visits: 1, uniqueVisitors: 1 },
-    { category: "WEAPONS", views: 1, visits: 1, uniqueVisitors: 1 }
+    {
+      category: "ARMORS",
+      publicViews: 2, publicVisits: 1, publicUniqueVisitors: 1,
+      adminViews: 1, adminVisits: 1, adminUniqueVisitors: 1
+    },
+    {
+      category: "WEAPONS",
+      publicViews: 1, publicVisits: 1, publicUniqueVisitors: 1,
+      adminViews: 0, adminVisits: 0, adminUniqueVisitors: 0
+    }
   ]);
 });
 
