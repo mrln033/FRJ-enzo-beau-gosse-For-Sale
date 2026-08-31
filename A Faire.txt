@@ -2,25 +2,44 @@ Projet 'FRJ For Sale' ==> Listes 'A faire' et 'Fait'
 
 ----------------
 = INSTRUCTIONS =
-Les pragraphes ci-dessous sont des idées de choses à faire/améliorer dans le projet.
-Pour chaque 'taches' réalisée, maintient ce fichier à jour, en déplaçant le paragraphe traité (la Demande) tel que (pour savoir ce qui a été demandé) et en détaillant ce qui a été fait (la Réalisation), dans la section suivante (REALISATIONS). Datation souhaitée ;)
+Les paragraphes ci-dessous sont des idées de choses à faire/améliorer dans le projet.
+Pour chaque tâche réalisée, maintiens ce fichier à jour, en déplaçant le paragraphe traité (la Demande) tel quel (pour savoir ce qui a été demandé) et en détaillant ce qui a été fait (la Réalisation), dans la section suivante (REALISATIONS). Datation souhaitée ;)
 Par la même occasion, si tu as de l'historique de ton côté, n'hésite pas à renseigner au mieux la partie REALISATIONS
 Je tiens à garder une trace de tout ce qu'on a fait sur ce projet.
 
+Convention d'identification à compter du 31/08/2026 :
+- chaque nouvelle tâche reçoit un identifiant permanent T-NNN, attribué dans l'ordre de création et jamais réutilisé ni renuméroté ;
+- son type est indiqué séparément : [CORRECTIF], [ÉVOLUTION] ou [MAINTENANCE] ;
+- son état est indiqué séparément : [À FAIRE], [EN COURS] ou [EN ATTENTE] ;
+- l'ordre des paragraphes dans DEMANDES donne l'ordre de priorité, indépendamment de leur numéro ;
+- les éventuelles étapes d'une tâche utilisent le suffixe .1, .2, etc. (exemple : T-003.1) ;
+- les anciennes références d.N restent inchangées dans l'historique afin de préserver la trace des échanges passés.
+
 ----------------------------------------
-POINT DE REPRISE — 30/08/2026
+POINT DE REPRISE — 31/08/2026
 
 Ordre recommandé déjà réalisé et validé : d.1 -> d.2 -> d.3 -> d.7 -> d.8 -> d.6 -> d.10 -> d.11 -> d.5 -> d.13 -> d.12.
 Les demandes d.13, d.12 et d.9 sont terminées. D.9 fournit les promotions quotidiennes et les soldes communs à GAS et D1.
 
-La seule demande encore ouverte est d.4.
-D.4 est mise en attente à la demande du 29/08/2026 : son périmètre doit être mieux cadré avant toute analyse définitive ou implémentation.
+Les tâches T-001 à T-004 sont à faire, dans l'ordre où elles figurent ci-dessous sauf nouvelle priorisation.
+L'ancienne demande d.4 reste ouverte mais mise en attente à la demande du 29/08/2026 : son périmètre doit être mieux cadré avant toute analyse définitive ou implémentation.
 
 -------------------------------
 DEMANDES  => CE QUI EST A FAIRE
 
+T-001 [CORRECTIF] [À FAIRE] => Demandes d'achat > Nouvelle demande directe.
+	Je veux que les articles soient triés par ordre alphabétique dans la liste déroulante d'ajout, indépendemment de leur catégorie/rayon.
+	J'aimerais également que les entêtes (Article / Quantité / MU) soient commun à toutes les lignes. Concrètement, chaque ligne ajoutées n'aurait pas ces entêtes qui se trouverait en haut du table de la zone des lignes d'articles. Par comtre, les mention en fin de lignses (Stock, prix et estimation) sont à conserver pour chaque ligne (peut être en plus petit pour l'ergonomie générale).
+T-002 [CORRECTIF] [À FAIRE] => Demandes d'achat > Nouvelle demande directe.
+	j'ai eu un 'souci' (qui n'en est pas vraiment un) d'affichage... Après la création d'un nouvelle demande, une confirmation est affichée en bas du formlaire, avec un lien vers la demande à communiquer éventuellement au client. Si on masque le formulaire et qu'on le rouvre (dans la meme session surement), ces lignes de confirmation sont toujours affichées :s
+T-003 [ÉVOLUTION] [À FAIRE] => Demandes d'achat > Nouvelle demande directe.
+	j'aimerais qu'aucun article ne soit sélectionne par défaut dans la liste... mais plutôt un msg du style 'Choisissez un article dans la liste...'. je voudrais également que le champs soit à 'saisie prédictive' ,)
+T-004 [CORRECTIF] [À FAIRE] => Demandes d'achat > Nouvelle demande directe.
+	le MU ne se met pas à jour à la sélection d'un article, alors qu'il devrait s'afficher en fonction du profil choisi.
+
+
 [EN ATTENTE DE CADRAGE]
-d.4/ Console Admin "Demandes d'Achat" ==> ajouter un bouton 'Supprimer' à chaque demande avec message de confirmation. Celà supprimerais l'enregistrement complet dans D1. Propagation Discord avec modification du statut en 'SUPPRIMEE' pour archivage.
+d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> ajouter un bouton 'Supprimer' à chaque demande avec message de confirmation. Celà supprimerais l'enregistrement complet dans D1. Propagation Discord avec modification du statut en 'SUPPRIMEE' pour archivage.
 
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
