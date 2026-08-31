@@ -17,6 +17,7 @@
   let lastOrdersReport = null;
   let lastOrders = [];
   let newOrderEditors = [];
+  let directOrderListSequence = 0;
 
   function hasAtMostDecimals(value, decimals) {
     const factor = 10 ** decimals;
@@ -29,6 +30,19 @@
       ? Number(item.markupValue || 0) * 100
       : Number(item.markupValue || 0);
     return amount.toFixed(6).replace(/\.?0+$/, "");
+  }
+
+  function compareCatalogItems(left, right) {
+    const options = { sensitivity: "base", numeric: true };
+    const byName = String(left?.itemName || "").localeCompare(String(right?.itemName || ""), "fr", options);
+    if (byName) return byName;
+    const byStorage = String(left?.storage || "").localeCompare(String(right?.storage || ""), "fr", options);
+    if (byStorage) return byStorage;
+    return String(left?.aisle || "").localeCompare(String(right?.aisle || ""), "fr", options);
+  }
+
+  function catalogItemChoiceLabel(item) {
+    return `${item.itemName} — ${item.storage} / ${item.aisle} — stock ${ui.formatQuantity(item.availableStock)}`;
   }
 
   function readSelectedStatuses() {
@@ -80,7 +94,7 @@
     try {
       const response = await global.FRJ_API.fetchD1Admin("/admin/orders/catalog", { cache: "no-store" });
       const result = await response.json();
-      orderCatalog = Array.isArray(result.items) ? result.items : [];
+      orderCatalog = Array.isArray(result.items) ? [...result.items].sort(compareCatalogItems) : [];
       if (!orderCatalog.length) throw new Error("Aucun article avec un stock positif n’est disponible.");
       toggle.disabled = false;
       toggle.textContent = "Ajouter une nouvelle demande";
@@ -344,23 +358,44 @@
   }
 
   function createDirectLineEditor(catalogItems, options = {}) {
+    const sortedCatalogItems = [...catalogItems].sort(compareCatalogItems);
     const root = document.createElement("div");
-    root.className = "direct-order-line";
+    root.className = options.sharedHeadings
+      ? "direct-order-line has-shared-headings"
+      : "direct-order-line";
     const articleLabel = document.createElement("label");
-    articleLabel.textContent = "Article";
-    const article = document.createElement("select");
+    articleLabel.className = "direct-order-field";
+    const articleHeading = document.createElement("span");
+    articleHeading.className = "direct-order-field-label";
+    articleHeading.textContent = "Article";
+    const article = document.createElement("input");
+    article.type = "search";
+    article.required = true;
+    article.placeholder = "Choisissez un article dans la liste…";
+    article.setAttribute("autocomplete", "off");
+    article.setAttribute("spellcheck", "false");
     article.setAttribute("aria-label", "Article de la demande directe");
-    catalogItems.forEach((item, index) => {
+    directOrderListSequence += 1;
+    const listId = `direct-order-articles-${directOrderListSequence}`;
+    const choices = new Map();
+    const datalist = document.createElement("datalist");
+    datalist.id = listId;
+    article.setAttribute("list", listId);
+    sortedCatalogItems.forEach((item) => {
+      const label = catalogItemChoiceLabel(item);
       const option = document.createElement("option");
-      option.value = String(index);
-      option.textContent = `${item.itemName} — ${item.storage} / ${item.aisle} — stock ${ui.formatQuantity(item.availableStock)}`;
-      article.appendChild(option);
+      option.value = label;
+      datalist.appendChild(option);
+      choices.set(label, item);
     });
-    article.value = catalogItems.length ? "0" : "";
-    articleLabel.appendChild(article);
+    article.value = "";
+    articleLabel.append(articleHeading, article, datalist);
 
     const quantityLabel = document.createElement("label");
-    quantityLabel.textContent = "Quantité";
+    quantityLabel.className = "direct-order-field";
+    const quantityHeading = document.createElement("span");
+    quantityHeading.className = "direct-order-field-label";
+    quantityHeading.textContent = "Quantité";
     const quantity = document.createElement("input");
     quantity.type = "number";
     quantity.min = "1";
@@ -368,10 +403,13 @@
     quantity.value = "1";
     quantity.required = true;
     quantity.setAttribute("aria-label", "Quantité de la demande directe");
-    quantityLabel.appendChild(quantity);
+    quantityLabel.append(quantityHeading, quantity);
 
     const markupLabel = document.createElement("label");
-    markupLabel.textContent = "MU";
+    markupLabel.className = "direct-order-field";
+    const markupHeading = document.createElement("span");
+    markupHeading.className = "direct-order-field-label";
+    markupHeading.textContent = "MU";
     const markupFields = document.createElement("span");
     markupFields.className = "direct-markup-fields";
     const kind = document.createElement("select");
@@ -388,11 +426,11 @@
     amount.min = "0";
     amount.max = "1000000";
     amount.step = "0.01";
-    amount.value = "100.00";
+    amount.value = "";
     amount.required = true;
     amount.setAttribute("aria-label", "Valeur de MU de la demande directe");
     markupFields.append(kind, amount);
-    markupLabel.appendChild(markupFields);
+    markupLabel.append(markupHeading, markupFields);
 
     const output = document.createElement("div");
     output.className = "direct-order-line-output";
@@ -405,14 +443,20 @@
     remove.className = "direct-order-remove";
     remove.textContent = "Retirer";
 
+    const selectedItem = () => choices.get(article.value) || null;
     const applyCatalogMarkup = (frjMember = options.frjMember === true) => {
-      const item = catalogItems[Number(article.value)] || null;
+      const item = selectedItem();
+      if (!item) {
+        kind.value = "percent";
+        amount.value = "";
+        return;
+      }
       const itemKind = item?.markupKind === "ped" || item?.markupKind === "percent"
         ? item.markupKind
         : "percent";
       const storedValue = Number(item?.markupValue);
       let displayedAmount = itemKind === "percent" ? 100 : 0;
-      if (Number.isFinite(storedValue)) {
+      if (item?.markupValue !== null && item?.markupValue !== "" && Number.isFinite(storedValue)) {
         displayedAmount = itemKind === "percent" ? storedValue * 100 : storedValue;
         if (frjMember) {
           displayedAmount = itemKind === "percent"
@@ -425,7 +469,7 @@
     };
 
     const read = () => {
-      const item = catalogItems[Number(article.value)] || null;
+      const item = selectedItem();
       const itemQuantity = Number(quantity.value);
       const markupAmount = Number(amount.value);
       const valid = Boolean(item)
@@ -455,8 +499,8 @@
       };
     };
     const refresh = () => {
-      const item = catalogItems[Number(article.value)] || null;
-      if (item) quantity.max = String(item.availableStock);
+      const item = selectedItem();
+      quantity.max = item ? String(item.availableStock) : "";
       const value = read();
       stock.textContent = item ? `Stock : ${ui.formatQuantity(item.availableStock)}` : "Stock : —";
       displayedPrice.textContent = item ? `Prix affiché : ${ui.formatPed(item.unitTtPed)} PED` : "Prix affiché : —";
@@ -464,10 +508,12 @@
       options.onChange?.();
       return value;
     };
-    article.addEventListener("change", () => {
+    const refreshSelectedItem = () => {
       applyCatalogMarkup();
       refresh();
-    });
+    };
+    article.addEventListener("input", refreshSelectedItem);
+    article.addEventListener("change", refreshSelectedItem);
     quantity.addEventListener("input", refresh);
     amount.addEventListener("input", refresh);
     kind.addEventListener("change", () => {
@@ -487,7 +533,6 @@
       }
     };
     remove.addEventListener("click", () => options.onRemove?.(editor));
-    applyCatalogMarkup();
     refresh();
     return editor;
   }
@@ -498,6 +543,7 @@
     const form = document.getElementById("newOrderForm");
     if (!toggle || !panel || !form) return;
     toggle.addEventListener("click", () => {
+      clearNewOrderResult();
       panel.hidden = !panel.hidden;
       toggle.textContent = panel.hidden ? "Ajouter une nouvelle demande" : "Masquer le formulaire";
       if (!panel.hidden && !newOrderEditors.length) addNewOrderLine();
@@ -510,6 +556,7 @@
     });
     document.getElementById("newOrderCancel").addEventListener("click", () => {
       resetNewOrderForm();
+      clearNewOrderResult();
       panel.hidden = true;
       toggle.textContent = "Ajouter une nouvelle demande";
     });
@@ -521,6 +568,7 @@
     let editor;
     editor = createDirectLineEditor(orderCatalog, {
       frjMember: document.getElementById("newOrderProfile").value === "frj",
+      sharedHeadings: true,
       onChange: updateNewOrderForm,
       onRemove: () => {
         newOrderEditors = newOrderEditors.filter((candidate) => candidate !== editor);
@@ -531,10 +579,23 @@
     renderNewOrderLines();
   }
 
+  function createDirectLinesHeader() {
+    const header = document.createElement("div");
+    header.className = "direct-order-lines-header";
+    header.setAttribute("aria-hidden", "true");
+    ["Article", "Quantité", "MU", "Détails de la ligne", ""].forEach((heading) => {
+      const cell = document.createElement("span");
+      cell.textContent = heading;
+      header.appendChild(cell);
+    });
+    return header;
+  }
+
   function renderNewOrderLines() {
     const container = document.getElementById("newOrderLines");
     if (!container) return;
-    container.replaceChildren(...newOrderEditors.map((editor) => editor.root));
+    const lines = newOrderEditors.map((editor) => editor.root);
+    container.replaceChildren(...(lines.length ? [createDirectLinesHeader(), ...lines] : []));
     newOrderEditors.forEach((editor) => { editor.remove.hidden = newOrderEditors.length === 1; });
     updateNewOrderForm();
   }
@@ -565,6 +626,13 @@
       feedback.textContent = "";
       feedback.className = "new-order-feedback";
     }
+  }
+
+  function clearNewOrderResult() {
+    const resultPanel = document.getElementById("newOrderResult");
+    if (!resultPanel) return;
+    resultPanel.replaceChildren();
+    resultPanel.hidden = true;
   }
 
   async function submitNewOrder(event) {
@@ -645,6 +713,7 @@
       const save = document.createElement("button");
       save.type = "button";
       save.textContent = "Ajouter à la proposition";
+      save.disabled = true;
       let editor;
       editor = createDirectLineEditor(available, {
         frjMember: order.frjMember === true,

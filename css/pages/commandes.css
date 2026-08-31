@@ -67,12 +67,15 @@ body { max-width: 1250px; margin: 0 auto; padding: 78px 18px 40px; box-sizing: b
     .new-order-identity input, .new-order-identity select { min-width: 0; padding: 7px; }
     .new-order-identity p { margin: 0; padding: 7px 0; }
     .direct-order-lines { display: grid; gap: 10px; margin-top: 14px; }
+    .direct-order-lines-header { display: grid; grid-template-columns: minmax(240px, 2.4fr) minmax(90px, .7fr) minmax(145px, 1fr) minmax(110px, .8fr) auto; gap: 8px; padding: 0 11px; color: #5e5547; font-size: .78rem; font-weight: 800; }
+    .direct-order-lines-header span:last-child { min-width: 58px; }
     .direct-order-line { display: grid; grid-template-columns: minmax(240px, 2.4fr) minmax(90px, .7fr) minmax(145px, 1fr) minmax(110px, .8fr) auto; gap: 8px; align-items: end; padding: 10px; border: 1px solid #d7ccb8; border-radius: 8px; background: #fff; }
     .direct-order-line label { display: grid; gap: 4px; min-width: 0; font-size: .82rem; font-weight: 700; }
+    .direct-order-line.has-shared-headings .direct-order-field-label { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
     .direct-order-line select, .direct-order-line input { min-width: 0; padding: 7px; box-sizing: border-box; }
     .direct-order-line .direct-markup-fields { display: grid; grid-template-columns: 70px minmax(70px, 1fr); gap: 5px; }
-    .direct-order-line-output { display: grid; gap: 3px; min-width: 105px; font-size: .8rem; }
-    .direct-order-line-output strong { font-size: .92rem; }
+    .direct-order-line-output { display: grid; gap: 2px; min-width: 105px; color: #675e51; font-size: .75rem; line-height: 1.25; }
+    .direct-order-line-output strong { color: #2f2a23; font-size: .86rem; }
     .direct-order-remove { padding: 7px 10px; border: 1px solid #a94b43; border-radius: 6px; color: #8c241d; background: #fff1ef; cursor: pointer; }
     .new-order-toolbar, .new-order-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; }
     .new-order-toolbar button, .new-order-actions button { padding: 8px 13px; }
@@ -97,7 +100,9 @@ body { max-width: 1250px; margin: 0 auto; padding: 78px 18px 40px; box-sizing: b
       .orders-header { align-items: flex-start; }
       .orders-page-actions { flex-direction: column; }
       .new-order-identity { grid-template-columns: 1fr; }
+      .direct-order-lines-header { display: none; }
       .direct-order-line { grid-template-columns: 1fr; }
+      .direct-order-line.has-shared-headings .direct-order-field-label { position: static; width: auto; height: auto; padding: 0; margin: 0; overflow: visible; clip: auto; white-space: normal; border: 0; }
       .order-card header { align-items: stretch; flex-direction: column; }
       .order-header-actions, .order-tracking-control { justify-items: stretch; }
       .order-tracking-feedback { max-width: none; text-align: left; }

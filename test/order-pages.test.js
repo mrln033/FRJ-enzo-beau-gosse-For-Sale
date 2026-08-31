@@ -372,10 +372,16 @@ test("d.12 crée une demande directe et propose son lien de suivi", async () => 
   const created = [];
   const requests = [];
   const token = `${"a".repeat(36)}-${"b".repeat(36)}`;
-  const catalog = [{
-    itemName: "Item A", storage: "ARMORS", aisle: "PARTS", availableStock: 5, unitTtPed: 10,
-    markupKind: "percent", markupValue: 1.2
-  }];
+  const catalog = [
+    {
+      itemName: "Zulu Item", storage: "ARMORS", aisle: "PARTS", availableStock: 2, unitTtPed: 20,
+      markupKind: "ped", markupValue: 1
+    },
+    {
+      itemName: "Item A", storage: "ARMORS", aisle: "PARTS", availableStock: 5, unitTtPed: 10,
+      markupKind: "percent", markupValue: 1.2
+    }
+  ];
   const document = {
     getElementById: (id) => elements.get(id),
     createElement: () => {
@@ -412,7 +418,22 @@ test("d.12 crée une demande directe et propose son lien de suivi", async () => 
   await settle();
 
   elements.get("newOrderToggle").listeners.get("click")();
+  const linesHeader = elements.get("newOrderLines").children[0];
+  assert.equal(linesHeader.className, "direct-order-lines-header");
+  assert.deepEqual(linesHeader.children.slice(0, 4).map((cell) => cell.textContent), [
+    "Article", "Quantité", "MU", "Détails de la ligne"
+  ]);
+  const article = created.find((element) => element.attributes.get("aria-label") === "Article de la demande directe");
   const amount = created.find((element) => element.attributes.get("aria-label") === "Valeur de MU de la demande directe");
+  const datalist = created.find((element) => element.id === article.attributes.get("list"));
+  assert.equal(article.type, "search");
+  assert.equal(article.value, "");
+  assert.match(article.placeholder, /Choisissez un article/);
+  assert.match(datalist.children[0].value, /^Item A/);
+  assert.match(datalist.children[1].value, /^Zulu Item/);
+  assert.equal(amount.value, "");
+  article.value = datalist.children[0].value;
+  article.listeners.get("input")();
   assert.equal(amount.step, "0.01");
   assert.equal(amount.value, "110.00");
   elements.get("newOrderProfile").value = "public";
@@ -434,6 +455,11 @@ test("d.12 crée une demande directe et propose son lien de suivi", async () => 
   assert.equal(elements.get("newOrderResult").hidden, false);
   assert.match(elements.get("newOrderResult").children[0].textContent, /FRJ-20260829-ABC123/);
   assert.match(elements.get("newOrderResult").children[1].href, /suivi-commande\.html\?token=/);
+  elements.get("newOrderToggle").listeners.get("click")();
+  assert.equal(elements.get("newOrderResult").hidden, true);
+  assert.equal(elements.get("newOrderResult").children.length, 0);
+  elements.get("newOrderToggle").listeners.get("click")();
+  assert.equal(elements.get("newOrderResult").hidden, true);
 });
 
 test("d.12 ajoute un article à une proposition existante", async () => {
@@ -508,6 +534,12 @@ test("d.12 ajoute un article à une proposition existante", async () => {
   assert.equal(form.hidden, true);
   toggle.listeners.get("click")();
   const save = created.filter((element) => element.textContent === "Ajouter à la proposition").at(-1);
+  const article = created.filter((element) => element.attributes.get("aria-label") === "Article de la demande directe").at(-1);
+  const datalist = created.find((element) => element.id === article.attributes.get("list"));
+  assert.equal(save.disabled, true);
+  article.value = datalist.children[0].value;
+  article.listeners.get("input")();
+  assert.equal(save.disabled, false);
   await save.listeners.get("click")();
   await settle();
   const post = requests.find((request) => request.path.endsWith(`/admin/orders/${order.id}/items`) || request.path === `/admin/orders/${order.id}/items`);
