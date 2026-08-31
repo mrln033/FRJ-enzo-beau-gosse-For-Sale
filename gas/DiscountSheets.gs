@@ -86,8 +86,16 @@ function frjDiscountSheetDate_(value) {
 
 function frjGenerateDailyPromotionFromGas_() {
   var config = frjReadLocalDiscountConfig_().rows[0];
-  if (!config.automaticPromotionsEnabled) return { reason: "AUTOMATION_DISABLED" };
-  var date = Utilities.formatDate(new Date(), "Europe/Paris", "yyyy-MM-dd");
+  var businessDate = Utilities.formatDate(new Date(), "Europe/Paris", "yyyy-MM-dd");
+  var tomorrowDate = frjAddDiscountDays_(businessDate, 1);
+  if (!config.automaticPromotionsEnabled) {
+    return {
+      reason: "AUTOMATION_DISABLED", businessDate: businessDate,
+      today: { reason: "AUTOMATION_DISABLED", date: businessDate, campaign: null },
+      tomorrow: { reason: "AUTOMATION_DISABLED", date: tomorrowDate, campaign: null },
+      generatedDates: []
+    };
+  }
   var campaigns = frjReadLocalDiscountCampaigns_();
   var sheet = SpreadsheetApp.openById(FRJ_SYNC_CONFIG.appSpreadsheetId).getSheetByName(FRJ_SYNC_CONFIG.catalogSheetName);
   var values = sheet.getLastRow() > 1 ? sheet.getRange(2, 1, sheet.getLastRow() - 1, 9).getValues() : [];
@@ -95,24 +103,37 @@ function frjGenerateDailyPromotionFromGas_() {
     var parsed = frjParsePromotionMarkup_(row[8]);
     return { storage: row[0], aisle: row[1], quantity: Number(row[3]), markupKind: parsed.kind, markupValue: parsed.value };
   });
-  var result = frjPlanDailyPromotion_({
-    date: date, items: items,
-    dailyPromotions: campaigns.rows.filter(function(row) { return row.type === "daily_promo"; }),
-    sales: campaigns.rows.filter(function(row) { return row.type === "sale"; }),
-    defaultRate: config.defaultPromotionRate, seed: config.selectionSeed
-  });
-  if (result.reason !== "GENERATED") return result;
-  var campaign = result.campaign;
-  campaigns.rows.push({
-    id: "daily-promo-" + date, type: "daily_promo", startsOn: date, endsOn: date,
-    storage: campaign.storage, aisle: campaign.aisle, discountRate: campaign.discountRate,
-    enabled: true, origin: "automatic", eligiblePairCount: result.eligiblePairCount,
-    candidatePairCount: result.candidatePairCount, updatedAt: new Date().toISOString()
-  });
-  frjWriteLocalDiscountCampaigns_({ rows: campaigns.rows });
-  frjClearCatalogCache_();
-  frjRequestSynchronization_("generation-promotion-quotidienne", FRJ_SYNC_CONFIG.appSpreadsheetId);
-  return result;
+  function generateForDate(date) {
+    var result = frjPlanDailyPromotion_({
+      date: date, items: items,
+      dailyPromotions: campaigns.rows.filter(function(row) { return row.type === "daily_promo"; }),
+      sales: campaigns.rows.filter(function(row) { return row.type === "sale"; }),
+      defaultRate: config.defaultPromotionRate, seed: config.selectionSeed
+    });
+    if (result.reason !== "GENERATED") return result;
+    var campaign = result.campaign;
+    campaigns.rows.push({
+      id: "daily-promo-" + date, type: "daily_promo", startsOn: date, endsOn: date,
+      storage: campaign.storage, aisle: campaign.aisle, discountRate: campaign.discountRate,
+      enabled: true, origin: "automatic", eligiblePairCount: result.eligiblePairCount,
+      candidatePairCount: result.candidatePairCount, updatedAt: new Date().toISOString()
+    });
+    return result;
+  }
+  var today = generateForDate(businessDate);
+  var tomorrow = generateForDate(tomorrowDate);
+  var generatedDates = [today, tomorrow].filter(function(result) {
+    return result.reason === "GENERATED";
+  }).map(function(result) { return result.date; });
+  if (generatedDates.length) {
+    frjWriteLocalDiscountCampaigns_({ rows: campaigns.rows });
+    frjClearCatalogCache_();
+    frjRequestSynchronization_("generation-promotion-aujourdhui-demain", FRJ_SYNC_CONFIG.appSpreadsheetId);
+  }
+  return {
+    reason: generatedDates.length ? "GENERATED" : tomorrow.reason,
+    businessDate: businessDate, today: today, tomorrow: tomorrow, generatedDates: generatedDates
+  };
 }
 
 function frjParsePromotionMarkup_(value) {

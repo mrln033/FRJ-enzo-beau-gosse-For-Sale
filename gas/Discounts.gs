@@ -142,7 +142,7 @@ function frjPlanDailyPromotion_(options) {
   var blockedKeys = {};
   promotions.forEach(function(promotion) {
     var age = frjDifferenceInDiscountDays_(promotion.date, businessDate);
-    if (age >= 1 && age < FRJ_DISCOUNT_CONFIG.cooldownDays) blockedKeys[promotion.key] = true;
+    if (Math.abs(age) >= 1 && Math.abs(age) < FRJ_DISCOUNT_CONFIG.cooldownDays) blockedKeys[promotion.key] = true;
   });
   var candidates = eligiblePairs.filter(function(pair) { return !blockedKeys[pair.key]; });
   if (candidates.length === 0) {
@@ -210,6 +210,15 @@ function frjNormalizeDiscountDate_(rawValue) {
 
 function frjDifferenceInDiscountDays_(earlier, later) {
   return (Date.parse(later + "T00:00:00Z") - Date.parse(earlier + "T00:00:00Z")) / 86400000;
+}
+
+function frjAddDiscountDays_(rawDate, days) {
+  var date = frjNormalizeDiscountDate_(rawDate);
+  var offset = Number(days);
+  if (!Number.isInteger(offset)) throw new Error("Décalage de date invalide");
+  var shifted = new Date(date + "T00:00:00Z");
+  shifted.setUTCDate(shifted.getUTCDate() + offset);
+  return shifted.toISOString().slice(0, 10);
 }
 
 function frjNormalizePromotionPairPart_(value) {

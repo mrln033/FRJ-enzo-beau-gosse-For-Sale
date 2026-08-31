@@ -32,7 +32,7 @@ import {
 } from "./orders.js";
 import { sendOrUpdateDiscordOrder } from "./discord.js";
 import { diffContainerConfig, mapContainerConfigRow, normalizeContainerConfigPayload } from "./containers.js";
-import { businessDateInParis } from "./discounts.js";
+import { addDiscountDays, businessDateInParis } from "./discounts.js";
 import {
   createDiscountCampaign,
   generateDailyPromotion,
@@ -1006,13 +1006,26 @@ async function storeCatalogSnapshot(env, options) {
 // Le cron doit publier le même signal de synchronisation qu'une génération
 // lancée depuis l'Admin. Sans cela, la campagne existerait dans D1 mais GAS ne
 // la découvrirait qu'au prochain audit complet.
-export async function handleScheduledDiscountGeneration(env) {
-  const result = await generateDailyPromotion(env);
-  if (result.reason === "GENERATED") {
+export async function handleScheduledDiscountGeneration(env, requestedBusinessDate = null) {
+  const businessDate = requestedBusinessDate ? String(requestedBusinessDate) : businessDateInParis();
+  const today = await generateDailyPromotion(env, businessDate);
+  const tomorrow = await generateDailyPromotion(env, addDiscountDays(businessDate, 1));
+  const generatedDates = [today, tomorrow]
+    .filter((result) => result.reason === "GENERATED")
+    .map((result) => result.date);
+  if (generatedDates.length) {
     await readDiscountSyncSnapshot(env);
     await notifyGasDataChanged(env, "discounts", "generation-promotion-planifiee-d1");
   }
-  return result;
+  return {
+    reason: generatedDates.length ? "GENERATED" : tomorrow.reason,
+    date: tomorrow.date,
+    campaign: tomorrow.campaign,
+    businessDate,
+    today,
+    tomorrow,
+    generatedDates
+  };
 }
 
 async function storeContainerSnapshot(env, options) {

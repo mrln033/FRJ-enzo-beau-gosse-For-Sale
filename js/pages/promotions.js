@@ -40,15 +40,23 @@
     defaultPromotionRate: Number($("#defaultPromotionRate").value) / 100
   })), "Configuration enregistrée."); }
   async function generateNow() {
-    const labels = {
-      GENERATED: "Promotion du jour générée.", ALREADY_GENERATED: "La promotion du jour existe déjà.",
-      SALE_ACTIVE: "Aucune promotion : des soldes sont en cours.",
-      INSUFFICIENT_ELIGIBLE_PAIRS: "Aucune promotion : moins de 7 couples sont éligibles.",
-      NO_AVAILABLE_PAIR_AFTER_COOLDOWN: "Aucune promotion : tous les couples éligibles sont encore dans leur délai de 7 jours.",
+    const describe = (result, period) => ({
+      GENERATED: `Promotion ${period} générée.`,
+      ALREADY_GENERATED: `La promotion ${period} existe déjà.`,
+      SALE_ACTIVE: `Aucune promotion ${period} : des soldes couvrent cette date.`,
+      INSUFFICIENT_ELIGIBLE_PAIRS: `Aucune promotion ${period} : moins de 7 couples sont éligibles.`,
+      NO_AVAILABLE_PAIR_AFTER_COOLDOWN: `Aucune promotion ${period} : tous les couples éligibles sont encore dans leur délai de 7 jours.`,
       AUTOMATION_DISABLED: "La génération automatique est désactivée."
-    };
+    })[result?.reason] || `Génération ${period} contrôlée.`;
     let message = "Génération contrôlée.";
-    await run(async () => { const result = await api("/admin/discounts/generate", body({})); message = labels[result.reason] || message; }, message);
+    await run(async () => {
+      const result = await api("/admin/discounts/generate", body({}));
+      message = result.reason === "AUTOMATION_DISABLED"
+        ? "La génération automatique est désactivée."
+        : (result.today && result.tomorrow
+        ? `${describe(result.today, "du jour")} ${describe(result.tomorrow, "de demain")}`
+        : describe(result, "du jour"));
+    }, message);
     setStatus(message);
   }
   async function createDaily(event) {

@@ -19,6 +19,8 @@ test("d.9 fournit une page Admin séparée pour promotions et soldes", () => {
   assert.match(controller, /\/admin\/discounts\/campaigns/);
   assert.match(controller, /campaign\.editable === true/);
   assert.match(controller, /terminée — lecture seule/);
+  assert.match(html, /Compléter aujourd’hui et préparer demain/);
+  assert.match(controller, /result\.today && result\.tomorrow/);
   assert.match(menu, /section: "discounts"/);
   assert.match(menu, /pathname\.includes\("promotions"\)/);
 });

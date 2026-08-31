@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
 import {
+  addDiscountDays,
   DAILY_PROMO_COOLDOWN_DAYS,
   DAILY_PROMO_MINIMUM_ELIGIBLE_PAIRS,
   DISCOUNT_TIME_ZONE,
@@ -39,6 +40,13 @@ test("d.9.1 fixe le contrat à sept couples et au fuseau de Paris", () => {
     minimumEligiblePairs: 7,
     cooldownDays: 7
   });
+});
+
+test("T-005 calcule demain sans erreur aux changements de mois et d'année", () => {
+  assert.equal(addDiscountDays("2026-08-31", 1), "2026-09-01");
+  assert.equal(addDiscountDays("2026-12-31", 1), "2027-01-01");
+  assert.equal(addDiscountDays("2028-02-28", 1), "2028-02-29");
+  assert.equal(gasContext.frjAddDiscountDays_("2026-12-31", 1), "2027-01-01");
 });
 
 test("un couple exige au moins un article en stock avec un MU valide", () => {
@@ -100,6 +108,28 @@ test("un couple tiré à J-6 est bloqué mais redevient disponible à J-7", () =
   });
   assert.equal(result.candidatePairCount, 1);
   assert.equal(result.campaign.storage, "CATEGORY 7");
+});
+
+test("T-005 répare le jour courant sans réutiliser le couple déjà prévu demain", () => {
+  const result = planDailyPromotion({
+    date: "2026-08-30",
+    items: sevenPairs(),
+    dailyPromotions: [{
+      date: "2026-08-31", storage: "Category 1", aisle: "Aisle 1", discountRate: 0.05
+    }],
+    seed: "rotation-1"
+  });
+  assert.equal(result.reason, "GENERATED");
+  assert.equal(result.candidatePairCount, 6);
+  assert.notEqual(result.campaign.storage, "CATEGORY 1");
+  assert.deepEqual(plain(gasContext.frjPlanDailyPromotion_({
+    date: "2026-08-30",
+    items: sevenPairs(),
+    dailyPromotions: [{
+      date: "2026-08-31", storage: "Category 1", aisle: "Aisle 1", discountRate: 0.05
+    }],
+    seed: "rotation-1"
+  })), result);
 });
 
 test("aucune promotion n'est générée pendant une période de soldes", () => {

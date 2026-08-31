@@ -84,6 +84,14 @@ function setup() {
   return db;
 }
 
+function completeSevenEligiblePairs(db) {
+  for (let index = 3; index <= 7; index += 1) {
+    db.prepare("INSERT INTO catalog_listings VALUES (?, ?, ?, 1)").run(`Item ${index}`, `CAT ${index}`, `AISLE ${index}`);
+    db.prepare("INSERT INTO inventory_current VALUES ('enzo', ?, ?, 1, 'Carried')").run(`row-${index}`, `Item ${index}`);
+    db.prepare("INSERT INTO market_current VALUES (?, 'percent', 1.1, CURRENT_TIMESTAMP)").run(`Item ${index}`);
+  }
+}
+
 async function post(env, path, payload) {
   const url = new URL(`https://api.example${path}`);
   return handleAdminPost(new Request(url, { method: "POST", body: JSON.stringify(payload) }), url, env);
@@ -153,17 +161,34 @@ test("d.9.2 refuse couple inéligible, répétition et soldes chevauchantes", as
   db.close();
 });
 
-test("d.9.4 le cron matérialise la promotion et signale sa synchronisation", async () => {
+test("T-005 le cron répare aujourd'hui puis prépare demain et signale une seule synchronisation", async () => {
   const db = setup();
-  for (let index = 3; index <= 7; index += 1) {
-    db.prepare("INSERT INTO catalog_listings VALUES (?, ?, ?, 1)").run(`Item ${index}`, `CAT ${index}`, `AISLE ${index}`);
-    db.prepare("INSERT INTO inventory_current VALUES ('enzo', ?, ?, 1, 'Carried')").run(`row-${index}`, `Item ${index}`);
-    db.prepare("INSERT INTO market_current VALUES (?, 'percent', 1.1, CURRENT_TIMESTAMP)").run(`Item ${index}`);
-  }
-  const result = await handleScheduledDiscountGeneration({ DB: makeD1(db) });
+  completeSevenEligiblePairs(db);
+  const result = await handleScheduledDiscountGeneration({ DB: makeD1(db) }, "2026-08-30");
   assert.equal(result.reason, "GENERATED");
-  assert.equal(db.prepare("SELECT COUNT(*) AS total FROM discount_campaigns WHERE origin = 'automatic'").get().total, 1);
+  assert.equal(result.today.reason, "GENERATED");
+  assert.equal(result.tomorrow.reason, "GENERATED");
+  assert.deepEqual(result.generatedDates, ["2026-08-30", "2026-08-31"]);
+  assert.equal(db.prepare("SELECT COUNT(*) AS total FROM discount_campaigns WHERE origin = 'automatic'").get().total, 2);
   const signal = db.prepare("SELECT details FROM sync_audit WHERE action = 'sync-requested' ORDER BY id DESC LIMIT 1").get();
   assert.equal(JSON.parse(signal.details).dataset, "discounts");
+  assert.equal(db.prepare("SELECT COUNT(*) AS total FROM sync_audit WHERE action = 'sync-requested'").get().total, 1);
+  db.close();
+});
+
+test("T-005 complète seulement aujourd'hui lorsque demain est déjà préparé", async () => {
+  const db = setup();
+  completeSevenEligiblePairs(db);
+  db.prepare(`
+    INSERT INTO discount_campaigns (
+      id, campaign_type, starts_on, ends_on, storage, aisle, discount_rate, enabled, origin
+    ) VALUES ('daily-promo-2026-08-31', 'daily_promo', '2026-08-31', '2026-08-31',
+              'CAT 3', 'AISLE 3', 0.05, 1, 'automatic')
+  `).run();
+  const result = await handleScheduledDiscountGeneration({ DB: makeD1(db) }, "2026-08-30");
+  assert.equal(result.today.reason, "GENERATED");
+  assert.equal(result.tomorrow.reason, "ALREADY_GENERATED");
+  assert.deepEqual(result.generatedDates, ["2026-08-30"]);
+  assert.notEqual(result.today.campaign.storage, "CAT 3");
   db.close();
 });

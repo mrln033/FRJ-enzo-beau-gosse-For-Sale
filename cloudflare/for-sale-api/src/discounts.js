@@ -10,6 +10,15 @@ export function businessDateInParis(value = new Date()) {
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
+export function addDiscountDays(rawDate, days) {
+  const date = normalizeIsoDate(rawDate);
+  const offset = Number(days);
+  if (!Number.isInteger(offset)) throw new Error("Décalage de date invalide");
+  const shifted = new Date(`${date}T00:00:00Z`);
+  shifted.setUTCDate(shifted.getUTCDate() + offset);
+  return shifted.toISOString().slice(0, 10);
+}
+
 export function isValidPromotionMarkup(kind, rawValue) {
   const value = optionalNumber(rawValue);
   if (value === null) return false;
@@ -157,7 +166,7 @@ export function planDailyPromotion({
   const blockedKeys = new Set(normalizedPromotions
     .filter((promotion) => {
       const age = differenceInCalendarDays(promotion.date, businessDate);
-      return age >= 1 && age < DAILY_PROMO_COOLDOWN_DAYS;
+      return Math.abs(age) >= 1 && Math.abs(age) < DAILY_PROMO_COOLDOWN_DAYS;
     })
     .map((promotion) => promotion.key));
   const candidates = eligiblePairs.filter((pair) => !blockedKeys.has(pair.key));

@@ -22,23 +22,26 @@ POINT DE REPRISE — 31/08/2026
 Ordre recommandé déjà réalisé et validé : d.1 -> d.2 -> d.3 -> d.7 -> d.8 -> d.6 -> d.10 -> d.11 -> d.5 -> d.13 -> d.12.
 Les demandes d.13, d.12 et d.9 sont terminées. D.9 fournit les promotions quotidiennes et les soldes communs à GAS et D1.
 
-Les tâches T-001 à T-004 sont terminées et publiées.
-La prochaine tâche active est T-005 : préparer automatiquement la promotion du lendemain et signaler l'absence éventuelle de promotion pour le jour courant.
-L'ancienne demande d.4 reste ouverte mais mise en attente à la demande du 29/08/2026 : son périmètre doit être mieux cadré avant toute analyse définitive ou implémentation.
+Les tâches T-001 à T-005 sont terminées et publiées.
+La seule demande encore ouverte est l'ancienne d.4, mise en attente à la demande du 29/08/2026 : son périmètre doit être mieux cadré avant toute analyse définitive ou implémentation.
 
 -------------------------------
 DEMANDES  => CE QUI EST A FAIRE
 
 >>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-006 <<<
 
-T-005 [ÉVOLUTION] [À FAIRE] => Promotions et soldes
-	Concernant la génération automatique, j'aimerais que ce soit la date du lendemain qui soit générée, avec un rappel si la date du jour n'est pas présente. De sorte à toujours avoir un jour 'd'avance' pour un ajustement manuel éventuel, et surtout de pouvoir appliquer les promotions dès 0h00:01 !! :)
-
 [EN ATTENTE DE CADRAGE]
 d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> ajouter un bouton 'Supprimer' à chaque demande avec message de confirmation. Celà supprimerais l'enregistrement complet dans D1. Propagation Discord avec modification du statut en 'SUPPRIMEE' pour archivage.
 
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
+
+31/08/2026 = Tâche T-005 — promotions préparées un jour à l'avance avec réparation automatique.
+Demande d'origine :
+T-005 [ÉVOLUTION] => Promotions et soldes
+	Concernant la génération automatique, j'aimerais que ce soit la date du lendemain qui soit générée, avec un rappel si la date du jour n'est pas présente. De sorte à toujours avoir un jour 'd'avance' pour un ajustement manuel éventuel, et surtout de pouvoir appliquer les promotions dès 0h00:01 !! :)
+	Précision ultérieure : aucun avertissement si la promotion du jour est absente ; elle doit être générée automatiquement avant la préparation du lendemain.
+Réalisation : à chaque exécution automatique, D1 et GAS vérifient d'abord la date métier courante Europe/Paris. Si sa promotion manque, elle est immédiatement générée ; le moteur prépare ensuite celle du lendemain. En régime normal, la campagne est donc déjà présente avant minuit et s'applique dès le changement de jour, tout en restant modifiable à l'avance dans l'Admin. La réparation respecte aussi une promotion future déjà préparée : la fenêtre glissante de sept jours bloque désormais les couples situés avant comme après la date à compléter. Le bouton Admin devient « Compléter aujourd'hui et préparer demain » et détaille le résultat des deux dates. Les changements de mois, d'année et l'année bissextile sont couverts. Les 207 tests réussissent et le dry-run Wrangler est valide. GAS est publié sur la version 26 du déploiement Web App existant ; le clone de contrôle est identique aux quinze sources locales et la route publique répond HTTP 200. Le Worker est publié sous la version '51b23d65-0e2d-4aab-9f35-cf3d79b3d881' avec le cron existant. Une exécution contrôlée du nouveau déclencheur a conservé la promotion du 31/08/2026, créé celle du 01/09/2026 avec un couple différent et enregistré le signal de synchronisation vers GAS. Aucune migration D1 n'était nécessaire.
 
 31/08/2026 = Tâches T-001 à T-004 — formulaire de demande directe fiabilisé et réorganisé.
 Demandes d'origine :
