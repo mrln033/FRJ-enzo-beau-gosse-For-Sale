@@ -42,7 +42,9 @@
   async function generateNow() {
     const describe = (result, period) => ({
       GENERATED: `Promotion ${period} générée.`,
+      REPLACED: `Le couple devenu inéligible pour la promotion ${period} a été remplacé.`,
       ALREADY_GENERATED: `La promotion ${period} existe déjà.`,
+      CAMPAIGN_DISABLED: `La promotion ${period} est désactivée par l’administrateur.`,
       SALE_ACTIVE: `Aucune promotion ${period} : des soldes couvrent cette date.`,
       INSUFFICIENT_ELIGIBLE_PAIRS: `Aucune promotion ${period} : moins de 7 couples sont éligibles.`,
       NO_AVAILABLE_PAIR_AFTER_COOLDOWN: `Aucune promotion ${period} : tous les couples éligibles sont encore dans leur délai de 7 jours.`,
@@ -71,6 +73,7 @@
     const host = $("#discountCampaigns"); host.replaceChildren(...state.campaigns.map((campaign) => {
       const row=document.createElement("div"); row.className=`discount-row ${campaign.type}`;
       const editable=campaign.editable === true; row.classList.toggle("past", !editable);
+      const rateOnly=campaign.editMode === "rate-only";
       const type=document.createElement("strong"); type.textContent=campaign.type === "sale" ? "Soldes" : "Promotion";
       const first=document.createElement("input"); first.type="date"; first.value=campaign.startsOn;
       let second;
@@ -97,8 +100,10 @@
       const label=document.createElement("span"); label.append(type, document.createElement("br"));
       const meta=document.createElement("span"); meta.className="discount-origin";
       meta.textContent=(campaign.type==="daily_promo"?`${campaign.storage} — ${campaign.aisle} · ${campaign.origin}`:campaign.origin)
-        + (editable ? "" : " · terminée — lecture seule"); label.append(meta);
-      [first,second,rate,enabled,save].forEach((control) => { control.disabled=!editable; });
+        + (!editable ? " · terminée — lecture seule" : (rateOnly ? " · aujourd’hui — taux uniquement" : "")); label.append(meta);
+      [first,second,enabled].forEach((control) => { control.disabled=!editable || rateOnly; });
+      [rate,save].forEach((control) => { control.disabled=!editable; });
+      if (rateOnly) { save.textContent="Enregistrer le taux"; row.title="Le couple du jour est figé ; seul le taux reste modifiable"; }
       if (!editable) { save.textContent="Lecture seule"; row.title="Cette campagne passée ne peut plus être modifiée"; }
       row.append(label,first,second,rate,enabled,save); return row;
     }));

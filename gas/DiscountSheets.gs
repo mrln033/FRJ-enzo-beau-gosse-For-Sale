@@ -103,32 +103,64 @@ function frjGenerateDailyPromotionFromGas_() {
     var parsed = frjParsePromotionMarkup_(row[8]);
     return { storage: row[0], aisle: row[1], quantity: Number(row[3]), markupKind: parsed.kind, markupValue: parsed.value };
   });
-  function generateForDate(date) {
+  var eligiblePairKeys = {};
+  frjCollectEligiblePromotionPairs_(items).forEach(function(pair) { eligiblePairKeys[pair.key] = true; });
+  function generateForDate(date, revalidateExisting) {
+    var existing = campaigns.rows.find(function(row) {
+      return row.type === "daily_promo" && row.startsOn === date;
+    });
+    if (existing && existing.enabled !== true) {
+      return { reason: "CAMPAIGN_DISABLED", date: date, campaign: existing, changed: false };
+    }
+    if (existing && (!revalidateExisting
+      || eligiblePairKeys[frjPromotionPairKey_(existing.storage, existing.aisle)])) {
+      return { reason: "ALREADY_GENERATED", date: date, campaign: existing, changed: false };
+    }
+
+    var planningPromotions = existing
+      ? campaigns.rows.filter(function(row) { return row.id !== existing.id; })
+      : campaigns.rows;
     var result = frjPlanDailyPromotion_({
       date: date, items: items,
-      dailyPromotions: campaigns.rows.filter(function(row) { return row.type === "daily_promo"; }),
+      dailyPromotions: planningPromotions.filter(function(row) { return row.type === "daily_promo"; }),
       sales: campaigns.rows.filter(function(row) { return row.type === "sale"; }),
-      defaultRate: config.defaultPromotionRate, seed: config.selectionSeed
+      defaultRate: existing ? existing.discountRate : config.defaultPromotionRate, seed: config.selectionSeed
     });
-    if (result.reason !== "GENERATED") return result;
+    if (result.reason !== "GENERATED") {
+      if (existing) result.campaign = existing;
+      result.changed = false;
+      return result;
+    }
     var campaign = result.campaign;
+    if (existing) {
+      var previousPair = { storage: existing.storage, aisle: existing.aisle };
+      existing.storage = campaign.storage;
+      existing.aisle = campaign.aisle;
+      existing.origin = "automatic";
+      existing.eligiblePairCount = result.eligiblePairCount;
+      existing.candidatePairCount = result.candidatePairCount;
+      existing.updatedAt = new Date().toISOString();
+      return Object.assign({}, result, {
+        reason: "REPLACED", campaign: existing, previousPair: previousPair, changed: true
+      });
+    }
     campaigns.rows.push({
       id: "daily-promo-" + date, type: "daily_promo", startsOn: date, endsOn: date,
       storage: campaign.storage, aisle: campaign.aisle, discountRate: campaign.discountRate,
       enabled: true, origin: "automatic", eligiblePairCount: result.eligiblePairCount,
       candidatePairCount: result.candidatePairCount, updatedAt: new Date().toISOString()
     });
-    return result;
+    return Object.assign({}, result, { changed: true });
   }
-  var today = generateForDate(businessDate);
-  var tomorrow = generateForDate(tomorrowDate);
+  var today = generateForDate(businessDate, false);
+  var tomorrow = generateForDate(tomorrowDate, true);
   var generatedDates = [today, tomorrow].filter(function(result) {
-    return result.reason === "GENERATED";
+    return result.changed === true;
   }).map(function(result) { return result.date; });
   if (generatedDates.length) {
     frjWriteLocalDiscountCampaigns_({ rows: campaigns.rows });
     frjClearCatalogCache_();
-    frjRequestSynchronization_("generation-promotion-aujourdhui-demain", FRJ_SYNC_CONFIG.appSpreadsheetId);
+    frjRequestSynchronization_("generation-ou-reevaluation-promotion-demain", FRJ_SYNC_CONFIG.appSpreadsheetId);
   }
   return {
     reason: generatedDates.length ? "GENERATED" : tomorrow.reason,

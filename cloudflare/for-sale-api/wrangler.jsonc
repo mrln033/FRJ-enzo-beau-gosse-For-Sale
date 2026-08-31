@@ -19,7 +19,7 @@
 		"CART_ENABLED": "true"
 	},
 	"triggers": {
-		"crons": ["5 22,23 * * *"]
+		"crons": ["5 22,23 * * *", "55 21,22 * * *"]
 	},
 	"d1_databases": [
 		{

@@ -90,7 +90,7 @@ gas/
 ```
 
 Ce rangement ne change aucune fonction publique appelée par le frontend ou par les déclencheurs déjà installés.
-Il est publié dans le projet Apps Script de production sur la version 26 du déploiement Web App existant ; l'URL `/exec` reste inchangée.
+Il est publié dans le projet Apps Script de production sur la version 27 du déploiement Web App existant ; l'URL `/exec` reste inchangée.
 Comme ce projet GAS est autonome, les routes de catalogue ouvrent explicitement le classeur BDD_APP par son identifiant et ne dépendent pas de `SpreadsheetApp.getActiveSpreadsheet()`.
 
 ## Promotions et soldes — d.9
@@ -99,7 +99,7 @@ Le Worker et GAS disposent du même moteur de domaine. Une date métier est expr
 
 Une promotion quotidienne peut être générée si au moins sept couples catégorie/rayon sont éligibles. Un couple est éligible lorsqu'il contient au moins un article possédant une quantité vendable strictement positive et un MU exploitable : coefficient supérieur ou égal à 100 % ou supplément PED positif ou nul. Un couple sélectionné à la date J redevient disponible à J+7. La sélection est pseudo-aléatoire, stable pour une même date, une même graine et une même liste canonique de candidats, afin que GAS et D1 prennent la même décision.
 
-Le taux automatique vaut 5 % quand l'Admin n'a défini aucune autre valeur. La promotion est créée immédiatement sans confirmation, puis son couple, sa date, son taux et son activation restent modifiables dans `promotions.html`. Une relance conserve l'enregistrement déjà matérialisé. Les modifications Admin respectent l'éligibilité, la fenêtre glissante de sept jours et les périodes de soldes. Le cron D1 couvre minuit à Paris en heure d'été comme en heure d'hiver ; son second passage est volontairement idempotent. Le déclencheur quotidien GAS exécute le même moteur et chaque création signale la synchronisation.
+Le taux automatique vaut 5 % quand l'Admin n'a défini aucune autre valeur. La promotion est créée immédiatement sans confirmation. Jusqu'à la fin de J-1, le couple préparé pour J+1 est réévalué après les changements d'inventaire, de MU, de catalogue ou de conteneurs : s'il devient inéligible, il est remplacé tout en conservant son taux, sa date et son identifiant. Un dernier contrôle est planifié vers 23 h 55 à Paris. Dès J, le couple et l'activation sont figés, même si les ventes épuisent ensuite la promotion ; seul son taux reste modifiable dans `promotions.html`. Les modifications futures respectent l'éligibilité, la fenêtre glissante de sept jours et les périodes de soldes. Les crons D1 couvrent la préparation avant minuit et le changement de jour en heure d'été comme en heure d'hiver. GAS exécute le même moteur après les synchronisations différées et avec un contrôle final quotidien ; chaque création ou remplacement signale la synchronisation.
 
 Les soldes sont exclusivement configurés par l'Admin, avec des dates inclusives, un taux et un état actif. Deux périodes actives ne peuvent pas se chevaucher. Aucune promotion quotidienne n'est générée pendant des soldes et, lorsqu'une promotion déjà créée chevauche une période ajoutée ultérieurement, les soldes déterminent seuls le tarif actif.
 

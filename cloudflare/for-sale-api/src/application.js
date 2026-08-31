@@ -32,11 +32,12 @@ import {
 } from "./orders.js";
 import { sendOrUpdateDiscordOrder } from "./discord.js";
 import { diffContainerConfig, mapContainerConfigRow, normalizeContainerConfigPayload } from "./containers.js";
-import { addDiscountDays, businessDateInParis } from "./discounts.js";
+import { businessDateInParis } from "./discounts.js";
 import {
   createDiscountCampaign,
   generateDailyPromotion,
   readDiscountAdministration,
+  refreshTomorrowDailyPromotion,
   updateDiscountCampaign,
   updateDiscountConfig
 } from "./discount-admin.js";
@@ -378,6 +379,9 @@ export async function handlePost(request, url, env) {
       sourceUpdatedAt: new Date().toISOString(),
       contentHash
     });
+    if (avatar === "enzo") {
+      await refreshTomorrowAfterEligibilityChange(env, "reevaluation-promotion-demain-apres-inventaire");
+    }
     if (shouldSignalSync) {
       await notifyGasDataChanged(env, `inventory:${avatar}`, "import-d1-inventory");
     }
@@ -416,6 +420,7 @@ export async function handlePost(request, url, env) {
       sourceUpdatedAt: observedAt,
       contentHash
     });
+    await refreshTomorrowAfterEligibilityChange(env, "reevaluation-promotion-demain-apres-mu");
     if (shouldSignalSync) {
       await notifyGasDataChanged(env, "mu", "import-d1-mu");
     }
@@ -547,6 +552,9 @@ export async function handleSyncPost(request, url, env) {
       sourceUpdatedAt,
       contentHash
     });
+    if (avatar === "enzo") {
+      await refreshTomorrowAfterEligibilityChange(env, "reevaluation-promotion-demain-apres-inventaire");
+    }
     return json({ ok: true, noChange: false, state: result.state, rowsWritten: result.rowsWritten });
   }
 
@@ -570,6 +578,7 @@ export async function handleSyncPost(request, url, env) {
       sourceUpdatedAt,
       contentHash
     });
+    await refreshTomorrowAfterEligibilityChange(env, "reevaluation-promotion-demain-apres-mu");
     return json({ ok: true, noChange: false, state: result.state, rowsWritten: result.rowsWritten });
   }
 
@@ -592,6 +601,7 @@ export async function handleSyncPost(request, url, env) {
       sourceUpdatedAt,
       contentHash
     });
+    await refreshTomorrowAfterEligibilityChange(env, "reevaluation-promotion-demain-apres-catalogue");
     return json({ ok: true, noChange: false, state: result.state, rowsWritten: result.rowsWritten });
   }
 
@@ -614,6 +624,7 @@ export async function handleSyncPost(request, url, env) {
       sourceUpdatedAt,
       contentHash
     });
+    await refreshTomorrowAfterEligibilityChange(env, "reevaluation-promotion-demain-apres-conteneurs");
     return json({ ok: true, noChange: false, state: result.state, rowsWritten: result.rowsWritten });
   }
 
@@ -1009,9 +1020,9 @@ async function storeCatalogSnapshot(env, options) {
 export async function handleScheduledDiscountGeneration(env, requestedBusinessDate = null) {
   const businessDate = requestedBusinessDate ? String(requestedBusinessDate) : businessDateInParis();
   const today = await generateDailyPromotion(env, businessDate);
-  const tomorrow = await generateDailyPromotion(env, addDiscountDays(businessDate, 1));
+  const tomorrow = await refreshTomorrowDailyPromotion(env, businessDate);
   const generatedDates = [today, tomorrow]
-    .filter((result) => result.reason === "GENERATED")
+    .filter((result) => result.reason === "GENERATED" || result.reason === "REPLACED")
     .map((result) => result.date);
   if (generatedDates.length) {
     await readDiscountSyncSnapshot(env);
@@ -1026,6 +1037,15 @@ export async function handleScheduledDiscountGeneration(env, requestedBusinessDa
     tomorrow,
     generatedDates
   };
+}
+
+async function refreshTomorrowAfterEligibilityChange(env, reason) {
+  const result = await refreshTomorrowDailyPromotion(env);
+  if (result.changed) {
+    await readDiscountSyncSnapshot(env);
+    await notifyGasDataChanged(env, "discounts", reason);
+  }
+  return result;
 }
 
 async function storeContainerSnapshot(env, options) {
@@ -2018,6 +2038,9 @@ async function updateContainerConfig(env, payload) {
     sourceOrigin: "d1",
     sourceUpdatedAt: new Date().toISOString()
   });
+  if (normalized.avatar === "enzo") {
+    await refreshTomorrowAfterEligibilityChange(env, "reevaluation-promotion-demain-apres-conteneurs");
+  }
   const signal = await notifyGasDataChanged(env, "containers", "modification-d1-containers");
   return {
     ok: true,

@@ -28,7 +28,10 @@ export async function readDiscountAdministration(env) {
     config: mapDiscountConfig(config),
     campaigns: campaigns.results.map((row) => {
       const campaign = mapDiscountCampaign(row);
-      return { ...campaign, editable: campaign.endsOn >= businessDate };
+      const editMode = campaign.endsOn < businessDate
+        ? "readonly"
+        : (campaign.type === "daily_promo" && campaign.startsOn === businessDate ? "rate-only" : "full");
+      return { ...campaign, editable: editMode !== "readonly", editMode };
     }),
     eligiblePairs: collectEligiblePromotionPairs(items).map(({ storage, aisle, promotableItems }) => ({
       storage, aisle, promotableItems
@@ -70,11 +73,20 @@ export async function createDiscountCampaign(env, payload) {
 export async function updateDiscountCampaign(env, id, payload) {
   const existing = await readCampaign(env, id);
   if (!existing) throw new ApiError(404, "Campagne de remise introuvable");
-  if (existing.endsOn < businessDateInParis()) {
+  const businessDate = businessDateInParis();
+  if (existing.endsOn < businessDate) {
     throw new ApiError(409, "Une campagne terminée est conservée en lecture seule");
   }
   if (payload?.type && normalizeCampaignType(payload.type) !== existing.type) {
     throw new ApiError(400, "Le type d'une campagne ne peut pas être modifié");
+  }
+  if (existing.type === "daily_promo" && existing.startsOn === businessDate) {
+    assertTodayPromotionRateOnly(existing, payload);
+    const discountRate = normalizeAdminDiscountRate(payload?.discountRate ?? existing.discountRate);
+    await env.DB.prepare(`
+      UPDATE discount_campaigns SET discount_rate = ?, updated_at = ? WHERE id = ?
+    `).bind(discountRate, new Date().toISOString(), id).run();
+    return { ok: true, campaign: await readCampaign(env, id) };
   }
   const merged = { ...existing, ...payload, id, type: existing.type, origin: existing.origin };
   const candidate = existing.type === "daily_promo"
@@ -128,6 +140,119 @@ export async function generateDailyPromotion(env, requestedDate = null) {
     String(configRow?.selection_seed || "frj-daily-promo"), timestamp, timestamp
   ).run();
   return { ...result, campaign: await readCampaign(env, id) };
+}
+
+// Une campagne préparée reste provisoire jusqu'à la veille au soir. Cette
+// opération ne reçoit volontairement qu'une date métier et ne revalide que J+1 :
+// le couple de J est figé, même si les ventes le rendent ensuite inéligible.
+export async function refreshTomorrowDailyPromotion(env, requestedBusinessDate = null) {
+  const businessDate = requestedBusinessDate ? String(requestedBusinessDate) : businessDateInParis();
+  const date = addIsoDay(businessDate);
+  const configRow = await env.DB.prepare(`
+    SELECT automatic_promotions_enabled, default_promotion_rate, selection_seed
+    FROM discount_config WHERE singleton = 1
+  `).first();
+  if (Number(configRow?.automatic_promotions_enabled ?? 1) !== 1) {
+    return { reason: "AUTOMATION_DISABLED", date, campaign: null, changed: false };
+  }
+
+  const [items, campaigns] = await Promise.all([readAllPromotableItems(env), readCampaignRows(env)]);
+  const promotions = campaigns.filter((campaign) => campaign.type === "daily_promo");
+  const existing = promotions.find((campaign) => campaign.date === date);
+  if (!existing) {
+    const generated = await generateDailyPromotion(env, date);
+    return { ...generated, changed: generated.reason === "GENERATED" };
+  }
+  if (!existing.enabled) {
+    return { reason: "CAMPAIGN_DISABLED", date, campaign: existing, changed: false };
+  }
+
+  const eligibleKeys = new Set(collectEligiblePromotionPairs(items)
+    .map((pair) => promotionPairKey(pair.storage, pair.aisle)));
+  if (eligibleKeys.has(promotionPairKey(existing.storage, existing.aisle))) {
+    return { reason: "ALREADY_GENERATED", date, campaign: existing, changed: false };
+  }
+
+  const result = planDailyPromotion({
+    date,
+    items,
+    dailyPromotions: promotions.filter((campaign) => campaign.id !== existing.id),
+    sales: campaigns.filter((campaign) => campaign.type === "sale"),
+    defaultRate: existing.discountRate,
+    seed: String(configRow?.selection_seed || "frj-daily-promo")
+  });
+  if (result.reason !== "GENERATED") {
+    return {
+      ...result,
+      campaign: existing,
+      changed: false,
+      previousPair: { storage: existing.storage, aisle: existing.aisle }
+    };
+  }
+
+  const timestamp = new Date().toISOString();
+  await env.DB.batch([
+    env.DB.prepare(`
+      UPDATE discount_campaigns
+      SET storage = ?, aisle = ?, discount_rate = ?, origin = 'automatic',
+          eligible_pair_count = ?, candidate_pair_count = ?, generation_seed = ?, updated_at = ?
+      WHERE id = ? AND starts_on = ? AND campaign_type = 'daily_promo'
+    `).bind(
+      result.campaign.storage, result.campaign.aisle, existing.discountRate,
+      result.eligiblePairCount, result.candidatePairCount,
+      String(configRow?.selection_seed || "frj-daily-promo"), timestamp, existing.id, date
+    ),
+    env.DB.prepare(`
+      INSERT INTO sync_audit (dataset_key, direction, action, details)
+      VALUES ('discounts', 'd1-local', 'future-promotion-replaced', ?)
+    `).bind(JSON.stringify({
+      date,
+      previousPair: { storage: existing.storage, aisle: existing.aisle },
+      replacementPair: { storage: result.campaign.storage, aisle: result.campaign.aisle }
+    }))
+  ]);
+  return {
+    ...result,
+    reason: "REPLACED",
+    changed: true,
+    previousPair: { storage: existing.storage, aisle: existing.aisle },
+    campaign: await readCampaign(env, existing.id)
+  };
+}
+
+function assertTodayPromotionRateOnly(existing, payload) {
+  const requestedDate = String(payload?.date ?? payload?.startsOn ?? existing.startsOn);
+  const requestedEnd = String(payload?.endsOn ?? requestedDate);
+  const requestedStorage = String(payload?.storage ?? existing.storage).trim().toUpperCase();
+  const requestedAisle = String(payload?.aisle ?? existing.aisle).trim().toUpperCase();
+  const requestedEnabled = payload?.enabled === undefined ? existing.enabled : payload.enabled === true;
+  if (requestedDate !== existing.startsOn || requestedEnd !== existing.endsOn
+    || requestedStorage !== String(existing.storage).trim().toUpperCase()
+    || requestedAisle !== String(existing.aisle).trim().toUpperCase()
+    || requestedEnabled !== existing.enabled) {
+    throw new ApiError(409, "Le jour J, seul le pourcentage de remise peut être modifié");
+  }
+}
+
+function normalizeAdminDiscountRate(rawValue) {
+  const value = Number(rawValue);
+  if (!Number.isFinite(value) || value <= 0 || value > 1) {
+    throw new ApiError(400, "Le taux de promotion doit être compris entre 0 et 1");
+  }
+  return value;
+}
+
+function addIsoDay(date) {
+  const shifted = new Date(`${date}T00:00:00Z`);
+  if (Number.isNaN(shifted.getTime()) || shifted.toISOString().slice(0, 10) !== date) {
+    throw new ApiError(400, "Date métier invalide");
+  }
+  shifted.setUTCDate(shifted.getUTCDate() + 1);
+  return shifted.toISOString().slice(0, 10);
+}
+
+function promotionPairKey(storage, aisle) {
+  return `${String(storage || "").trim().toUpperCase()}\u001f${String(aisle || "").trim().toUpperCase()}`;
 }
 
 async function validateAdminDailyPromotion(env, payload) {

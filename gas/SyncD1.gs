@@ -10,7 +10,7 @@ var FRJ_SYNC_CONFIG = Object.freeze({
   syncDelayMs: 5 * 60 * 1000,
   auditDelayMs: 30 * 60 * 1000,
   dailyAuditHour: 2,
-  schedulerVersion: "2026-08-27-v4",
+  schedulerVersion: "2026-08-31-v5",
   outboxProperty: "FRJ_GAS_OUTBOX",
   inventorySheets: {
     enzo: "Inventaire Enzo",
@@ -67,6 +67,13 @@ function installFrjBidirectionalSync() {
     .everyDays(1)
     .inTimezone("Europe/Paris")
     .create();
+  ScriptApp.newTrigger("frjPromotionTomorrowFinalCheckTrigger")
+    .timeBased()
+    .atHour(23)
+    .nearMinute(55)
+    .everyDays(1)
+    .inTimezone("Europe/Paris")
+    .create();
   // Ce trigger ne synchronise pas les données : il ne lit qu'un petit marqueur D1.
   ScriptApp.newTrigger("frjD1SignalPollTrigger").timeBased().everyMinutes(5).create();
 
@@ -116,7 +123,8 @@ function frjOwnedTriggerHandlers_() {
   return [
     "frjSyncFastTrigger", "frjSyncAuditTrigger",
     "frjSpreadsheetChangedTrigger", "frjDeferredSyncTrigger",
-    "frjDeferredAuditTrigger", "frjDailyAuditTrigger", "frjD1SignalPollTrigger"
+    "frjDeferredAuditTrigger", "frjDailyAuditTrigger", "frjD1SignalPollTrigger",
+    "frjPromotionTomorrowFinalCheckTrigger"
   ];
 }
 
@@ -150,6 +158,7 @@ function frjDeferredSyncTrigger() {
   var summary;
   try {
     summary = frjRunSync_(false);
+    frjGenerateDailyPromotionFromGas_();
   } catch (error) {
     // La demande reste marquée comme sale et sera retentée cinq minutes plus tard.
     frjScheduleOneShot_(
@@ -195,6 +204,11 @@ function frjDailyAuditTrigger() {
   frjGenerateDailyPromotionFromGas_();
   frjEnsureSchedulerVersion_();
   return frjRunIntegrityAudit_("audit-quotidien-02h");
+}
+
+function frjPromotionTomorrowFinalCheckTrigger() {
+  frjEnsureSchedulerVersion_();
+  return frjGenerateDailyPromotionFromGas_();
 }
 
 function frjD1SignalPollTrigger() {

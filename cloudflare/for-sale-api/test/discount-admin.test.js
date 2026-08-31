@@ -92,6 +92,19 @@ function completeSevenEligiblePairs(db) {
   }
 }
 
+function addEligiblePair(db, index) {
+  db.prepare("INSERT INTO catalog_listings VALUES (?, ?, ?, 1)").run(`Item ${index}`, `CAT ${index}`, `AISLE ${index}`);
+  db.prepare("INSERT INTO inventory_current VALUES ('enzo', ?, ?, 1, 'Carried')").run(`row-${index}`, `Item ${index}`);
+  db.prepare("INSERT INTO market_current VALUES (?, 'percent', 1.1, CURRENT_TIMESTAMP)").run(`Item ${index}`);
+}
+
+function parisBusinessDate() {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit"
+  }).formatToParts(new Date()).map((part) => [part.type, part.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
 async function post(env, path, payload) {
   const url = new URL(`https://api.example${path}`);
   return handleAdminPost(new Request(url, { method: "POST", body: JSON.stringify(payload) }), url, env);
@@ -190,5 +203,64 @@ test("T-005 complète seulement aujourd'hui lorsque demain est déjà préparé"
   assert.equal(result.tomorrow.reason, "ALREADY_GENERATED");
   assert.deepEqual(result.generatedDates, ["2026-08-30"]);
   assert.notEqual(result.today.campaign.storage, "CAT 3");
+  db.close();
+});
+
+test("T-005 réévalue et remplace uniquement le couple de J+1 devenu inéligible", async () => {
+  const db = setup();
+  completeSevenEligiblePairs(db);
+  addEligiblePair(db, 8);
+  addEligiblePair(db, 9);
+  db.exec(`
+    INSERT INTO discount_campaigns (
+      id, campaign_type, starts_on, ends_on, storage, aisle, discount_rate, enabled, origin
+    ) VALUES
+      ('daily-promo-2026-08-30', 'daily_promo', '2026-08-30', '2026-08-30', 'ARMORS', 'PARTS', 0.08, 1, 'automatic'),
+      ('daily-promo-2026-08-31', 'daily_promo', '2026-08-31', '2026-08-31', 'MATERIALS', 'ORES', 0.07, 1, 'automatic');
+    UPDATE inventory_current SET quantity = 0 WHERE row_key IN ('a', 'b');
+  `);
+
+  const result = await handleScheduledDiscountGeneration({ DB: makeD1(db) }, "2026-08-30");
+  const today = db.prepare("SELECT storage, aisle, discount_rate FROM discount_campaigns WHERE id = 'daily-promo-2026-08-30'").get();
+  const tomorrow = db.prepare("SELECT storage, aisle, discount_rate, origin FROM discount_campaigns WHERE id = 'daily-promo-2026-08-31'").get();
+
+  assert.equal(result.today.reason, "ALREADY_GENERATED");
+  assert.equal(result.tomorrow.reason, "REPLACED");
+  assert.deepEqual({ ...today }, { storage: "ARMORS", aisle: "PARTS", discount_rate: 0.08 });
+  assert.notEqual(tomorrow.storage, "MATERIALS");
+  assert.equal(tomorrow.discount_rate, 0.07);
+  assert.equal(tomorrow.origin, "automatic");
+  assert.equal(
+    db.prepare("SELECT COUNT(*) AS total FROM sync_audit WHERE action = 'future-promotion-replaced'").get().total,
+    1
+  );
+  db.close();
+});
+
+test("le jour J seule la remise d'une promotion peut être modifiée", async () => {
+  const db = setup();
+  const env = { DB: makeD1(db) };
+  const today = parisBusinessDate();
+  db.prepare(`
+    INSERT INTO discount_campaigns (
+      id, campaign_type, starts_on, ends_on, storage, aisle, discount_rate, enabled, origin
+    ) VALUES ('today-promo', 'daily_promo', ?, ?, 'ARMORS', 'PARTS', 0.05, 1, 'manual')
+  `).run(today, today);
+
+  const administration = await (await handleAdminGet(new URL("https://api.example/admin/discounts"), env)).json();
+  assert.equal(administration.campaigns.find((campaign) => campaign.id === "today-promo").editMode, "rate-only");
+
+  const response = await post(env, "/admin/discounts/campaigns/today-promo", { discountRate: 0.09 });
+  assert.equal((await response.json()).campaign.discountRate, 0.09);
+  await assert.rejects(
+    () => post(env, "/admin/discounts/campaigns/today-promo", {
+      storage: "MATERIALS", aisle: "ORES", discountRate: 0.09
+    }),
+    /seul le pourcentage de remise/
+  );
+  assert.deepEqual(
+    { ...db.prepare("SELECT storage, aisle, enabled FROM discount_campaigns WHERE id = 'today-promo'").get() },
+    { storage: "ARMORS", aisle: "PARTS", enabled: 1 }
+  );
   db.close();
 });
