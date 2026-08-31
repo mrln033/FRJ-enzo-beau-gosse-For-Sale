@@ -23,12 +23,16 @@ Ordre recommandé déjà réalisé et validé : d.1 -> d.2 -> d.3 -> d.7 -> d.8 
 Les demandes d.13, d.12 et d.9 sont terminées. D.9 fournit les promotions quotidiennes et les soldes communs à GAS et D1.
 
 Les tâches T-001 à T-004 sont terminées et publiées.
-La seule demande encore ouverte est l'ancienne d.4, mise en attente à la demande du 29/08/2026 : son périmètre doit être mieux cadré avant toute analyse définitive ou implémentation.
+La prochaine tâche active est T-005 : préparer automatiquement la promotion du lendemain et signaler l'absence éventuelle de promotion pour le jour courant.
+L'ancienne demande d.4 reste ouverte mais mise en attente à la demande du 29/08/2026 : son périmètre doit être mieux cadré avant toute analyse définitive ou implémentation.
 
 -------------------------------
 DEMANDES  => CE QUI EST A FAIRE
 
->>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-005 <<<
+>>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-006 <<<
+
+T-005 [ÉVOLUTION] [À FAIRE] => Promotions et soldes
+	Concernant la génération automatique, j'aimerais que ce soit la date du lendemain qui soit générée, avec un rappel si la date du jour n'est pas présente. De sorte à toujours avoir un jour 'd'avance' pour un ajustement manuel éventuel, et surtout de pouvoir appliquer les promotions dès 0h00:01 !! :)
 
 [EN ATTENTE DE CADRAGE]
 d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> ajouter un bouton 'Supprimer' à chaque demande avec message de confirmation. Celà supprimerais l'enregistrement complet dans D1. Propagation Discord avec modification du statut en 'SUPPRIMEE' pour archivage.
