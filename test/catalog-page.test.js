@@ -16,6 +16,8 @@ test("index.html charge le contrôleur avant le panier et sans gestionnaire inli
   assert.doesNotMatch(html, /<script(?![^>]*\bsrc=)/i);
   assert.doesNotMatch(html, /\son(?:click|change|input)=/i);
   assert.doesNotMatch(source, /\son(?:click|change|input)=/i);
+  assert.match(source, /FRJ_VISITS\?\.recordCategoryView\?\.\(category\)/);
+  assert.match(source, /FRJ_VISITS\?\.resetCategoryView\?\.\(\)/);
 });
 
 function loadCatalogController(search = "") {

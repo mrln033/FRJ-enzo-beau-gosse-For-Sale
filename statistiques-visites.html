@@ -7,12 +7,12 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <link rel="icon" href="./favicon.ico">
   <link rel="stylesheet" href="./css/site.css?v=20260829-1">
-  <link rel="stylesheet" href="./css/pages/statistiques-visites.css?v=20260829-1">
+  <link rel="stylesheet" href="./css/pages/statistiques-visites.css?v=20260831-1">
   <script src="./js/admin-session.js?v=20260820-1"></script>
   <script src="./js/api-client.js?v=20260829-1"></script>
-  <script defer src="./js/visit-tracking.js?v=20260829-1"></script>
+  <script defer src="./js/visit-tracking.js?v=20260831-1"></script>
   <script defer src="./js/admin-menu.js?v=20260830-1"></script>
-  <script defer src="./js/pages/statistiques-visites.js?v=20260829-1"></script>
+  <script defer src="./js/pages/statistiques-visites.js?v=20260831-1"></script>
   <title>[FRJ] — Statistiques des visites</title>
 </head>
 <body class="visit-statistics-page" data-visit-module="visit-statistics">
@@ -43,6 +43,7 @@
           <option value="order-tracking">Suivi de demande</option>
           <option value="admin-orders">Demandes d'achat</option>
           <option value="admin-containers">Conteneurs D1</option>
+          <option value="admin-discounts">Promotions et soldes</option>
           <option value="sync-report">Rapport de synchronisation</option>
           <option value="inventory-import">Mise à jour inventaire</option>
           <option value="markup-import">Mise à jour MU</option>
@@ -78,6 +79,25 @@
               </tr>
             </thead>
             <tbody id="visitStatisticsRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="visitCategoryPanel" class="visit-statistics-panel">
+        <h2>Catégories consultées</h2>
+        <p class="visit-statistics-note">
+          Classement sur la période et l’audience sélectionnées. Un affichage est enregistré uniquement
+          après le chargement réussi d’une catégorie ; les données commencent à la mise en service de ce suivi.
+        </p>
+        <div class="visit-statistics-table-wrap">
+          <table class="visit-category-table">
+            <thead>
+              <tr>
+                <th>Rang</th><th>Catégorie</th><th>Affichages</th>
+                <th>Visites</th><th>Visiteurs uniques/jour</th>
+              </tr>
+            </thead>
+            <tbody id="visitCategoryRows"></tbody>
           </table>
         </div>
       </section>

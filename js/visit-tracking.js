@@ -5,6 +5,7 @@
   const SESSION_KEY = "FRJ_VISIT_SESSION_V1";
   const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
   let lastCounter = null;
+  let lastRecordedCategory = "";
 
   function createId() {
     if (typeof global.crypto?.randomUUID === "function") return global.crypto.randomUUID();
@@ -94,6 +95,7 @@
         visitorId: context.visitorId,
         sessionId: context.sessionId,
         page,
+        eventType: "page_view",
         admin: global.FRJ_ADMIN?.active === true
       });
       renderCounter(result.counter);
@@ -107,7 +109,34 @@
     }
   }
 
-  global.FRJ_VISITS = Object.freeze({ refreshCounterLabel: () => renderCounter() });
+  async function recordCategoryView(category) {
+    const normalizedCategory = String(category || "").trim().toUpperCase();
+    if (!normalizedCategory || normalizedCategory === lastRecordedCategory
+      || typeof global.FRJ_API?.recordVisit !== "function") return;
+    lastRecordedCategory = normalizedCategory;
+    try {
+      const context = visitContext();
+      const result = await global.FRJ_API.recordVisit({
+        eventId: createId(),
+        visitorId: context.visitorId,
+        sessionId: context.sessionId,
+        page: "catalog",
+        eventType: "category_view",
+        category: normalizedCategory,
+        admin: global.FRJ_ADMIN?.active === true
+      });
+      renderCounter(result.counter);
+    } catch (error) {
+      if (lastRecordedCategory === normalizedCategory) lastRecordedCategory = "";
+      console.warn("Comptage de catégorie indisponible :", error);
+    }
+  }
+
+  global.FRJ_VISITS = Object.freeze({
+    refreshCounterLabel: () => renderCounter(),
+    recordCategoryView,
+    resetCategoryView: () => { lastRecordedCategory = ""; }
+  });
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", record);
   else record();
 })(window);

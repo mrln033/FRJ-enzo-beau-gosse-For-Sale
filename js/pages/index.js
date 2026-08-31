@@ -51,6 +51,7 @@ document.addEventListener("DOMContentLoaded", () => {
             resetRayonFilter();
             updateFilterVisibility();
             renderCards([]);
+            window.FRJ_VISITS?.resetCategoryView?.();
             return;
           }
 
@@ -326,6 +327,9 @@ function loadCategoryData(category) {
 
       updateRayonFilter();
       applyFilter();
+      if (selectedCategory === category) {
+        void window.FRJ_VISITS?.recordCategoryView?.(category);
+      }
     })
     .catch(err => {
       console.error("Erreur chargement data:", err);

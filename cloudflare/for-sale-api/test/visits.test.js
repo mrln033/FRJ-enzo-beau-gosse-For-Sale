@@ -59,6 +59,7 @@ function makeD1(database) {
 function makeEnv() {
   const database = new DatabaseSync(":memory:");
   database.exec(readFileSync(new URL("../migrations/0019_visit_statistics.sql", import.meta.url), "utf8"));
+  database.exec(readFileSync(new URL("../migrations/0022_visit_category_statistics.sql", import.meta.url), "utf8"));
   return { database, env: { DB: makeD1(database), VISIT_STATS_SALT: "test-salt-ne-jamais-stocker" } };
 }
 
@@ -95,6 +96,8 @@ test("d.13 journalise anonymement et déduplique chaque événement", async () =
   const row = database.prepare(`SELECT * FROM visit_events`).get();
   assert.equal(row.event_id, payload.eventId);
   assert.equal(row.page_key, "catalog");
+  assert.equal(row.event_type, "page_view");
+  assert.equal(row.category_key, null);
   assert.equal(row.audience, "PUBLIC");
   assert.notEqual(row.session_hash, payload.sessionId);
   assert.notEqual(row.visitor_hash, payload.visitorId);
@@ -139,11 +142,45 @@ test("d.13 distingue pages vues, sessions, visiteurs quotidiens et audience Admi
   assert.equal(admin.pageViews, 1);
 });
 
+test("les catégories affichées sont classées sans gonfler les pages vues", async () => {
+  const { env } = makeEnv();
+  await record(env, visitPayload());
+  await record(env, visitPayload({ eventType: "category_view", category: "ARMORS" }));
+  await record(env, visitPayload({ eventType: "category_view", category: "ARMORS" }));
+  await record(env, visitPayload({
+    eventType: "category_view",
+    category: "WEAPONS",
+    sessionId: "33333333-3333-4333-8333-333333333333"
+  }));
+
+  const counter = await (await handleVisitCounterGet(env)).json();
+  const report = await (await handleAdminVisitStatisticsGet(
+    new URL(`https://api.example/admin/visit-statistics?startDate=${counter.startDate}&endDate=${counter.startDate}`),
+    env
+  )).json();
+
+  assert.deepEqual(report.totals, { pageViews: 1, visits: 1, uniqueVisitors: 1 });
+  assert.deepEqual(report.categoryRows, [
+    { category: "ARMORS", views: 2, visits: 1, uniqueVisitors: 1 },
+    { category: "WEAPONS", views: 1, visits: 1, uniqueVisitors: 1 }
+  ]);
+});
+
 test("d.13 valide les pages et les filtres de statistiques", async () => {
   const { env } = makeEnv();
+  const discountVisit = await record(env, visitPayload({ page: "admin-discounts", admin: true }));
+  assert.equal(discountVisit.result.recorded, true);
   await assert.rejects(
     () => record(env, visitPayload({ page: "page-inventée" })),
     /Page de visite invalide/
+  );
+  await assert.rejects(
+    () => record(env, visitPayload({ eventType: "category_view", category: "catégorie-inventée" })),
+    /Catégorie de visite invalide/
+  );
+  await assert.rejects(
+    () => record(env, visitPayload({ eventType: "category_view", category: "ARMORS", page: "cart-help" })),
+    /Catégorie de visite invalide/
   );
   await assert.rejects(
     () => handleAdminVisitStatisticsGet(

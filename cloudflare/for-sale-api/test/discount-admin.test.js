@@ -114,7 +114,7 @@ test("d.9.2 crée et modifie une promotion manuelle éligible", async () => {
   const db = setup();
   const env = { DB: makeD1(db) };
   let response = await post(env, "/admin/discounts/campaigns", {
-    type: "daily_promo", date: "2026-08-30", storage: "Armors", aisle: "Parts", discountRate: 0.07
+    type: "daily_promo", date: "2099-08-30", storage: "Armors", aisle: "Parts", discountRate: 0.07
   });
   assert.equal(response.status, 201);
   const created = (await response.json()).campaign;

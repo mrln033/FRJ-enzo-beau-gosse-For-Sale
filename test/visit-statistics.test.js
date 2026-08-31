@@ -11,7 +11,7 @@ const publicHtml = await readFile(new URL("../index.html", import.meta.url), "ut
 const trackedPages = await Promise.all([
   "index.html", "aide-panier.html", "suivi-commande.html", "commandes.html",
   "conteneurs.html", "rapport-sync.html", "maj_inventaire-enzo.html", "maj_mu.html",
-  "statistiques-visites.html"
+  "promotions.html", "statistiques-visites.html"
 ].map(async (name) => ({ name, content: await readFile(new URL(`../${name}`, import.meta.url), "utf8") })));
 
 class FakeElement {
@@ -60,7 +60,7 @@ test("d.13 place un compteur discret sous le catalogue et suit toutes les pages"
   assert.doesNotMatch(publicHtml, /site-visit-footer[^}]*position:\s*fixed/);
   trackedPages.forEach(({ name, content }) => {
     assert.match(content, /data-visit-module="[^"]+"/, `${name} doit déclarer son module`);
-    assert.match(content, /js\/visit-tracking\.js\?v=20260829-1/, `${name} doit charger le suivi commun`);
+    assert.match(content, /js\/visit-tracking\.js\?v=20260831-1/, `${name} doit charger le suivi commun`);
   });
 });
 
@@ -93,6 +93,7 @@ test("d.13 conserve une session 30 minutes et rend le compteur bilingue", async 
 
   assert.equal(payloads.length, 1);
   assert.equal(payloads[0].page, "catalog");
+  assert.equal(payloads[0].eventType, "page_view");
   assert.equal(payloads[0].admin, false);
   assert.match(payloads[0].visitorId, /^[a-f0-9-]{36}$/);
   assert.match(payloads[0].sessionId, /^[a-f0-9-]{36}$/);
@@ -103,6 +104,19 @@ test("d.13 conserve une session 30 minutes et rend le compteur bilingue", async 
   window.FRJ_VISITS.refreshCounterLabel();
   assert.equal(counter.textContent, "1 visite");
   assert.match(counter.title, /29\/08\/2026/);
+
+  await window.FRJ_VISITS.recordCategoryView("armors");
+  await window.FRJ_VISITS.recordCategoryView("ARMORS");
+  await window.FRJ_VISITS.recordCategoryView("WEAPONS");
+  assert.equal(payloads.length, 3);
+  assert.deepEqual(
+    { page: payloads[1].page, eventType: payloads[1].eventType, category: payloads[1].category },
+    { page: "catalog", eventType: "category_view", category: "ARMORS" }
+  );
+  assert.equal(payloads[2].category, "WEAPONS");
+  window.FRJ_VISITS.resetCategoryView();
+  await window.FRJ_VISITS.recordCategoryView("WEAPONS");
+  assert.equal(payloads.length, 4);
 });
 
 test("d.13 réserve le tableau détaillé au menu Admin et rend ses indicateurs", async () => {
@@ -115,7 +129,7 @@ test("d.13 réserve le tableau détaillé au menu Admin et rend ses indicateurs"
     "visitStatisticsFilters", "visitStartDate", "visitEndDate", "visitAudience", "visitPage",
     "clearVisitStatsToken", "visitStatisticsLoading", "visitStatisticsError",
     "visitStatisticsContent", "visitPublicTotal", "visitPeriodVisits", "visitPageViews",
-    "visitUniqueVisitors", "visitStatisticsRows"
+    "visitUniqueVisitors", "visitStatisticsRows", "visitCategoryPanel", "visitCategoryRows"
   ];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id)]));
   elements.get("visitAudience").value = "ALL";
@@ -126,11 +140,16 @@ test("d.13 réserve le tableau détaillé au menu Admin et rend ses indicateurs"
     createElement: () => new FakeElement()
   };
   const report = {
+    filters: { page: "ALL" },
     publicCounter: { visits: 12 },
     totals: { visits: 4, pageViews: 7, uniqueVisitors: 3 },
     rows: [
       { date: "2026-08-29", page: "__TOTAL__", audience: "PUBLIC", pageViews: 7, visits: 4, uniqueVisitors: 3 },
       { date: "2026-08-29", page: "catalog", audience: "PUBLIC", pageViews: 7, visits: 4, uniqueVisitors: 3 }
+    ],
+    categoryRows: [
+      { category: "ARMORS", views: 9, visits: 4, uniqueVisitors: 3 },
+      { category: "WEAPONS", views: 5, visits: 3, uniqueVisitors: 2 }
     ]
   };
   const window = {
@@ -155,5 +174,7 @@ test("d.13 réserve le tableau détaillé au menu Admin et rend ses indicateurs"
   assert.equal(elements.get("visitUniqueVisitors").textContent, "3");
   assert.equal(elements.get("visitStatisticsRows").children.length, 2);
   assert.equal(elements.get("visitStatisticsRows").children[0].className, "visit-statistics-total-row");
+  assert.equal(elements.get("visitCategoryRows").children.length, 2);
+  assert.equal(elements.get("visitCategoryRows").children[0].children[1].textContent, "ARMORS");
   assert.equal(elements.get("visitStatisticsContent").hidden, false);
 });

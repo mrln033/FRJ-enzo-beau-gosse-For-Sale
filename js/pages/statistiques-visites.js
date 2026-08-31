@@ -10,6 +10,7 @@
     "order-tracking": "Suivi de demande",
     "admin-orders": "Demandes d'achat",
     "admin-containers": "Conteneurs D1",
+    "admin-discounts": "Promotions et soldes",
     "sync-report": "Rapport de synchronisation",
     "inventory-import": "Mise à jour inventaire",
     "markup-import": "Mise à jour MU",
@@ -54,6 +55,7 @@
 
     const body = document.getElementById("visitStatisticsRows");
     const rows = report.rows || [];
+    renderCategories(report);
     if (!rows.length) {
       const row = document.createElement("tr");
       const cell = document.createElement("td");
@@ -71,6 +73,34 @@
       appendCell(row, PAGE_LABELS[item.page] || item.page);
       appendCell(row, item.audience === "PUBLIC" ? "Public" : "Administrateur");
       appendCell(row, number(item.pageViews));
+      appendCell(row, number(item.visits));
+      appendCell(row, number(item.uniqueVisitors));
+      return row;
+    }));
+  }
+
+  function renderCategories(report) {
+    const panel = document.getElementById("visitCategoryPanel");
+    const body = document.getElementById("visitCategoryRows");
+    const selectedPage = report.filters?.page || "ALL";
+    panel.hidden = selectedPage !== "ALL" && selectedPage !== "catalog";
+    if (panel.hidden) return;
+    const rows = report.categoryRows || [];
+    if (!rows.length) {
+      const row = document.createElement("tr");
+      const cell = document.createElement("td");
+      cell.colSpan = 5;
+      cell.className = "visit-statistics-empty";
+      cell.textContent = "Aucune catégorie enregistrée sur cette période.";
+      row.appendChild(cell);
+      body.replaceChildren(row);
+      return;
+    }
+    body.replaceChildren(...rows.map((item, index) => {
+      const row = document.createElement("tr");
+      appendCell(row, number(index + 1));
+      appendCell(row, item.category);
+      appendCell(row, number(item.views));
       appendCell(row, number(item.visits));
       appendCell(row, number(item.uniqueVisitors));
       return row;

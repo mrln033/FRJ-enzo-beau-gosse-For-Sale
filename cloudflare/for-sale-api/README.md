@@ -159,8 +159,12 @@ Le frontend enregistre une vue au chargement de chaque page avec un identifiant 
 30 minutes générés dans le navigateur. Le Worker ne conserve que leurs empreintes SHA-256 salées avec
 `VISIT_STATS_SALT` : aucun identifiant brut ni adresse IP n'est enregistré. `POST /visits` accepte uniquement
 les origines publiques autorisées et `GET /visits/counter` expose seulement le cumul des sessions publiques.
+Après le chargement réussi d'une catégorie du catalogue, un événement distinct conserve également sa clé.
+Ces événements n'augmentent pas le nombre de pages vues et un clic répété sur la catégorie déjà affichée
+n'est pas recompté.
 
 La page `statistiques-visites.html`, accessible depuis le menu Admin, interroge
 `GET /admin/visit-statistics`. Cette route exige `ADMIN_TOKEN` et fournit les vues, sessions et visiteurs
 uniques quotidiens, filtrables par période, audience et page. Les événements sont conservés dans D1 afin de
-permettre des statistiques historiques sans dépendance à GAS.
+permettre des statistiques historiques sans dépendance à GAS. Un classement séparé des catégories consultées,
+trié par nombre d'affichages, présente aussi les sessions et visiteurs uniques quotidiens de chacune d'elles.
