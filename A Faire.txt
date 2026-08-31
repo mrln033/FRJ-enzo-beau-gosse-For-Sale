@@ -11,8 +11,9 @@ Convention d'identification à compter du 31/08/2026 :
 - chaque nouvelle tâche reçoit un identifiant permanent T-NNN, attribué dans l'ordre de création et jamais réutilisé ni renuméroté ;
 - son type est indiqué séparément : [CORRECTIF], [ÉVOLUTION] ou [MAINTENANCE] ;
 - son état est indiqué séparément : [À FAIRE], [EN COURS] ou [EN ATTENTE] ;
-- l'ordre des paragraphes dans DEMANDES donne l'ordre de priorité, indépendamment de leur numéro ;
+- l'ordre des lots dans le POINT DE REPRISE donne la priorité courante, indépendamment du numéro permanent des tâches ;
 - les éventuelles étapes d'une tâche utilisent le suffixe .1, .2, etc. (exemple : T-003.1) ;
+- le repère PROCHAIN IDENTIFIANT placé au début de DEMANDES indique le numéro à employer et doit être avancé dès son attribution ;
 - les anciennes références d.N restent inchangées dans l'historique afin de préserver la trace des échanges passés.
 
 ----------------------------------------
@@ -21,15 +22,33 @@ POINT DE REPRISE — 31/08/2026
 Ordre recommandé déjà réalisé et validé : d.1 -> d.2 -> d.3 -> d.7 -> d.8 -> d.6 -> d.10 -> d.11 -> d.5 -> d.13 -> d.12.
 Les demandes d.13, d.12 et d.9 sont terminées. D.9 fournit les promotions quotidiennes et les soldes communs à GAS et D1.
 
-Les tâches T-001 à T-004 sont à faire, dans l'ordre où elles figurent ci-dessous sauf nouvelle priorisation.
+Ordre et regroupements recommandés :
+
+LOT 1 [PRIORITÉ 1] — Fiabiliser la sélection d'article et le MU :
+- T-004 : corriger l'actualisation du MU selon l'article et le profil choisis ;
+- T-003 : ne sélectionner aucun article par défaut et rendre la recherche prédictive ;
+- T-001.1 : trier alphabétiquement les articles, indépendamment de leur catégorie et de leur rayon.
+Ces trois changements portent sur le même composant de sélection et doivent être développés puis testés ensemble afin d'éviter des corrections successives incompatibles. Validation conseillée après ce lot.
+
+LOT 2 [PRIORITÉ 2] — Réinitialiser correctement le formulaire :
+- T-002 : effacer la confirmation et le lien de suivi lorsqu'un formulaire terminé est masqué puis rouvert.
+Ce correctif d'état est indépendant du sélecteur et forme un petit lot facile à valider isolément.
+
+LOT 3 [PRIORITÉ 3] — Améliorer la présentation des lignes :
+- T-001.2 : mutualiser les entêtes Article / Quantité / MU et conserver les informations propres à chaque ligne dans une présentation plus compacte.
+Ce changement visuel vient en dernier pour être testé sur le sélecteur déjà stabilisé, sans mélanger validation fonctionnelle et validation ergonomique.
+
 L'ancienne demande d.4 reste ouverte mais mise en attente à la demande du 29/08/2026 : son périmètre doit être mieux cadré avant toute analyse définitive ou implémentation.
 
 -------------------------------
 DEMANDES  => CE QUI EST A FAIRE
 
-T-001 [CORRECTIF] [À FAIRE] => Demandes d'achat > Nouvelle demande directe.
+>>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-005 <<<
+
+T-001 [ÉVOLUTION] [À FAIRE] => Demandes d'achat > Nouvelle demande directe.
 	Je veux que les articles soient triés par ordre alphabétique dans la liste déroulante d'ajout, indépendemment de leur catégorie/rayon.
 	J'aimerais également que les entêtes (Article / Quantité / MU) soient commun à toutes les lignes. Concrètement, chaque ligne ajoutées n'aurait pas ces entêtes qui se trouverait en haut du table de la zone des lignes d'articles. Par comtre, les mention en fin de lignses (Stock, prix et estimation) sont à conserver pour chaque ligne (peut être en plus petit pour l'ergonomie générale).
+	Découpage : T-001.1 = tri alphabétique du sélecteur (LOT 1) ; T-001.2 = entêtes mutualisées et présentation compacte (LOT 3).
 T-002 [CORRECTIF] [À FAIRE] => Demandes d'achat > Nouvelle demande directe.
 	j'ai eu un 'souci' (qui n'en est pas vraiment un) d'affichage... Après la création d'un nouvelle demande, une confirmation est affichée en bas du formlaire, avec un lien vers la demande à communiquer éventuellement au client. Si on masque le formulaire et qu'on le rouvre (dans la meme session surement), ces lignes de confirmation sont toujours affichées :s
 T-003 [ÉVOLUTION] [À FAIRE] => Demandes d'achat > Nouvelle demande directe.
