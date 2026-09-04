@@ -36,6 +36,12 @@ Les imports suivants entretiennent automatiquement la liste uniquement par ajout
 
 Le dataset `containers` fait ensuite partie de la synchronisation bidirectionnelle ordinaire. Une modification manuelle des cases dans Google Sheets est détectée par les triggers existants ; une modification effectuée dans l'interface D1 est signalée au prochain contrôle. Les lignes ajoutées indépendamment de chaque côté sont réunies et ne sont jamais supprimées par la fusion.
 
+## Contrat des feuilles d'inventaire MindArk
+
+Les feuilles d'inventaire sont un contrat externe historique, utilisé par plusieurs autres classeurs Google Sheets. Elles reproduisent donc chaque ligne du TSV MindArk, sans regroupement ni tri, dans les six colonnes `Id | article/date | Quantity | Value(PED) | Container | ContainerRefId`.
+
+La seule exception volontaire au fichier source se trouve en `B1` : l'en-tête `Name` y est remplacé par la date et l'heure d'import, au format `dd/MM/yyyy - HH:mm:ss`. Les noms d'articles occupent la colonne B à partir de la ligne 2. Lorsqu'une synchronisation D1 restaure une feuille, la colonne `Value(PED)` conserve quatre décimales et aucun contenu technique ne subsiste en dehors des six colonnes contractuelles.
+
 ## Promotion préparée pour le lendemain
 
 Après chaque synchronisation différée susceptible de modifier le stock, le catalogue, les conteneurs ou les MU, GAS contrôle uniquement le couple de la promotion de J+1. S'il n'est plus éligible, il est remplacé en conservant sa date, son taux et son identifiant. Le couple de J n'est jamais remplacé automatiquement ; dans l'Admin, seul son taux demeure modifiable. Un trigger quotidien supplémentaire effectue un dernier contrôle de J+1 vers 23 h 55 dans le fuseau `Europe/Paris`.
@@ -50,4 +56,4 @@ Après chaque synchronisation différée susceptible de modifier le stock, le ca
 6. Mettre à jour le déploiement Web App existant avec son `deploymentId`, afin de conserver la même URL `/exec`.
 7. Cloner à nouveau le projet et comparer les empreintes des fichiers, puis tester les routes publiques sans écriture métier.
 
-Le déploiement de production actuel est la version 28. Son URL est référencée par `js/api-client.js` pour le secours des demandes et par le Worker pour la synchronisation ; elle doit rester stable.
+Le déploiement de production actuel est la version 29. Son URL est référencée par `js/api-client.js` pour le secours des demandes et par le Worker pour la synchronisation ; elle doit rester stable.

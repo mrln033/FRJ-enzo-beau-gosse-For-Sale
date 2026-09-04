@@ -449,11 +449,11 @@ function frjInventoryMetadataSchemaProperty_(dataset) {
 }
 
 function frjInventoryMetadataSchemaIsCurrent_(dataset) {
-  return PropertiesService.getScriptProperties().getProperty(frjInventoryMetadataSchemaProperty_(dataset)) === "2";
+  return PropertiesService.getScriptProperties().getProperty(frjInventoryMetadataSchemaProperty_(dataset)) === "3";
 }
 
 function frjMarkInventoryMetadataSchemaCurrent_(dataset) {
-  PropertiesService.getScriptProperties().setProperty(frjInventoryMetadataSchemaProperty_(dataset), "2");
+  PropertiesService.getScriptProperties().setProperty(frjInventoryMetadataSchemaProperty_(dataset), "3");
 }
 
 function frjRetryDatasetAfterConcurrentChange_(dataset, forceAudit, retryCount) {

@@ -87,3 +87,20 @@ test("d.11.2 applique dans GAS la confirmation permanente des prix", () => {
   assert.match(sources["PurchaseOrders.gs"], /set\("PRIX_STATUT", order\.pricingStatus \|\| "estimated"\)/);
   assert.match(sources["PurchaseOrders.gs"], /pricingStatus: order\.pricingStatus \|\| "estimated"/);
 });
+
+test("T-009 conserve la feuille d'inventaire au format MindArk exact", () => {
+  assert.match(
+    sources["Imports.gs"],
+    /expectedHeaders = \["Id", "Name", "Quantity", "Value\(PED\)", "Container", "ContainerRefId"\]/
+  );
+  assert.match(sources["Imports.gs"], /getRange\("B1"\)/);
+  assert.match(sources["Imports.gs"], /setNumberFormat\("dd\/MM\/yyyy - HH:mm:ss"\)/);
+  assert.match(
+    sources["SyncSheets.gs"],
+    /var data = \[\["Id", updatedAt, "Quantity", "Value\(PED\)", "Container", "ContainerRefId"\]\]/
+  );
+  assert.match(sources["SyncSheets.gs"], /setNumberFormat\("0\.0000"\)/);
+  assert.match(sources["SyncSheets.gs"], /getRange\("B1"\)\.setNumberFormat\("dd\/MM\/yyyy - HH:mm:ss"\)/);
+  assert.match(sources["SyncSheets.gs"], /sheet\.getMaxColumns\(\)\)\.clearContent\(\)/);
+  assert.match(sources["Catalog.gs"], /function getInventoryDate\(\)[\s\S]*getRange\("B1"\)/);
+});

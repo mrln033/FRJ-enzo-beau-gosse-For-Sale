@@ -147,8 +147,8 @@ function resolveInventoryItemHeader(headers) {
   const namedHeader = headers.find((header) => aliases.has(header.toLowerCase()));
   if (namedHeader !== undefined) return namedHeader;
 
-  // GAS remplace B1 par la date d'import. Une copie depuis la feuille conserve donc
-  // les cinq en-têtes standard, mais la colonne des articles porte une date en B1.
+  // GAS remplace volontairement B1 par la date d'import. Une copie depuis la feuille
+  // conserve donc cinq en-têtes standard, mais la colonne des articles porte cette date.
   const hasLegacySheetLayout = headers.length >= 6
     && headers[0] === "Id"
     && headers[2] === "Quantity"

@@ -74,8 +74,11 @@ function frjWriteLocalInventory_(avatar, snapshot) {
     ]);
   });
 
-  sheet.getRange(1, 1, sheet.getMaxRows(), 6).clearContent();
+  // La feuille est un miroir du TSV MindArk réutilisé par d'autres classeurs :
+  // ne conserver aucune colonne ou cellule technique en dehors de ces six champs.
+  sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns()).clearContent();
   sheet.getRange(1, 1, data.length, 6).setValues(data);
+  if (data.length > 1) sheet.getRange(2, 4, data.length - 1, 1).setNumberFormat("0.0000");
   sheet.getRange("B1").setNumberFormat("dd/MM/yyyy - HH:mm:ss");
   SpreadsheetApp.flush();
   // frjRunSync_ détient déjà le verrou global pendant cette écriture.

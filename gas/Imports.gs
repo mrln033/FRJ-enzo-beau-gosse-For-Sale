@@ -105,6 +105,12 @@ function processInventory(csv, avatar) {
     return "CSV vide";
   }
 
+  const expectedHeaders = ["Id", "Name", "Quantity", "Value(PED)", "Container", "ContainerRefId"];
+  const actualHeaders = data[0].map(value => String(value || "").trim());
+  if (actualHeaders.length !== expectedHeaders.length || actualHeaders.some((value, index) => value !== expectedHeaders[index])) {
+    throw new Error("Colonnes inventaire MindArk invalides : " + actualHeaders.join(" | "));
+  }
+
   const numRows = data.length;
   const numCols = data[0].length;
 
@@ -123,7 +129,8 @@ function processInventory(csv, avatar) {
   // Écrire le tableau complet en une opération limite les appels Google Sheets.
   sheet.getRange(1, 1, numRows, numCols).setValues(data);
 
-  // B1 porte la date de référence affichée par la route inventoryDate.
+  // Exception historique au TSV MindArk : B1 contient la date/heure d'import,
+  // tandis que les articles restent en colonne B à partir de la ligne 2.
   const cell = sheet.getRange("B1");
   cell.setValue(new Date());
   cell.setNumberFormat("dd/MM/yyyy - HH:mm:ss");
