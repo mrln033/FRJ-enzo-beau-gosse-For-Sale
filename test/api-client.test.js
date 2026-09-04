@@ -52,7 +52,7 @@ test("GAS reste le backend de lecture par défaut", async () => {
   assert.equal(api.backend, "gas");
   assert.equal(api.activeBackend, "gas");
   assert.equal(events.at(-1).detail.backend, "gas");
-  assert.match(urls[0], /^https:\/\/script\.google\.com\//);
+  assert.match(urls[0], /AKfycbxD_sOPcjLT-eWPrDMfLgaSx16yAeH17SCd8xByP2faU24z8ge5AiAWOueVBRanHjGx/);
 });
 
 test("une lecture D1 en échec se replie sur GAS", async () => {
@@ -189,7 +189,7 @@ test("un import double écrit dans GAS puis D1 indépendamment du paramètre bac
   assert.equal(outcome.ok, true);
   assert.equal(outcome.partial, false);
   assert.equal(requests.length, 2);
-  assert.match(requests[0].url, /^https:\/\/script\.google\.com\//);
+  assert.match(requests[0].url, /AKfycbxa0B_4R6tsn8aQCLy1Y3LEqbDj4SY22xbascJfMRd1I1thQkCRPySAjszdHoxX1h2a/);
   assert.match(requests[1].url, /workers\.dev.*[?&]paired=gas/);
   assert.equal(requests[1].options.headers.get("Authorization"), "Bearer jeton-double");
   assert.deepEqual(Array.from(outcome.results, (result) => result.message), ["Import GAS OK", "Import D1 OK"]);
@@ -250,7 +250,7 @@ test("un double succès publie ensuite l'état GAS dans le rapport", async () =>
 
   assert.equal(outcome.ok, true);
   assert.equal(requests.length, 3);
-  assert.match(requests[0].url, /^https:\/\/script\.google\.com\//);
+  assert.match(requests[0].url, /AKfycbxa0B_4R6tsn8aQCLy1Y3LEqbDj4SY22xbascJfMRd1I1thQkCRPySAjszdHoxX1h2a/);
   assert.match(requests[1].url, /workers\.dev\?type=mu&paired=gas/);
   assert.match(requests[2].url, /workers\.dev\/admin\/sync-observation/);
   const observation = JSON.parse(requests[2].options.body);

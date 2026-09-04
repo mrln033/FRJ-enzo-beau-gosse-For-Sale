@@ -99,7 +99,9 @@ test("T-009 conserve la feuille d'inventaire au format MindArk exact", () => {
     sources["SyncSheets.gs"],
     /var data = \[\["Id", updatedAt, "Quantity", "Value\(PED\)", "Container", "ContainerRefId"\]\]/
   );
-  assert.match(sources["SyncSheets.gs"], /setNumberFormat\("0\.0000"\)/);
+  assert.match(sources["Imports.gs"], /getRange\(2, 4, numRows - 1, 1\)\.setNumberFormat\("@"\)/);
+  assert.match(sources["SyncSheets.gs"], /getRange\(2, 4, data\.length - 1, 1\)\.setNumberFormat\("@"\)/);
+  assert.match(sources["SyncSheets.gs"], /Number\(row\.valuePed\)\.toFixed\(4\)/);
   assert.match(sources["SyncSheets.gs"], /getRange\("B1"\)\.setNumberFormat\("dd\/MM\/yyyy - HH:mm:ss"\)/);
   assert.match(sources["SyncSheets.gs"], /sheet\.getMaxColumns\(\)\)\.clearContent\(\)/);
   assert.match(sources["Catalog.gs"], /function getInventoryDate\(\)[\s\S]*getRange\("B1"\)/);

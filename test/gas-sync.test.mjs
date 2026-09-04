@@ -49,6 +49,7 @@ vm.createContext(context);
 [
   "Containers.gs",
   "DiscountSheets.gs",
+  "Imports.gs",
   "SyncD1.gs",
   "SyncOrders.gs",
   "SyncEngine.gs",
@@ -216,13 +217,31 @@ test("T-009 conserve les métadonnées d'inventaire et les apostrophes", async (
   assert.doesNotMatch(importsSource, /frjRefreshContainerConfigurationAfterInventory_\(inventoryId\)/);
 });
 
-test("T-009 répare une fois GAS depuis D1 avant de rétablir le bidirectionnel", () => {
+test("T-009 répare les métadonnées depuis le côté le plus complet", () => {
   const syncEngineSource = fs.readFileSync(new URL("../gas/SyncEngine.gs", import.meta.url), "utf8");
   const applicationSource = fs.readFileSync(new URL("../cloudflare/for-sale-api/src/application.js", import.meta.url), "utf8");
-  assert.match(syncEngineSource, /inventoryMetadataUpgrade[\s\S]*direction = "d1-to-gas"/);
+  const complete = [{ sourceId: "1", itemName: "A", quantity: 1, valuePed: 0.1, containerRefId: "null" }];
+  const incomplete = [{ sourceId: null, itemName: "A", quantity: 1, valuePed: 0.1, containerRefId: null }];
+  assert.ok(context.frjInventoryMetadataScore_(complete) > context.frjInventoryMetadataScore_(incomplete));
+  assert.match(syncEngineSource, /localMetadataScore > remoteMetadataScore[\s\S]*"gas-to-d1"/);
+  assert.match(syncEngineSource, /remoteMetadataScore > localMetadataScore[\s\S]*"d1-to-gas"/);
+  assert.match(syncEngineSource, /local\.hash === remoteState\.hash[\s\S]*frjWriteLocalDataset_\(dataset, \{ state: remoteState, rows: local\.rows \}\)/);
   scriptProperties.clear();
   assert.equal(context.frjInventoryMetadataSchemaIsCurrent_("inventory:enzo"), false);
   context.frjMarkInventoryMetadataSchemaCurrent_("inventory:enzo");
   assert.equal(context.frjInventoryMetadataSchemaIsCurrent_("inventory:enzo"), true);
   assert.match(applicationSource, /const snapshot = await readInventorySnapshot\(env, avatar\)/);
+});
+
+test("T-009 écrit les types de cellules comme un collage MindArk", () => {
+  const rows = context.frjNormalizeInventorySheetData_([
+    ["Id", "Name", "Quantity", "Value(PED)", "Container", "ContainerRefId"],
+    ["1", "Article A", "2", "0.1000", "STORAGE (Calypso)", "807"],
+    ["2", "Article B", "1", "4.0000", "STORAGE (Calypso)", "null"]
+  ]);
+  assert.deepEqual(JSON.parse(JSON.stringify(rows)), [
+    ["Id", "Name", "Quantity", "Value(PED)", "Container", "ContainerRefId"],
+    [1, "Article A", 2, "0.1000", "STORAGE (Calypso)", 807],
+    [2, "Article B", 1, "4.0000", "STORAGE (Calypso)", "null"]
+  ]);
 });

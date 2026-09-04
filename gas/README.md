@@ -40,7 +40,7 @@ Le dataset `containers` fait ensuite partie de la synchronisation bidirectionnel
 
 Les feuilles d'inventaire sont un contrat externe historique, utilisé par plusieurs autres classeurs Google Sheets. Elles reproduisent donc chaque ligne du TSV MindArk, sans regroupement ni tri, dans les six colonnes `Id | article/date | Quantity | Value(PED) | Container | ContainerRefId`.
 
-La seule exception volontaire au fichier source se trouve en `B1` : l'en-tête `Name` y est remplacé par la date et l'heure d'import, au format `dd/MM/yyyy - HH:mm:ss`. Les noms d'articles occupent la colonne B à partir de la ligne 2. Lorsqu'une synchronisation D1 restaure une feuille, la colonne `Value(PED)` conserve quatre décimales et aucun contenu technique ne subsiste en dehors des six colonnes contractuelles.
+La seule exception volontaire au fichier source se trouve en `B1` : l'en-tête `Name` y est remplacé par la date et l'heure d'import, au format `dd/MM/yyyy - HH:mm:ss`. Les noms d'articles occupent la colonne B à partir de la ligne 2. La colonne `Value(PED)` est volontairement stockée comme texte brut sur quatre décimales (`0.1000`) afin de conserver le point décimal indépendamment de la locale Google Sheets et de préserver les `IMPORTRANGE` historiques. L'import direct et une restauration depuis D1 appliquent exactement ce même contrat. Aucun contenu technique ne subsiste en dehors des six colonnes contractuelles.
 
 ## Promotion préparée pour le lendemain
 
@@ -56,4 +56,4 @@ Après chaque synchronisation différée susceptible de modifier le stock, le ca
 6. Mettre à jour le déploiement Web App existant avec son `deploymentId`, afin de conserver la même URL `/exec`.
 7. Cloner à nouveau le projet et comparer les empreintes des fichiers, puis tester les routes publiques sans écriture métier.
 
-Le déploiement de production actuel est la version 29. Son URL est référencée par `js/api-client.js` pour le secours des demandes et par le Worker pour la synchronisation ; elle doit rester stable.
+Le déploiement de production actuel est la version 30. Son URL est référencée par `js/api-client.js` pour le secours des demandes et par le Worker pour la synchronisation ; elle doit rester stable.

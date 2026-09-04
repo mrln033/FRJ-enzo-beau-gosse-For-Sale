@@ -111,8 +111,9 @@ function processInventory(csv, avatar) {
     throw new Error("Colonnes inventaire MindArk invalides : " + actualHeaders.join(" | "));
   }
 
-  const numRows = data.length;
-  const numCols = data[0].length;
+  const sheetData = frjNormalizeInventorySheetData_(data);
+  const numRows = sheetData.length;
+  const numCols = sheetData[0].length;
 
   // Agrandir avant l'écriture évite une troncature lorsque l'import dépasse la feuille.
   if (sheet.getMaxRows() < numRows) {
@@ -127,7 +128,11 @@ function processInventory(csv, avatar) {
   sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns()).clearContent();
 
   // Écrire le tableau complet en une opération limite les appels Google Sheets.
-  sheet.getRange(1, 1, numRows, numCols).setValues(data);
+  if (numRows > 1) {
+    // Contrat historique : Value(PED) reste du texte avec un point décimal.
+    sheet.getRange(2, 4, numRows - 1, 1).setNumberFormat("@");
+  }
+  sheet.getRange(1, 1, numRows, numCols).setValues(sheetData);
 
   // Exception historique au TSV MindArk : B1 contient la date/heure d'import,
   // tandis que les articles restent en colonne B à partir de la ligne 2.
@@ -141,4 +146,46 @@ function processInventory(csv, avatar) {
   frjRefreshContainerConfigurationAfterInventoryUnlocked_(inventoryId);
 
   return `✅ Import inventaire OK dans ${SHEET_NAME} (${numRows} lignes)`;
+}
+
+function frjNormalizeInventorySheetData_(data) {
+  return data.map((row, index) => {
+    if (row.length !== 6) {
+      throw new Error("Ligne inventaire MindArk " + (index + 1) + " invalide : " + row.length + " colonnes");
+    }
+    if (index === 0) return row;
+    return [
+      frjInventoryNumberOrTextCell_(row[0]),
+      row[1],
+      frjInventoryRequiredNumberCell_(row[2], "Quantity", index + 1),
+      frjInventoryPedTextCell_(row[3], index + 1),
+      row[4],
+      frjInventoryNumberOrTextCell_(row[5])
+    ];
+  });
+}
+
+function frjInventoryRequiredNumberCell_(value, column, lineNumber) {
+  const text = String(value === null || value === undefined ? "" : value).trim();
+  const number = Number(text);
+  if (!text || !isFinite(number)) {
+    throw new Error(column + " invalide à la ligne " + lineNumber + " : " + text);
+  }
+  return number;
+}
+
+function frjInventoryPedTextCell_(value, lineNumber) {
+  const text = String(value === null || value === undefined ? "" : value).trim();
+  const number = Number(text);
+  if (!text || !isFinite(number)) {
+    throw new Error("Value(PED) invalide à la ligne " + lineNumber + " : " + text);
+  }
+  return number.toFixed(4);
+}
+
+function frjInventoryNumberOrTextCell_(value) {
+  const text = String(value === null || value === undefined ? "" : value).trim();
+  if (!text || text.toLowerCase() === "null") return text;
+  const number = Number(text);
+  return isFinite(number) ? number : text;
 }

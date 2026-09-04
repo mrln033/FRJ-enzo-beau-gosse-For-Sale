@@ -316,6 +316,12 @@ function frjSynchronizeDataset_(dataset, remoteState, forceAudit, retryCount) {
   var inventoryMetadataUpgrade = dataset.indexOf("inventory:") === 0
     && !frjInventoryMetadataSchemaIsCurrent_(dataset);
   if (local.hash === remoteState.hash) {
+    if (inventoryMetadataUpgrade) {
+      // L'empreinte métier ne distingue pas nombre et texte. Réécrire une fois
+      // garantit notamment Value(PED) en texte à point décimal, même à contenu égal.
+      frjWriteLocalDataset_(dataset, { state: remoteState, rows: local.rows });
+      local = frjReadLocalDataset_(dataset);
+    }
     frjSetBaseHash_(dataset, local.hash);
     if (inventoryMetadataUpgrade) frjMarkInventoryMetadataSchemaCurrent_(dataset);
     if (forceAudit) frjReportAudit_(dataset, "verified", local.hash, remoteState.hash, { rows: local.rows.length });
@@ -333,15 +339,23 @@ function frjSynchronizeDataset_(dataset, remoteState, forceAudit, retryCount) {
   var remoteChanged = !baseHash || remoteState.hash !== baseHash;
   var direction;
   var mergeCandidate = null;
+  var inventoryUpgradeDirection = null;
+
+  if (inventoryMetadataUpgrade) {
+    remoteSnapshot = remoteSnapshot || frjReadRemoteDataset_(dataset);
+    var localMetadataScore = frjInventoryMetadataScore_(local.rows);
+    var remoteMetadataScore = frjInventoryMetadataScore_(remoteSnapshot.rows);
+    if (localMetadataScore > remoteMetadataScore) inventoryUpgradeDirection = "gas-to-d1";
+    if (remoteMetadataScore > localMetadataScore) inventoryUpgradeDirection = "d1-to-gas";
+  }
 
   if (dataset === "catalog") {
     // BDD_APP reste pour l'instant le référentiel maître : ses colonnes E:G sont des formules IMPORTRANGE.
     direction = "gas-to-d1";
-  } else if (inventoryMetadataUpgrade) {
-    // L'ancienne empreinte supprimait Id, Value(PED) et ContainerRefId.
-    // D1 ayant conservé l'import brut, il répare une seule fois la feuille GAS,
-    // puis les synchronisations suivantes redeviennent strictement bidirectionnelles.
-    direction = "d1-to-gas";
+  } else if (inventoryUpgradeDirection) {
+    // L'ancienne empreinte supprimait Id, Value(PED) et ContainerRefId. La réparation
+    // part du côté qui possède effectivement le plus de métadonnées, sans imposer D1.
+    direction = inventoryUpgradeDirection;
   } else if (dataset === "containers" && !baseHash) {
     // Premier raccordement : la feuille CONFIG_CONTAINER contient les choix
     // historiques explicites (18 activés) et initialise la base commune.
@@ -399,6 +413,9 @@ function frjSynchronizeDataset_(dataset, remoteState, forceAudit, retryCount) {
         frjSetBaseHash_(dataset, unitedLocal.hash);
       } else {
         frjSetBaseHash_(dataset, pushed.state.hash);
+        if (inventoryMetadataUpgrade) {
+          frjWriteLocalDataset_(dataset, { state: pushed.state, rows: local.rows });
+        }
       }
     } else {
       remoteSnapshot = remoteSnapshot || frjReadRemoteDataset_(dataset);
@@ -449,11 +466,20 @@ function frjInventoryMetadataSchemaProperty_(dataset) {
 }
 
 function frjInventoryMetadataSchemaIsCurrent_(dataset) {
-  return PropertiesService.getScriptProperties().getProperty(frjInventoryMetadataSchemaProperty_(dataset)) === "3";
+  return PropertiesService.getScriptProperties().getProperty(frjInventoryMetadataSchemaProperty_(dataset)) === "4";
 }
 
 function frjMarkInventoryMetadataSchemaCurrent_(dataset) {
-  PropertiesService.getScriptProperties().setProperty(frjInventoryMetadataSchemaProperty_(dataset), "3");
+  PropertiesService.getScriptProperties().setProperty(frjInventoryMetadataSchemaProperty_(dataset), "4");
+}
+
+function frjInventoryMetadataScore_(rows) {
+  return (rows || []).reduce(function(score, row) {
+    if (frjText_(row.sourceId)) score += 2;
+    if (row.valuePed !== null && row.valuePed !== undefined && isFinite(Number(row.valuePed))) score += 1;
+    if (frjText_(row.containerRefId)) score += 2;
+    return score;
+  }, 0);
 }
 
 function frjRetryDatasetAfterConcurrentChange_(dataset, forceAudit, retryCount) {

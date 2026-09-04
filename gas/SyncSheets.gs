@@ -65,20 +65,20 @@ function frjWriteLocalInventory_(avatar, snapshot) {
   var data = [["Id", updatedAt, "Quantity", "Value(PED)", "Container", "ContainerRefId"]];
   snapshot.rows.forEach(function(row) {
     data.push([
-      row.sourceId || "",
+      frjInventoryNumberOrTextCell_(row.sourceId),
       row.itemName,
       Number(row.quantity),
-      row.valuePed === null || row.valuePed === undefined ? "" : Number(row.valuePed),
+      row.valuePed === null || row.valuePed === undefined ? "" : Number(row.valuePed).toFixed(4),
       row.container || "",
-      row.containerRefId || ""
+      frjInventoryNumberOrTextCell_(row.containerRefId)
     ]);
   });
 
   // La feuille est un miroir du TSV MindArk réutilisé par d'autres classeurs :
   // ne conserver aucune colonne ou cellule technique en dehors de ces six champs.
   sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns()).clearContent();
+  if (data.length > 1) sheet.getRange(2, 4, data.length - 1, 1).setNumberFormat("@");
   sheet.getRange(1, 1, data.length, 6).setValues(data);
-  if (data.length > 1) sheet.getRange(2, 4, data.length - 1, 1).setNumberFormat("0.0000");
   sheet.getRange("B1").setNumberFormat("dd/MM/yyyy - HH:mm:ss");
   SpreadsheetApp.flush();
   // frjRunSync_ détient déjà le verrou global pendant cette écriture.

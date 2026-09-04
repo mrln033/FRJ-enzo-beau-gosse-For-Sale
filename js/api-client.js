@@ -1,8 +1,10 @@
 (function initFrjApi(global) {
   "use strict";
 
-  const GAS_URL = "https://script.google.com/macros/s/AKfycbxD_sOPcjLT-eWPrDMfLgaSx16yAeH17SCd8xByP2faU24z8ge5AiAWOueVBRanHjGx/exec";
-  const GAS_ORDER_URL = "https://script.google.com/macros/s/AKfycbxa0B_4R6tsn8aQCLy1Y3LEqbDj4SY22xbascJfMRd1I1thQkCRPySAjszdHoxX1h2a/exec";
+  // Le catalogue historique et l'application d'administration sont deux
+  // déploiements distincts. Tous les POST métier doivent viser GAS_APP_URL.
+  const GAS_CATALOG_URL = "https://script.google.com/macros/s/AKfycbxD_sOPcjLT-eWPrDMfLgaSx16yAeH17SCd8xByP2faU24z8ge5AiAWOueVBRanHjGx/exec";
+  const GAS_APP_URL = "https://script.google.com/macros/s/AKfycbxa0B_4R6tsn8aQCLy1Y3LEqbDj4SY22xbascJfMRd1I1thQkCRPySAjszdHoxX1h2a/exec";
   const D1_URL = "https://frj-for-sale-api.merlin-merzhin-lesage.workers.dev";
   const ADMIN_TOKEN_KEY = "FRJ_D1_ADMIN_TOKEN";
   const requestedBackend = new URLSearchParams(global.location.search).get("backend");
@@ -12,7 +14,7 @@
   reflectBackend(preferredBackend);
 
   const backends = {
-    gas: GAS_URL,
+    gas: GAS_CATALOG_URL,
     d1: D1_URL
   };
 
@@ -100,7 +102,7 @@
 
   async function requestGas(query, options = {}) {
     setActiveBackend("gas");
-    const response = await global.fetch(buildUrl("gas", query), options);
+    const response = await global.fetch(buildBaseUrl(GAS_APP_URL, query), options);
     if (!response.ok) {
       const details = await response.text();
       throw new Error(details || `GAS répond ${response.status}`);
@@ -130,7 +132,7 @@
       if (d1Error?.status && d1Error.status < 500) throw d1Error;
       try {
         setActiveBackend("gas");
-        const response = await global.fetch(`${GAS_ORDER_URL}?type=order`, {
+        const response = await global.fetch(`${GAS_APP_URL}?type=order`, {
           method: "POST",
           headers: { "Content-Type": "text/plain;charset=UTF-8" },
           body
@@ -213,7 +215,7 @@
     const result = await readJsonResponse(response);
     if (response.ok) return result;
     if (sourceBackend === "gas" && (response.status === 404 || response.status >= 500)) {
-      const gasResponse = await global.fetch(`${GAS_ORDER_URL}?type=orderCancel`, {
+      const gasResponse = await global.fetch(`${GAS_APP_URL}?type=orderCancel`, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=UTF-8" },
         body: JSON.stringify({ accessToken: token })
@@ -349,11 +351,15 @@
   }
 
   function buildUrl(backend, query) {
+    return buildBaseUrl(backends[backend], query);
+  }
+
+  function buildBaseUrl(baseUrl, query) {
     const suffix = String(query || "");
     if (suffix.startsWith("?") || suffix.startsWith("/")) {
-      return `${backends[backend]}${suffix}`;
+      return `${baseUrl}${suffix}`;
     }
-    return `${backends[backend]}/${suffix}`;
+    return `${baseUrl}/${suffix}`;
   }
 
   async function getAdminToken() {
