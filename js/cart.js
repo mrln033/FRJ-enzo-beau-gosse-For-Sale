@@ -373,7 +373,7 @@
       const reference = document.createElement("span");
       reference.textContent = `${request.reference} — ${requestStatusLabel(request.status)}`;
       const link = document.createElement("a");
-      link.href = trackingUrl(request.accessToken);
+      link.href = trackingUrl(request.accessToken, request.catalogBackend);
       link.target = "_self";
       link.textContent = label("trackRequest");
       const copy = button(label("copyTracking"), "cart-secondary", async () => {
@@ -432,6 +432,7 @@
     const form = event.currentTarget;
     const submit = form.querySelector("button[type=submit]");
     const data = new FormData(form);
+    const catalogBackend = currentCatalogBackend();
     submit.disabled = true;
     submit.textContent = label("sending");
     setStatus("");
@@ -471,6 +472,7 @@
         reference,
         accessToken: payload.accessToken,
         backend: result.backend,
+        catalogBackend,
         submittedAt: new Date().toISOString(),
         status: result.order?.status || "submitted"
       };
@@ -644,6 +646,9 @@
         reference: String(request.reference || "").trim(),
         accessToken,
         backend: request.backend === "gas" ? "gas" : "d1",
+        catalogBackend: request.catalogBackend === "d1" || request.catalogBackend === "gas"
+          ? request.catalogBackend
+          : null,
         submittedAt: String(request.submittedAt || ""),
         updatedAt: String(request.updatedAt || ""),
         status: String(request.status || "")
@@ -651,6 +656,7 @@
       const normalizedReference = normalized.reference.toLocaleUpperCase("en-US");
       const requestKey = normalizedReference ? `reference:${normalizedReference}` : `token:${accessToken}`;
       const existing = byRequest.get(requestKey);
+      if (existing && !normalized.catalogBackend) normalized.catalogBackend = existing.catalogBackend || null;
       const normalizedTime = Date.parse(normalized.updatedAt || normalized.submittedAt || 0);
       const existingTime = Date.parse(existing?.updatedAt || existing?.submittedAt || 0);
       if (
@@ -659,6 +665,8 @@
         || (normalizedTime === existingTime && existing.backend === "gas" && normalized.backend === "d1")
       ) {
         byRequest.set(requestKey, normalized);
+      } else if (existing && !existing.catalogBackend && normalized.catalogBackend) {
+        existing.catalogBackend = normalized.catalogBackend;
       }
     });
     const sorted = [...byRequest.values()]
@@ -707,10 +715,16 @@
     render();
   }
 
-  function trackingUrl(accessToken) {
+  function currentCatalogBackend() {
+    return global.FRJ_API?.activeBackend === "d1" ? "d1" : "gas";
+  }
+
+  function trackingUrl(accessToken, storedCatalogBackend = null) {
     const url = new URL("./suivi-commande.html", global.location.href);
     url.searchParams.set("token", accessToken);
-    const backend = new URLSearchParams(global.location.search).get("backend") === "d1" ? "d1" : "gas";
+    const backend = storedCatalogBackend === "d1" || storedCatalogBackend === "gas"
+      ? storedCatalogBackend
+      : currentCatalogBackend();
     url.searchParams.set("backend", backend);
     return url.toString();
   }

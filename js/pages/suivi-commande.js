@@ -45,12 +45,49 @@
   const HIDDEN_REQUESTS_KEY = "FRJ_HIDDEN_PURCHASE_REQUESTS_V1";
   const searchParams = new URLSearchParams(global.location.search);
   const token = searchParams.get("token") || "";
-  const catalogBackend = searchParams.get("backend") === "d1" ? "d1" : "gas";
+  const catalogBackend = resolveCatalogBackend(searchParams, token);
   const ui = global.FRJ_ORDER_UI;
   let lang = global.localStorage.getItem("lang") === "FR" ? "FR" : "EN";
   let refreshing = false;
 
   document.getElementById("catalogReturnLink").href = `./?backend=${catalogBackend}`;
+  canonicalizeTrackingUrl();
+
+  function normalizeBackend(value) {
+    return value === "d1" || value === "gas" ? value : null;
+  }
+
+  function resolveCatalogBackend(params, accessToken) {
+    const explicitBackend = normalizeBackend(params.get("backend"));
+    if (explicitBackend) return explicitBackend;
+    try {
+      const requests = JSON.parse(global.localStorage.getItem(REQUESTS_KEY) || "[]");
+      const remembered = Array.isArray(requests)
+        ? requests.find((request) => request?.accessToken === accessToken)
+        : null;
+      const rememberedBackend = normalizeBackend(remembered?.catalogBackend);
+      if (rememberedBackend) return rememberedBackend;
+    } catch {
+      // Un lien privé reste utilisable si le stockage local est indisponible.
+    }
+    try {
+      const referrer = new URL(global.document.referrer);
+      if (referrer.origin === global.location.origin) {
+        const referrerBackend = normalizeBackend(referrer.searchParams.get("backend"));
+        if (referrerBackend) return referrerBackend;
+      }
+    } catch {
+      // Un accès direct sans provenance conserve le mode historique GAS.
+    }
+    return "gas";
+  }
+
+  function canonicalizeTrackingUrl() {
+    if (normalizeBackend(searchParams.get("backend"))) return;
+    const url = new URL(global.location.href);
+    url.searchParams.set("backend", catalogBackend);
+    global.history.replaceState(null, "", url);
+  }
 
   function text(key) {
     return COPY[lang][key] || key;
@@ -90,6 +127,7 @@
         reference: String(order.publicReference || ""),
         accessToken: token,
         backend: "d1",
+        catalogBackend,
         submittedAt: String(order.createdAt || ""),
         updatedAt: String(order.updatedAt || ""),
         status: String(order.status || "submitted")

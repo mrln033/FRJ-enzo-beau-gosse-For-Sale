@@ -694,7 +694,7 @@
         })
       });
       const result = await response.json();
-      const trackingUrl = new URL(result.trackingPath, global.location.href).href;
+      const trackingUrl = adminTrackingUrl(result.trackingPath);
       const copied = await copyTrackingUrl(trackingUrl);
       const message = document.createElement("p");
       message.textContent = `${result.order.publicReference} créée au statut À valider.${copied ? " Lien copié." : ""}`;
@@ -819,7 +819,7 @@
           if (!result.trackingPath || !result.accessToken) {
             throw new Error("Le Worker n’a pas renvoyé de lien de suivi valide.");
           }
-          trackingUrl = new URL(result.trackingPath, global.location.href).href;
+          trackingUrl = adminTrackingUrl(result.trackingPath);
         }
 
         const copied = await copyTrackingUrl(trackingUrl);
@@ -873,6 +873,12 @@
     } catch {
       return false;
     }
+  }
+
+  function adminTrackingUrl(trackingPath) {
+    const url = new URL(trackingPath, global.location.href);
+    url.searchParams.set("backend", "d1");
+    return url.href;
   }
 
   function createHistoryPanel(order) {

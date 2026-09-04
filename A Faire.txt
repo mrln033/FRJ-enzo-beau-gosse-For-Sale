@@ -22,19 +22,25 @@ POINT DE REPRISE — 31/08/2026
 Ordre recommandé déjà réalisé et validé : d.1 -> d.2 -> d.3 -> d.7 -> d.8 -> d.6 -> d.10 -> d.11 -> d.5 -> d.13 -> d.12.
 Les demandes d.13, d.12 et d.9 sont terminées. D.9 fournit les promotions quotidiennes et les soldes communs à GAS et D1.
 
-Les tâches T-001 à T-007 sont terminées et publiées.
+Les tâches T-001 à T-008 sont terminées et publiées.
 La seule demande encore ouverte est l'ancienne d.4, mise en attente à la demande du 29/08/2026 : son périmètre doit être mieux cadré avant toute analyse définitive ou implémentation.
 
 -------------------------------
 DEMANDES  => CE QUI EST A FAIRE
 
->>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-008 <<<
+>>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-009 <<<
 
 [EN ATTENTE DE CADRAGE]
 d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> ajouter un bouton 'Supprimer' à chaque demande avec message de confirmation. Celà supprimerais l'enregistrement complet dans D1. Propagation Discord avec modification du statut en 'SUPPRIMEE' pour archivage.
 
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
+
+04/09/2026 = Tâche T-008 — retour du suivi client vers le bon mode de catalogue.
+Demande d'origine :
+T-008  ==> Panier client < Suivi demande
+	Quand un suive de demande est affiché coté client, l'appui sur 'Retour au catalogue' affiche le catalogu en version GAS. J'aimerais que le retour se fasse dans le mode où l'appel a été initié.
+Réalisation : le panier mémorise désormais le backend réellement affiché au moment où la transmission est initiée, y compris lorsqu'un catalogue ouvert sans paramètre explicite a basculé automatiquement de GAS vers D1. Chaque lien de suivi transporte ce mode et le bouton « Retour au catalogue » restitue donc précisément GAS ou D1. Le mode d'origine est conservé dans l'historique local des demandes lors des actualisations et des fusions entre onglets. Pour les anciens liens sans paramètre, la page de suivi tente d'abord de retrouver le mode mémorisé pour la demande, puis celui de la page d'origine ; elle canonise ensuite son URL afin que toute copie ultérieure conserve ce choix. Un lien ouvert directement sans aucun contexte garde le comportement historique GAS. Les liens créés depuis l'Admin ciblent explicitement le catalogue D1. Les versions des trois contrôleurs concernés sont renouvelées pour invalider le cache navigateur. Les contrôles de syntaxe réussissent ; aucun changement Worker, D1 ou GAS n'est nécessaire.
 
 04/09/2026 = Tâches T-006 et T-007 — recherche prédictive, MU remisé et repères de campagne dans les demandes.
 Demandes d'origine :
