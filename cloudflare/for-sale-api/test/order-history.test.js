@@ -253,6 +253,8 @@ test("l'acceptation et l'annulation client écrivent leur événement dans le m�
   applyMigration(database, "0009_order_proposals.sql");
   applyMigration(database, "0016_purchase_order_history.sql");
   applyMigration(database, "0018_purchase_order_tracking_tokens.sql");
+  applyMigration(database, "0021_purchase_order_discounts.sql");
+  applyMigration(database, "0023_mutable_order_discounts.sql");
   insertOrder(database);
   const token = "b".repeat(72);
   const tokenHash = createHash("sha256").update(token).digest("hex");
@@ -289,6 +291,8 @@ test("d.5 crée des liens de suivi secondaires sans invalider les précédents",
   applyMigration(database, "0008_order_discord_notifications.sql");
   applyMigration(database, "0009_order_proposals.sql");
   applyMigration(database, "0016_purchase_order_history.sql");
+  applyMigration(database, "0021_purchase_order_discounts.sql");
+  applyMigration(database, "0023_mutable_order_discounts.sql");
   applyMigration(database, "0018_purchase_order_tracking_tokens.sql");
   insertOrder(database);
   insertOrderItem(database);
@@ -351,6 +355,8 @@ test("l'historique GAS met à jour D1 puis revient par le curseur sans doublon",
   applyMigration(database, "0008_order_discord_notifications.sql");
   applyMigration(database, "0009_order_proposals.sql");
   applyMigration(database, "0016_purchase_order_history.sql");
+  applyMigration(database, "0021_purchase_order_discounts.sql");
+  applyMigration(database, "0023_mutable_order_discounts.sql");
   insertOrder(database);
   insertOrderItem(database);
   database.prepare(`UPDATE purchase_orders SET updated_at = ? WHERE id = ?`)

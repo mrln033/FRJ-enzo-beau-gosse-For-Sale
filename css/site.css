@@ -750,3 +750,9 @@ html[data-frj-backend="d1"] .backend-status-dot {
     text-align: center;
   }
 }
+.order-discount-marker {
+	margin-left: .3em;
+	font-size: .8em;
+	font-weight: 500;
+	color: #9a5b16;
+}

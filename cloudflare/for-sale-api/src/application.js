@@ -26,13 +26,15 @@ import {
   normalizeAdminOrderLine,
   normalizeOrderSubmission,
   orderItemKey,
+  formatMarkup,
+  priceOrderLine,
   priceOrderLines,
   reviseOrderLine,
   validateOrderStatus
 } from "./orders.js";
 import { sendOrUpdateDiscordOrder } from "./discord.js";
 import { diffContainerConfig, mapContainerConfigRow, normalizeContainerConfigPayload } from "./containers.js";
-import { businessDateInParis } from "./discounts.js";
+import { businessDateInParis, computeDiscountedMarkup } from "./discounts.js";
 import {
   createDiscountCampaign,
   generateDailyPromotion,
@@ -630,7 +632,9 @@ export async function handleSyncPost(request, url, env) {
 
   if (url.pathname === "/sync/discounts") {
     await assertExpectedHash(env, "discounts", expectedHash);
-    return json(await storeDiscountSyncSnapshot(env, payload));
+    const result = await storeDiscountSyncSnapshot(env, payload);
+    result.ordersRefreshed = (await refreshMutableOrderDiscounts(env)).length;
+    return json(result);
   }
   if (url.pathname === "/sync/discount-config") {
     await assertExpectedHash(env, "discount-config", expectedHash);
@@ -1028,6 +1032,7 @@ export async function handleScheduledDiscountGeneration(env, requestedBusinessDa
     await readDiscountSyncSnapshot(env);
     await notifyGasDataChanged(env, "discounts", "generation-promotion-planifiee-d1");
   }
+  const refreshedOrderIds = await refreshMutableOrderDiscounts(env);
   return {
     reason: generatedDates.length ? "GENERATED" : tomorrow.reason,
     date: tomorrow.date,
@@ -1035,7 +1040,8 @@ export async function handleScheduledDiscountGeneration(env, requestedBusinessDa
     businessDate,
     today,
     tomorrow,
-    generatedDates
+    generatedDates,
+    ordersRefreshed: refreshedOrderIds.length
   };
 }
 
@@ -1633,12 +1639,12 @@ function mapSyncState(row) {
 async function updateOrderProposal(env, orderId, requestedItems) {
   const [orderResult, itemsResult] = await env.DB.batch([
     env.DB.prepare(`
-      SELECT id, status, approval_required, proposal_version
+      SELECT id, status, approval_required, proposal_version, frj_member
       FROM purchase_orders WHERE id = ?
     `).bind(orderId),
     env.DB.prepare(`
       SELECT order_id, line_no, item_name, storage, aisle, unit_tt_ped,
-             quantity, markup_kind, markup_value
+             quantity, markup_kind, markup_value, discount_rate
       FROM purchase_order_items WHERE order_id = ? ORDER BY line_no
     `).bind(orderId)
   ]);
@@ -1677,7 +1683,16 @@ async function updateOrderProposal(env, orderId, requestedItems) {
     const stock = stocks.get(String(existing.item_name).toLocaleLowerCase("en-US")) || 0;
     const revised = parseOrderValue(() => reviseOrderLine(existing, requested, stock));
     const noChange = hasSameOrderTerms(existing, revised);
-    if (!noChange) changed.push({ existing, revised });
+    if (!noChange) changed.push({
+      existing,
+      revised,
+      baseMarkup: deriveBaseMarkup(
+        revised.markupKind,
+        revised.markupValue,
+        Number(order.frj_member || 0) === 1,
+        existing.discount_rate
+      )
+    });
   });
 
   if (!changed.length) {
@@ -1690,15 +1705,16 @@ async function updateOrderProposal(env, orderId, requestedItems) {
   }
 
   const nextVersion = Number(order.proposal_version || 0) + 1;
-  const statements = changed.map(({ existing, revised }) => env.DB.prepare(`
+  const statements = changed.map(({ existing, revised, baseMarkup }) => env.DB.prepare(`
     UPDATE purchase_order_items
     SET quantity = ?, stock_at_submission = ?, markup_kind = ?, markup_value = ?,
-        markup_display = ?, unit_sale_ped = ?, line_tt_ped = ?, line_sale_ped = ?, price_status = ?
+        markup_display = ?, unit_sale_ped = ?, line_tt_ped = ?, line_sale_ped = ?, price_status = ?,
+        base_markup_kind = ?, base_markup_value = ?, base_markup_profiled = 0
     WHERE order_id = ? AND line_no = ?
   `).bind(
     revised.quantity, revised.stockAtSubmission, revised.markupKind, revised.markupValue,
     revised.markupDisplay, revised.unitSalePed, revised.lineTtPed, revised.lineSalePed,
-    revised.priceStatus, orderId, Number(existing.line_no)
+    revised.priceStatus, baseMarkup.kind, baseMarkup.value, orderId, Number(existing.line_no)
   ));
   statements.push(
     env.DB.prepare(`
@@ -1740,6 +1756,7 @@ export async function handleAdminPost(request, url, env) {
     if (payload.date && result.reason === "GENERATED") {
       await notifyGasDataChanged(env, "discounts", "generation-promotion-d1");
     }
+    if (payload.date) result.ordersRefreshed = (await refreshMutableOrderDiscounts(env)).length;
     return json(result);
   }
   if (url.pathname === "/admin/discounts/config") {
@@ -1755,6 +1772,7 @@ export async function handleAdminPost(request, url, env) {
     const result = await createDiscountCampaign(env, payload);
     await readDiscountSyncSnapshot(env);
     await notifyGasDataChanged(env, "discounts", "creation-campagne-d1");
+    result.ordersRefreshed = (await refreshMutableOrderDiscounts(env)).length;
     return json(result, 201);
   }
 
@@ -1764,6 +1782,7 @@ export async function handleAdminPost(request, url, env) {
     const result = await updateDiscountCampaign(env, discountCampaignMatch[1], payload);
     await readDiscountSyncSnapshot(env);
     await notifyGasDataChanged(env, "discounts", "modification-campagne-d1");
+    result.ordersRefreshed = (await refreshMutableOrderDiscounts(env)).length;
     return json(result);
   }
 
@@ -1842,7 +1861,8 @@ export async function handleAdminPost(request, url, env) {
     const lineNo = Number(orderItemMatch[2]);
     const existing = await env.DB.prepare(`
       SELECT oi.order_id, oi.line_no, oi.item_name, oi.storage, oi.aisle, oi.unit_tt_ped,
-             oi.quantity, oi.markup_kind, oi.markup_value, po.status, po.approval_required
+             oi.quantity, oi.markup_kind, oi.markup_value, oi.discount_rate,
+             po.status, po.approval_required, po.frj_member
       FROM purchase_order_items oi
       JOIN purchase_orders po ON po.id = oi.order_id
       WHERE oi.order_id = ? AND oi.line_no = ?
@@ -1862,16 +1882,23 @@ export async function handleAdminPost(request, url, env) {
     if (hasSameOrderTerms(existing, revised)) {
       return json({ ok: true, noChange: true });
     }
+    const baseMarkup = deriveBaseMarkup(
+      revised.markupKind,
+      revised.markupValue,
+      Number(existing.frj_member || 0) === 1,
+      existing.discount_rate
+    );
     await env.DB.batch([
       env.DB.prepare(`
         UPDATE purchase_order_items
         SET quantity = ?, stock_at_submission = ?, markup_kind = ?, markup_value = ?,
-            markup_display = ?, unit_sale_ped = ?, line_tt_ped = ?, line_sale_ped = ?, price_status = ?
+            markup_display = ?, unit_sale_ped = ?, line_tt_ped = ?, line_sale_ped = ?, price_status = ?,
+            base_markup_kind = ?, base_markup_value = ?, base_markup_profiled = 0
         WHERE order_id = ? AND line_no = ?
       `).bind(
         revised.quantity, revised.stockAtSubmission, revised.markupKind, revised.markupValue,
         revised.markupDisplay, revised.unitSalePed, revised.lineTtPed, revised.lineSalePed,
-        revised.priceStatus, orderId, lineNo
+        revised.priceStatus, baseMarkup.kind, baseMarkup.value, orderId, lineNo
       ),
       env.DB.prepare(`
         UPDATE purchase_orders
@@ -1907,6 +1934,9 @@ export async function handleAdminPost(request, url, env) {
       return json({ ok: true, noChange: true, status });
     }
     const confirmsPricing = confirmsOrderPricing(status);
+    if (confirmsPricing && canReviseOrder(existing.status, existing.approval_required)) {
+      await refreshMutableOrderDiscounts(env, existing.id);
+    }
     const statements = [
       env.DB.prepare(`
         UPDATE purchase_orders
@@ -2059,6 +2089,7 @@ export async function handlePublicOrderGet(url, env) {
   const tokenHash = await sha256(match[1]);
   const orderId = await resolveOrderIdByTrackingToken(env, tokenHash);
   if (!orderId) throw new ApiError(404, "Demande introuvable");
+  await refreshMutableOrderDiscounts(env, orderId);
   const order = await env.DB.prepare(`
     SELECT id, public_reference, status, approval_required, proposal_version, buyer_avatar, language, frj_member,
            total_tt_ped, total_sale_ped, pricing_status, created_at, updated_at
@@ -2068,7 +2099,9 @@ export async function handlePublicOrderGet(url, env) {
   const items = await env.DB.prepare(`
     SELECT line_no, item_name, storage, aisle, quantity, stock_at_submission,
            unit_tt_ped, markup_kind, markup_value, markup_display, unit_sale_ped,
-           line_tt_ped, line_sale_ped, price_status
+           line_tt_ped, line_sale_ped, price_status,
+           base_markup_kind, base_markup_value, base_markup_profiled,
+           discount_campaign_id, discount_kind, discount_rate
     FROM purchase_order_items WHERE order_id = ? ORDER BY line_no
   `).bind(order.id).all();
   return json({ order: mapPublicOrder(order, items.results) });
@@ -2315,15 +2348,16 @@ async function storePurchaseOrder(env, order, items, eventAction, syncedEvent = 
         order_id, line_no, item_name, storage, aisle, quantity, stock_at_submission,
         unit_tt_ped, markup_kind, markup_value, markup_display, unit_sale_ped,
         line_tt_ped, line_sale_ped, price_status, base_markup_kind, base_markup_value,
-        discount_campaign_id, discount_kind, discount_rate
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        base_markup_profiled, discount_campaign_id, discount_kind, discount_rate
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       order.id, Number(item.lineNo || index + 1), item.itemName, item.storage, item.aisle,
       Number(item.quantity), Number(item.stockAtSubmission), Number(item.unitTtPed),
       item.markupKind || "none", item.markupValue ?? null, item.markupDisplay || null,
       Number(item.unitSalePed), Number(item.lineTtPed), Number(item.lineSalePed),
       item.priceStatus || "estimated", item.baseMarkupKind || item.markupKind || "none",
-      item.baseMarkupValue ?? item.markupValue ?? null, item.discountCampaignId || null,
+      item.baseMarkupValue ?? item.markupValue ?? null, item.baseMarkupProfiled ? 1 : 0,
+      item.discountCampaignId || null,
       item.discountKind || null, item.discountRate ?? null
     )),
     syncedEvent
@@ -2508,7 +2542,9 @@ async function synchronizeDiscordOrder(env, orderId) {
     env.DB.prepare(`
       SELECT line_no, item_name, storage, aisle, quantity, stock_at_submission,
              unit_tt_ped, markup_kind, markup_value, markup_display, unit_sale_ped,
-             line_tt_ped, line_sale_ped, price_status
+             line_tt_ped, line_sale_ped, price_status,
+             base_markup_kind, base_markup_value, base_markup_profiled,
+             discount_campaign_id, discount_kind, discount_rate
       FROM purchase_order_items WHERE order_id = ? ORDER BY line_no
     `).bind(orderId)
   ]);
@@ -2558,6 +2594,7 @@ function publicDiscordResult(result) {
 }
 
 async function readAdminOrderCatalog(env) {
+  const businessDate = businessDateInParis();
   const result = await env.DB.prepare(`
     WITH stock AS (
       SELECT item_name, SUM(quantity) AS available_stock
@@ -2572,16 +2609,25 @@ async function readAdminOrderCatalog(env) {
       c.unit_price_ped,
       stock.available_stock,
       CASE WHEN datetime(mc.observed_at) >= datetime('now', '-7 days') THEN mc.weighted_kind ELSE NULL END AS markup_kind,
-      CASE WHEN datetime(mc.observed_at) >= datetime('now', '-7 days') THEN mc.weighted_value ELSE NULL END AS markup_value
+      CASE WHEN datetime(mc.observed_at) >= datetime('now', '-7 days') THEN mc.weighted_value ELSE NULL END AS markup_value,
+      COALESCE(s.campaign_type, p.campaign_type) AS discount_kind,
+      COALESCE(s.id, p.id) AS discount_campaign_id,
+      COALESCE(s.discount_rate, p.discount_rate) AS discount_rate
     FROM catalog_listings l
     JOIN catalog_items c ON c.name = l.item_name COLLATE NOCASE
     JOIN stock ON stock.item_name = l.item_name COLLATE NOCASE
     LEFT JOIN market_current mc ON mc.item_name = l.item_name COLLATE NOCASE
+    LEFT JOIN discount_campaigns s
+      ON s.campaign_type = 'sale' AND s.enabled = 1
+     AND ? BETWEEN s.starts_on AND s.ends_on
+    LEFT JOIN discount_campaigns p
+      ON p.campaign_type = 'daily_promo' AND p.enabled = 1
+     AND p.starts_on = ? AND p.storage = l.storage AND p.aisle = l.aisle
     WHERE l.enabled = 1
       AND stock.available_stock > 0
       AND c.unit_price_ped IS NOT NULL
     ORDER BY l.storage, l.aisle, l.item_name COLLATE NOCASE
-  `).all();
+  `).bind(businessDate, businessDate).all();
   return {
     generatedAt: new Date().toISOString(),
     items: result.results.map((row) => ({
@@ -2593,7 +2639,12 @@ async function readAdminOrderCatalog(env) {
       markupKind: row.markup_kind || "none",
       markupValue: row.markup_value === null || row.markup_value === undefined
         ? null
-        : Number(row.markup_value)
+        : Number(row.markup_value),
+      discountKind: row.discount_kind || null,
+      discountCampaignId: row.discount_campaign_id || null,
+      discountRate: row.discount_rate === null || row.discount_rate === undefined
+        ? null
+        : Number(row.discount_rate)
     }))
   };
 }
@@ -2602,7 +2653,7 @@ async function createAdminOrder(env, payload) {
   if (!isCartEnabled(env)) throw new ApiError(503, "Transmission des paniers désactivée");
   const draft = parseOrderValue(() => normalizeAdminOrderDraft(payload));
   const catalog = await readAdminOrderCatalog(env);
-  const lines = priceAdminOrderLines(draft.items, catalog.items);
+  const lines = priceAdminOrderLines(draft.items, catalog.items, draft.frjMember);
   const totals = orderLineTotals(lines);
   const now = new Date().toISOString();
   const identity = await createUniqueAdminOrderIdentity(env);
@@ -2644,7 +2695,7 @@ async function addAdminOrderItem(env, orderId, payload) {
   const requested = parseOrderValue(() => normalizeAdminOrderLine(payload));
   const [orderResult, itemsResult] = await env.DB.batch([
     env.DB.prepare(`
-      SELECT id, status, approval_required, proposal_version
+      SELECT id, status, approval_required, proposal_version, frj_member
       FROM purchase_orders WHERE id = ?
     `).bind(orderId),
     env.DB.prepare(`
@@ -2667,7 +2718,7 @@ async function addAdminOrderItem(env, orderId, payload) {
     throw new ApiError(409, "Cet article est déjà présent : modifie sa ligne existante");
   }
   const catalog = await readAdminOrderCatalog(env);
-  const line = priceAdminOrderLines([requested], catalog.items)[0];
+  const line = priceAdminOrderLines([requested], catalog.items, Number(order.frj_member || 0) === 1)[0];
   const lineNo = Math.max(0, ...itemsResult.results.map((item) => Number(item.line_no || 0))) + 1;
   line.lineNo = lineNo;
   const nextVersion = Number(order.proposal_version || 0) + 1;
@@ -2676,12 +2727,15 @@ async function addAdminOrderItem(env, orderId, payload) {
       INSERT INTO purchase_order_items (
         order_id, line_no, item_name, storage, aisle, quantity, stock_at_submission,
         unit_tt_ped, markup_kind, markup_value, markup_display, unit_sale_ped,
-        line_tt_ped, line_sale_ped, price_status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        line_tt_ped, line_sale_ped, price_status, base_markup_kind, base_markup_value,
+        base_markup_profiled, discount_campaign_id, discount_kind, discount_rate
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       orderId, lineNo, line.itemName, line.storage, line.aisle, line.quantity,
       line.stockAtSubmission, line.unitTtPed, line.markupKind, line.markupValue,
-      line.markupDisplay, line.unitSalePed, line.lineTtPed, line.lineSalePed, line.priceStatus
+      line.markupDisplay, line.unitSalePed, line.lineTtPed, line.lineSalePed, line.priceStatus,
+      line.baseMarkupKind, line.baseMarkupValue, line.baseMarkupProfiled ? 1 : 0,
+      line.discountCampaignId, line.discountKind, line.discountRate
     ),
     env.DB.prepare(`
       UPDATE purchase_orders
@@ -2712,7 +2766,7 @@ async function addAdminOrderItem(env, orderId, payload) {
   };
 }
 
-function priceAdminOrderLines(requestedItems, catalogItems) {
+function priceAdminOrderLines(requestedItems, catalogItems, frjMember = false) {
   const catalog = new Map(catalogItems.map((item) => [orderItemKey(item), item]));
   return requestedItems.map((requested, index) => {
     const current = catalog.get(orderItemKey(requested));
@@ -2722,15 +2776,40 @@ function priceAdminOrderLines(requestedItems, catalogItems) {
       requested,
       current.availableStock
     ));
+    const baseMarkup = deriveBaseMarkup(
+      revised.markupKind,
+      revised.markupValue,
+      frjMember,
+      current.discountRate
+    );
     return {
       lineNo: index + 1,
       itemName: current.itemName,
       storage: current.storage,
       aisle: current.aisle,
       unitTtPed: current.unitTtPed,
+      baseMarkupKind: baseMarkup.kind,
+      baseMarkupValue: baseMarkup.value,
+      baseMarkupProfiled: false,
+      discountKind: current.discountKind || null,
+      discountCampaignId: current.discountCampaignId || null,
+      discountRate: current.discountRate ?? null,
       ...revised
     };
   });
+}
+
+function deriveBaseMarkup(kind, effectiveValue, frjMember, discountRate) {
+  if (kind !== "percent" && kind !== "ped") return { kind: "none", value: null };
+  const rate = Number(discountRate);
+  const campaignFactor = Number.isFinite(rate) && rate > 0 && rate <= 1 ? 1 - rate : 1;
+  const profileFactor = frjMember === true ? 0.5 : 1;
+  const factor = profileFactor * campaignFactor;
+  const effective = Number(effectiveValue);
+  if (!Number.isFinite(effective) || factor <= 0) return { kind: "none", value: null };
+  return kind === "percent"
+    ? { kind, value: 1 + ((effective - 1) / factor) }
+    : { kind, value: effective / factor };
 }
 
 function orderLineTotals(lines) {
@@ -2739,6 +2818,115 @@ function orderLineTotals(lines) {
     totalSalePed: roundOrderPed(lines.reduce((sum, line) => sum + line.lineSalePed, 0)),
     pricingStatus: lines.some((line) => line.priceStatus === "to-confirm") ? "to-confirm" : "estimated"
   };
+}
+
+export async function refreshMutableOrderDiscounts(env, orderId = null) {
+  const schema = await env.DB.prepare(`
+    SELECT COUNT(*) AS table_count
+    FROM sqlite_master
+    WHERE type = 'table' AND name IN ('purchase_orders', 'purchase_order_items', 'discount_campaigns')
+  `).first();
+  if (Number(schema?.table_count || 0) !== 3) return [];
+  const businessDate = businessDateInParis();
+  const orderFilter = orderId ? "AND po.id = ?" : "";
+  const statement = env.DB.prepare(`
+    SELECT
+      oi.order_id, oi.line_no, oi.quantity, oi.unit_tt_ped,
+      oi.markup_kind, oi.markup_value, oi.line_sale_ped, oi.discount_campaign_id,
+      oi.discount_kind, oi.discount_rate,
+      COALESCE(oi.base_markup_kind, oi.markup_kind, 'none') AS base_markup_kind,
+      COALESCE(oi.base_markup_value, oi.markup_value) AS base_markup_value,
+      COALESCE(oi.base_markup_profiled, 0) AS base_markup_profiled,
+      po.frj_member,
+      COALESCE(s.campaign_type, p.campaign_type) AS current_discount_kind,
+      COALESCE(s.id, p.id) AS current_discount_campaign_id,
+      COALESCE(s.discount_rate, p.discount_rate) AS current_discount_rate
+    FROM purchase_order_items oi
+    JOIN purchase_orders po ON po.id = oi.order_id
+    LEFT JOIN discount_campaigns s
+      ON s.campaign_type = 'sale' AND s.enabled = 1
+     AND ? BETWEEN s.starts_on AND s.ends_on
+    LEFT JOIN discount_campaigns p
+      ON p.campaign_type = 'daily_promo' AND p.enabled = 1
+     AND p.starts_on = ? AND p.storage = oi.storage AND p.aisle = oi.aisle
+    WHERE (po.approval_required = 1 OR po.status IN ('submitted', 'viewed'))
+      ${orderFilter}
+    ORDER BY oi.order_id, oi.line_no
+  `);
+  const bindings = orderId ? [businessDate, businessDate, orderId] : [businessDate, businessDate];
+  const result = await statement.bind(...bindings).all();
+  const changedByOrder = new Map();
+  const updates = [];
+
+  result.results.forEach((row) => {
+    const baseKind = row.base_markup_kind || "none";
+    const baseValue = row.base_markup_value === null || row.base_markup_value === undefined
+      ? null
+      : Number(row.base_markup_value);
+    const discountRate = row.current_discount_rate === null || row.current_discount_rate === undefined
+      ? null
+      : Number(row.current_discount_rate);
+    const effective = computeDiscountedMarkup({
+      kind: baseKind,
+      value: baseValue,
+      frjMember: Number(row.base_markup_profiled || 0) === 1 ? false : Number(row.frj_member || 0) === 1,
+      discountRate: discountRate || 0
+    });
+    const prices = priceOrderLine(Number(row.unit_tt_ped || 0), Number(row.quantity || 0), effective.kind, effective.value);
+    const changed = String(row.markup_kind || "none") !== effective.kind
+      || !sameNullableNumber(row.markup_value, effective.value)
+      || String(row.discount_kind || "") !== String(row.current_discount_kind || "")
+      || String(row.discount_campaign_id || "") !== String(row.current_discount_campaign_id || "")
+      || !sameNullableNumber(row.discount_rate, discountRate)
+      || !sameNullableNumber(row.line_sale_ped, prices.lineSalePed);
+    if (!changed) return;
+    updates.push(env.DB.prepare(`
+      UPDATE purchase_order_items
+      SET markup_kind = ?, markup_value = ?, markup_display = ?, unit_sale_ped = ?,
+          line_tt_ped = ?, line_sale_ped = ?, price_status = ?,
+          discount_campaign_id = ?, discount_kind = ?, discount_rate = ?
+      WHERE order_id = ? AND line_no = ?
+    `).bind(
+      effective.kind, effective.value, formatMarkup(effective.kind, effective.value), prices.unitSalePed,
+      prices.lineTtPed, prices.lineSalePed, effective.kind === "none" ? "to-confirm" : "estimated",
+      row.current_discount_campaign_id || null, row.current_discount_kind || null, discountRate,
+      row.order_id, Number(row.line_no)
+    ));
+    const lines = changedByOrder.get(row.order_id) || [];
+    lines.push(Number(row.line_no));
+    changedByOrder.set(row.order_id, lines);
+  });
+
+  changedByOrder.forEach((lineNumbers, changedOrderId) => {
+    updates.push(env.DB.prepare(`
+      UPDATE purchase_orders
+      SET total_tt_ped = (SELECT ROUND(COALESCE(SUM(line_tt_ped), 0), 2) FROM purchase_order_items WHERE order_id = ?),
+          total_sale_ped = (SELECT ROUND(COALESCE(SUM(line_sale_ped), 0), 2) FROM purchase_order_items WHERE order_id = ?),
+          proposal_version = proposal_version + CASE WHEN approval_required = 1 THEN 1 ELSE 0 END,
+          pricing_status = CASE WHEN EXISTS (
+            SELECT 1 FROM purchase_order_items WHERE order_id = ? AND price_status = 'to-confirm'
+          ) THEN 'to-confirm' ELSE 'estimated' END,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(changedOrderId, changedOrderId, changedOrderId, changedOrderId));
+    updates.push(prepareOrderHistoryEvent(env, {
+      orderId: changedOrderId,
+      action: "discount-refreshed",
+      details: { businessDate, lineNumbers }
+    }));
+  });
+
+  if (updates.length) await env.DB.batch(updates);
+  for (const changedOrderId of changedByOrder.keys()) await synchronizeDiscordOrder(env, changedOrderId);
+  return [...changedByOrder.keys()];
+}
+
+function sameNullableNumber(left, right) {
+  if (left === null || left === undefined || left === "") {
+    return right === null || right === undefined || right === "";
+  }
+  if (right === null || right === undefined || right === "") return false;
+  return Math.abs(Number(left) - Number(right)) <= 1e-9;
 }
 
 async function createUniqueAdminOrderIdentity(env) {
@@ -2768,6 +2956,7 @@ function roundOrderPed(value) {
 
 async function readAdminOrders(env) {
   if (!isCartEnabled(env)) return { enabled: false, generatedAt: new Date().toISOString(), orders: [] };
+  await refreshMutableOrderDiscounts(env);
   const [ordersResult, itemsResult] = await env.DB.batch([
     env.DB.prepare(`
       SELECT id, public_reference, status, approval_required, proposal_version,
@@ -2780,7 +2969,9 @@ async function readAdminOrders(env) {
       SELECT oi.order_id, oi.line_no, oi.item_name, oi.storage, oi.aisle, oi.quantity,
               oi.stock_at_submission, oi.unit_tt_ped, oi.markup_kind, oi.markup_value,
               oi.markup_display, oi.unit_sale_ped,
-             oi.line_tt_ped, oi.line_sale_ped, oi.price_status
+             oi.line_tt_ped, oi.line_sale_ped, oi.price_status,
+             oi.base_markup_kind, oi.base_markup_value, oi.base_markup_profiled,
+             oi.discount_campaign_id, oi.discount_kind, oi.discount_rate
       FROM purchase_order_items oi
       JOIN (SELECT id FROM purchase_orders ORDER BY created_at DESC LIMIT 200) recent
         ON recent.id = oi.order_id
@@ -2896,7 +3087,9 @@ async function readOrdersForGasMirror(env, url) {
     env.DB.prepare(`
       SELECT order_id, line_no, item_name, storage, aisle, quantity, stock_at_submission,
              unit_tt_ped, markup_kind, markup_value, markup_display, unit_sale_ped,
-             line_tt_ped, line_sale_ped, price_status
+             line_tt_ped, line_sale_ped, price_status,
+             base_markup_kind, base_markup_value, base_markup_profiled,
+             discount_campaign_id, discount_kind, discount_rate
       FROM purchase_order_items
       WHERE order_id IN (SELECT CAST(value AS TEXT) FROM json_each(?))
       ORDER BY order_id, line_no
@@ -2995,6 +3188,7 @@ function mapOrderItem(item) {
     markupValue: item.markup_value ?? item.markupValue ?? null,
     baseMarkupKind: item.base_markup_kind || item.baseMarkupKind || item.markup_kind || item.markupKind || "none",
     baseMarkupValue: item.base_markup_value ?? item.baseMarkupValue ?? item.markup_value ?? item.markupValue ?? null,
+    baseMarkupProfiled: Number(item.base_markup_profiled ?? item.baseMarkupProfiled ?? 0) === 1,
     discountCampaignId: item.discount_campaign_id || item.discountCampaignId || null,
     discountKind: item.discount_kind || item.discountKind || null,
     discountRate: item.discount_rate ?? item.discountRate ?? null

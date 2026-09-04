@@ -219,7 +219,8 @@
     (order.items || []).forEach((item) => {
       const row = document.createElement("tr");
       const itemCell = document.createElement("td");
-      itemCell.textContent = `${item.itemName} (${item.storage} · ${item.aisle})`;
+      itemCell.append(document.createTextNode(`${item.itemName} (${item.storage} · ${item.aisle})`));
+      appendDiscountMarker(itemCell, item);
       row.appendChild(itemCell);
 
       const quantityCell = document.createElement("td");
@@ -383,11 +384,24 @@
     article.setAttribute("list", listId);
     sortedCatalogItems.forEach((item) => {
       const label = catalogItemChoiceLabel(item);
-      const option = document.createElement("option");
-      option.value = label;
-      datalist.appendChild(option);
       choices.set(label, item);
     });
+    const normalizeSearch = (value) => String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLocaleLowerCase("fr");
+    const renderSuggestions = () => {
+      const query = normalizeSearch(article.value);
+      const options = [];
+      choices.forEach((_item, label) => {
+        if (query && !normalizeSearch(label).includes(query)) return;
+        const option = document.createElement("option");
+        option.value = label;
+        options.push(option);
+      });
+      datalist.replaceChildren(...options);
+    };
+    renderSuggestions();
     article.value = "";
     articleLabel.append(articleHeading, article, datalist);
 
@@ -435,9 +449,13 @@
     const output = document.createElement("div");
     output.className = "direct-order-line-output";
     const stock = document.createElement("span");
+    const discount = document.createElement("small");
+    discount.className = "order-discount-marker";
+    const discountEmphasis = document.createElement("em");
+    discount.appendChild(discountEmphasis);
     const displayedPrice = document.createElement("span");
     const estimate = document.createElement("strong");
-    output.append(stock, displayedPrice, estimate);
+    output.append(stock, discount, displayedPrice, estimate);
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "direct-order-remove";
@@ -457,12 +475,12 @@
       const storedValue = Number(item?.markupValue);
       let displayedAmount = itemKind === "percent" ? 100 : 0;
       if (item?.markupValue !== null && item?.markupValue !== "" && Number.isFinite(storedValue)) {
-        displayedAmount = itemKind === "percent" ? storedValue * 100 : storedValue;
-        if (frjMember) {
-          displayedAmount = itemKind === "percent"
-            ? (1 + ((storedValue - 1) / 2)) * 100
-            : storedValue / 2;
-        }
+        const profileFactor = frjMember ? 0.5 : 1;
+        const rate = Number(item?.discountRate);
+        const campaignFactor = Number.isFinite(rate) && rate > 0 && rate <= 1 ? 1 - rate : 1;
+        displayedAmount = itemKind === "percent"
+          ? (1 + ((storedValue - 1) * profileFactor * campaignFactor)) * 100
+          : storedValue * profileFactor * campaignFactor;
       }
       kind.value = itemKind;
       amount.value = ui.roundPed(displayedAmount).toFixed(2);
@@ -494,7 +512,10 @@
           aisle: item.aisle,
           quantity: itemQuantity,
           markupKind: kind.value,
-          markupAmount
+          markupAmount,
+          discountKind: item.discountKind || null,
+          discountCampaignId: item.discountCampaignId || null,
+          discountRate: item.discountRate ?? null
         } : null
       };
     };
@@ -503,12 +524,16 @@
       quantity.max = item ? String(item.availableStock) : "";
       const value = read();
       stock.textContent = item ? `Stock : ${ui.formatQuantity(item.availableStock)}` : "Stock : —";
+      const discountLabel = item ? ui.discountMarker(item) : "";
+      discountEmphasis.textContent = discountLabel ? `(${discountLabel})` : "";
+      discount.hidden = !discountLabel;
       displayedPrice.textContent = item ? `Prix affiché : ${ui.formatPed(item.unitTtPed)} PED` : "Prix affiché : —";
       estimate.textContent = value.valid ? `Estimation : ${ui.formatPed(value.lineSale)} PED` : "Estimation : —";
       options.onChange?.();
       return value;
     };
     const refreshSelectedItem = () => {
+      renderSuggestions();
       applyCatalogMarkup();
       refresh();
     };
@@ -535,6 +560,17 @@
     remove.addEventListener("click", () => options.onRemove?.(editor));
     refresh();
     return editor;
+  }
+
+  function appendDiscountMarker(parent, item) {
+    const label = ui.discountMarker(item);
+    if (!label) return;
+    const marker = document.createElement("small");
+    marker.className = "order-discount-marker";
+    const emphasis = document.createElement("em");
+    emphasis.textContent = `(${label})`;
+    marker.appendChild(emphasis);
+    parent.append(" ", marker);
   }
 
   function initializeNewOrderForm() {

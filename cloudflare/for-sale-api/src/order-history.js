@@ -14,7 +14,7 @@ const CLIENT_ACTIONS = new Set(["submitted", "proposal-accepted", "client-cancel
 const ADMIN_ACTIONS = new Set([
   "admin-created", "status-changed", "proposal-changed", "proposal-line-changed", "proposal-line-added"
 ]);
-const HIDDEN_ACTIONS = new Set(["history-comment-updated", "pricing-confirmed-backfill"]);
+const HIDDEN_ACTIONS = new Set(["history-comment-updated", "pricing-confirmed-backfill", "discount-refreshed"]);
 const SYNCED_ACTIONS = new Set([
   "submitted",
   "gas-fallback-synchronized",

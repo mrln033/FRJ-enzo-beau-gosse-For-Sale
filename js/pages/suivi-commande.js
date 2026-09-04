@@ -246,8 +246,19 @@
     (order.items || []).forEach((item) => {
       const row = document.createElement("tr");
       const markupLabel = order.frjMember ? text("member") : text("public");
+      const itemCell = document.createElement("td");
+      itemCell.append(document.createTextNode(`${item.itemName} (${item.storage} · ${item.aisle})`));
+      const marker = ui.discountMarker(item, lang);
+      if (marker) {
+        const small = document.createElement("small");
+        small.className = "order-discount-marker";
+        const emphasis = document.createElement("em");
+        emphasis.textContent = `(${marker})`;
+        small.appendChild(emphasis);
+        itemCell.append(" ", small);
+      }
+      row.appendChild(itemCell);
       [
-        `${item.itemName} (${item.storage} · ${item.aisle})`,
         ui.formatQuantity(item.quantity, lang),
         `${ui.formatPed(item.unitTtPed, lang)} PED`,
         `${markupLabel} : ${item.markupDisplay || text("pending")}`,

@@ -22,19 +22,30 @@ POINT DE REPRISE — 31/08/2026
 Ordre recommandé déjà réalisé et validé : d.1 -> d.2 -> d.3 -> d.7 -> d.8 -> d.6 -> d.10 -> d.11 -> d.5 -> d.13 -> d.12.
 Les demandes d.13, d.12 et d.9 sont terminées. D.9 fournit les promotions quotidiennes et les soldes communs à GAS et D1.
 
-Les tâches T-001 à T-005 sont terminées et publiées.
+Les tâches T-001 à T-007 sont terminées et publiées.
 La seule demande encore ouverte est l'ancienne d.4, mise en attente à la demande du 29/08/2026 : son périmètre doit être mieux cadré avant toute analyse définitive ou implémentation.
 
 -------------------------------
 DEMANDES  => CE QUI EST A FAIRE
 
->>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-006 <<<
+>>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-008 <<<
 
 [EN ATTENTE DE CADRAGE]
 d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> ajouter un bouton 'Supprimer' à chaque demande avec message de confirmation. Celà supprimerais l'enregistrement complet dans D1. Propagation Discord avec modification du statut en 'SUPPRIMEE' pour archivage.
 
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
+
+04/09/2026 = Tâches T-006 et T-007 — recherche prédictive, MU remisé et repères de campagne dans les demandes.
+Demandes d'origine :
+T-006  ==>  Formulaire Demande d'achat>Demande directe
+	La saisie d'un article n'est pas entièrement prédictive. je m'explique : quand le champ est vide et qu'on clique dedans pour saisir, la lite déroulante complète s'affiche, mais ne se réduit pas avec l'avancée de la saisie. Quand le champ est déjà rempli et qu'on clique dedans pour modifier la saisie, la liste déroulante 'prédicitve' s'affiche bien, limitée aux occurences correspondant à la saisie déjà présente.
+	De plus, le MU qui est récupéré et affiché n'est pas le bon en cas de promotion/solde : c'est le taux plein qui s'affiche, et non pas le taux remisé :s
+
+T-007  ==> Panier, Suivi demande, Demande d'achat, Demande directe, ...
+	Dans toutes les pages listant des articles, mais pas dans les liste déroulantes, j'aimerais que la remise soit mentionnée si elle existe. Par exemple, entre parenthèse à la suite de l'article, en petits caractères italiques : 'P-10' pour un une promotion à 10% ou 'S-25' pour un article soldé à 25%.
+	Bien sur, les règles précitées auparavant restent applicables : en cas de changement, mise à jour des demandes 'A valider', 'Transmise' ou 'Vue', mais données figées dès le statut 'A préparer' et au-dessus.
+Réalisation : la liste native de la demande directe est reconstruite à chaque caractère, sans afficher les repères de remise dans ses suggestions, et filtre désormais aussi bien dès la première saisie qu'après modification d'une valeur existante. Le catalogue Admin expose la campagne active ; le MU proposé applique dans l'ordre le profil Public/FRJ puis la promotion ou les soldes. Les vues Panier, Suivi client, Demandes d'achat et Demande directe ajoutent après l'article un repère discret en petits caractères italiques, sous la forme (P-10) ou (S-25). Lorsqu'une campagne du jour apparaît, disparaît ou change de taux, D1 recalcule les lignes et totaux des demandes encore « À valider », « Transmises » ou « Vues » à partir d'une MU de base non remisée. Cette vérification se fait aussi à la lecture d'une demande modifiable, pour couvrir immédiatement les demandes préexistantes et les changements de date. Une proposition déjà en attente change de version afin qu'une page client périmée ne puisse pas accepter silencieusement un ancien prix. Un dernier recalcul est effectué lors du passage à « À préparer », puis la remise, le MU et les montants sont définitivement figés pour ce statut et tous les suivants. La migration 0023 distingue les anciennes MU de demandes directes déjà adaptées au profil, afin de ne pas leur appliquer deux fois l'avantage membre. Les scénarios T-006/T-007 et les non-régressions portent la suite automatisée à 82 tests réussis ; les scripts frontend et Worker passent également les contrôles de syntaxe. Avant migration, la sauvegarde complète 'save/frj-for-sale-before-t006-t007-2026-09-04.sql' a été créée (SHA-256 F694A70F1BDF5A325530020B10DDF6FC4FE0174CBFDE8A414C0EB90DE3F2DDD4). La migration distante 0023 est appliquée, aucune migration ne reste en attente et le Worker est publié sous la version '8a56b4e6-ccd8-48fe-89fc-3ac873907f3e'. Aucun changement GAS n'est nécessaire.
 
 31/08/2026 = Tâche T-005 — promotions préparées un jour à l'avance avec réparation automatique.
 Demande d'origine :

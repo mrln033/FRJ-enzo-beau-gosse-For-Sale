@@ -320,7 +320,7 @@ function saleUnitPrice(unitTt, kind, value) {
   return unitTt;
 }
 
-function priceOrderLine(unitTt, quantity, markupKind, markupValue) {
+export function priceOrderLine(unitTt, quantity, markupKind, markupValue) {
   const unitSale = saleUnitPrice(unitTt, markupKind, markupValue);
   return {
     // La précision de travail est conservée en base pour les petits prix.
@@ -341,7 +341,7 @@ function hasAtMostDecimals(value, decimals) {
   return Math.abs(Number(value) - roundPed(value, decimals)) <= 1e-9;
 }
 
-function formatMarkup(kind, value) {
+export function formatMarkup(kind, value) {
   if (!Number.isFinite(value)) return null;
   if (kind === "percent") return `${(value * 100).toFixed(2).replace(".", ",")} %`;
   if (kind === "ped") return `${value.toFixed(2).replace(".", ",")} PED`;

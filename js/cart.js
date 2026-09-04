@@ -2,6 +2,7 @@
   "use strict";
 
   const enabled = global.FRJ_FEATURES?.cart === true;
+  const orderUi = global.FRJ_ORDER_UI;
   const STORAGE_KEY = "FRJ_PURCHASE_CART_V1";
   const REQUESTS_KEY = "FRJ_PURCHASE_REQUESTS_V1";
   const HIDDEN_REQUESTS_KEY = "FRJ_HIDDEN_PURCHASE_REQUESTS_V1";
@@ -306,7 +307,7 @@
     const prices = linePrices(item);
     line.innerHTML = `
       <div class="cart-line-title">
-        <strong>${escapeHtml(item.itemName)}</strong>
+        <strong>${escapeHtml(item.itemName)}</strong>${orderUi?.discountMarker(item, language()) ? ` <small class="order-discount-marker"><em>(${escapeHtml(orderUi.discountMarker(item, language()))})</em></small>` : ""}
         <small>${escapeHtml(item.storage)} · ${escapeHtml(item.aisle)}</small>
       </div>
       <label>${escapeHtml(label("quantity"))}

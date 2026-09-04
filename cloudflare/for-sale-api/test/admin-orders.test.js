@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
-import { handleAdminGet, handleAdminPost } from "../src/application.js";
+import { handleAdminGet, handleAdminPost, refreshMutableOrderDiscounts } from "../src/application.js";
 import { normalizeAdminOrderDraft, normalizeAdminOrderLine } from "../src/orders.js";
 
 class D1Statement {
@@ -112,6 +112,22 @@ function setupDatabase() {
       weighted_value REAL,
       observed_at TEXT
     );
+    CREATE TABLE discount_campaigns (
+      id TEXT PRIMARY KEY,
+      campaign_type TEXT NOT NULL,
+      starts_on TEXT NOT NULL,
+      ends_on TEXT NOT NULL,
+      storage TEXT,
+      aisle TEXT,
+      discount_rate REAL NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      origin TEXT NOT NULL DEFAULT 'manual',
+      eligible_pair_count INTEGER,
+      candidate_pair_count INTEGER,
+      generation_seed TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
   `);
   applyMigration(database, "0007_purchase_requests.sql");
   applyMigration(database, "0008_order_discord_notifications.sql");
@@ -119,6 +135,7 @@ function setupDatabase() {
   applyMigration(database, "0016_purchase_order_history.sql");
   applyMigration(database, "0018_purchase_order_tracking_tokens.sql");
   applyMigration(database, "0021_purchase_order_discounts.sql");
+  applyMigration(database, "0023_mutable_order_discounts.sql");
   database.exec(`
     INSERT INTO avatars VALUES ('enzo', 'Enzo', 'Inventaire Enzo');
     INSERT INTO catalog_items (name, unit_price_ped) VALUES ('Item A', 10), ('Item B', 5), ('Sans stock', 2);
@@ -162,6 +179,66 @@ test("d.12 expose seulement les listings possédant un stock vendable", async ()
       { markupKind: "ped", markupValue: 2.5 }
     ]
   );
+});
+
+test("T-006 expose la remise active et la demande directe conserve sa MU remisée", async () => {
+  const database = setupDatabase();
+  database.exec(`
+    INSERT INTO discount_campaigns (
+      id, campaign_type, starts_on, ends_on, storage, aisle, discount_rate, enabled
+    ) VALUES (
+      'promo-active', 'daily_promo', date('now'), date('now'), 'ARMORS', 'PARTS', 0.10, 1
+    )
+  `);
+  const env = { DB: makeD1(database), CART_ENABLED: "true" };
+  const catalog = await (await handleAdminGet(new URL("https://api.example/admin/orders/catalog"), env)).json();
+  const item = catalog.items.find((entry) => entry.itemName === "Item A");
+  assert.equal(item.discountKind, "daily_promo");
+  assert.equal(item.discountCampaignId, "promo-active");
+  assert.equal(item.discountRate, 0.1);
+
+  const url = new URL("https://api.example/admin/orders");
+  const created = await (await handleAdminPost(new Request(url, {
+    method: "POST",
+    body: JSON.stringify({
+      buyerAvatar: "Promo Buyer",
+      frjMember: false,
+      items: [{ ...lineA, markupAmount: 118 }]
+    })
+  }), url, env)).json();
+  assert.equal(created.order.items[0].markupValue, 1.18);
+  assert.equal(created.order.items[0].baseMarkupValue, 1.2);
+  assert.equal(created.order.items[0].discountRate, 0.1);
+});
+
+test("T-007 actualise les remises des demandes modifiables puis les fige à préparer", async () => {
+  const database = setupDatabase();
+  const env = { DB: makeD1(database), CART_ENABLED: "true" };
+  const url = new URL("https://api.example/admin/orders");
+  const created = await (await handleAdminPost(new Request(url, {
+    method: "POST",
+    body: JSON.stringify({ buyerAvatar: "Mutable Buyer", frjMember: false, items: [{ ...lineA, markupAmount: 120 }] })
+  }), url, env)).json();
+  database.exec(`
+    INSERT INTO discount_campaigns (
+      id, campaign_type, starts_on, ends_on, storage, aisle, discount_rate, enabled
+    ) VALUES (
+      'promo-refresh', 'daily_promo', date('now'), date('now'), 'ARMORS', 'PARTS', 0.25, 1
+    )
+  `);
+  assert.deepEqual(await refreshMutableOrderDiscounts(env), [created.order.id]);
+  let line = database.prepare(`SELECT markup_value, discount_kind, discount_rate FROM purchase_order_items`).get();
+  assert.equal(line.markup_value, 1.15);
+  assert.equal(line.discount_kind, "daily_promo");
+  assert.equal(line.discount_rate, 0.25);
+  assert.equal(database.prepare(`SELECT proposal_version FROM purchase_orders`).get().proposal_version, 2);
+
+  database.prepare(`UPDATE purchase_orders SET status = 'preparing', approval_required = 0 WHERE id = ?`).run(created.order.id);
+  database.exec(`UPDATE discount_campaigns SET discount_rate = 0.5 WHERE id = 'promo-refresh'`);
+  assert.deepEqual(await refreshMutableOrderDiscounts(env), []);
+  line = database.prepare(`SELECT markup_value, discount_rate FROM purchase_order_items`).get();
+  assert.equal(line.markup_value, 1.15);
+  assert.equal(line.discount_rate, 0.25);
 });
 
 test("d.12 crée atomiquement une demande directe à valider et son lien privé", async () => {

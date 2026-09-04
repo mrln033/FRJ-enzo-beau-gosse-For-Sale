@@ -61,6 +61,16 @@
     return Math.round((Number(value) + Number.EPSILON) * factor) / factor;
   }
 
+  function discountMarker(item, language = "FR") {
+    const kind = item?.discountKind;
+    const rate = Number(item?.discountRate);
+    if (!["daily_promo", "sale"].includes(kind) || !Number.isFinite(rate) || rate <= 0 || rate > 1) return "";
+    const percent = (rate * 100).toLocaleString(normalizeLanguage(language) === "FR" ? "fr-FR" : "en-GB", {
+      maximumFractionDigits: 2
+    });
+    return `${kind === "sale" ? "S" : "P"}-${percent}`;
+  }
+
   // Avant la préparation, une proposition peut encore être modifiée par l'Admin ou annulée par le client.
   const canEditProposal = (status) => editableStatuses.has(status);
   const canCancel = (status) => editableStatuses.has(status);
@@ -74,6 +84,7 @@
     formatQuantity,
     formatDate,
     roundPed,
+    discountMarker,
     canEditProposal,
     canCancel,
     canHide
