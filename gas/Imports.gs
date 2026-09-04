@@ -129,7 +129,9 @@ function processInventory(csv, avatar) {
   cell.setNumberFormat("dd/MM/yyyy - HH:mm:ss");
 
   // La configuration évolue uniquement par ajout ; les choix existants restent intacts.
-  frjRefreshContainerConfigurationAfterInventory_(inventoryId);
+  // Le verrou global est déjà détenu par frjMainDoPost_ pendant cet import.
+  // Le reprendre ici faisait expirer la requête après une écriture pourtant réussie.
+  frjRefreshContainerConfigurationAfterInventoryUnlocked_(inventoryId);
 
   return `✅ Import inventaire OK dans ${SHEET_NAME} (${numRows} lignes)`;
 }

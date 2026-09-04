@@ -5,7 +5,7 @@ import {
   canonicalContainerPayload,
   canonicalInventoryPayload,
   canonicalMarketPayload,
-  aggregateInventoryRows,
+  inventoryRowsWithKeys,
   containerContentHash,
   inventoryContentHash,
   mergeMarketRows,
@@ -49,7 +49,7 @@ test("l'empreinte inventaire ignore l'ordre et les numéros de ligne", async () 
   assert.match(canonicalInventoryPayload([first]), /Item A/);
 });
 
-test("l'inventaire fusionne avatar/item/container et additionne quantité et valeur PED", async () => {
+test("l'inventaire conserve les six colonnes et distingue chaque ligne source", async () => {
   const rows = [
     {
       sourceId: "id-1", itemName: "Item A", quantity: 2, valuePed: 1.25,
@@ -62,17 +62,13 @@ test("l'inventaire fusionne avatar/item/container et additionne quantité et val
     { sourceId: "id-3", itemName: "Item A", quantity: 4, valuePed: null, container: "Carried" }
   ];
 
-  const aggregated = aggregateInventoryRows(rows);
-  assert.equal(aggregated.length, 2);
-  const storage = aggregated.find((row) => row.container.toLowerCase() === "storage (calypso)");
-  assert.equal(storage.quantity, 5);
-  assert.equal(storage.valuePed, 4);
-  assert.equal(storage.sourceId, null);
-  assert.equal(storage.containerRefId, null);
-  assert.equal(
-    await inventoryContentHash(rows),
-    await inventoryContentHash(aggregated)
-  );
+  const keyed = inventoryRowsWithKeys(rows);
+  assert.equal(keyed.length, 3);
+  assert.deepEqual(keyed.map((row) => row.sourceId), ["id-1", "id-2", "id-3"]);
+  assert.deepEqual(keyed.map((row) => row.containerRefId), ["ref-1", "ref-2", null]);
+  assert.notEqual(await inventoryContentHash(rows), await inventoryContentHash([
+    { ...rows[0], sourceId: null, containerRefId: null }, rows[1], rows[2]
+  ]));
 });
 
 test("la fusion MU remplace l'article reçu et conserve les autres", () => {

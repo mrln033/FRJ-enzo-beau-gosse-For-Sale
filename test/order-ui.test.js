@@ -44,3 +44,13 @@ test("les formats PED et quantité respectent la langue", () => {
   assert.equal(ui.formatQuantity(1.6, "EN"), "2");
   assert.equal(ui.roundPed(1.005), 1.01);
 });
+
+test("les totaux TT, MU et vente restent arithmétiquement cohérents", () => {
+  const totals = loadOrderUi().orderMarkupTotals(20, 28.25);
+  assert.deepEqual(JSON.parse(JSON.stringify(totals)), {
+    totalTtPed: 20,
+    markupPed: 8.25,
+    markupPercent: 41.25,
+    totalSalePed: 28.25
+  });
+});

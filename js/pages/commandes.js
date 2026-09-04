@@ -213,7 +213,8 @@
 
     const table = document.createElement("table");
     const saleHeading = pricingStatus === "confirmed" ? "Prix de vente" : "Estimation vente";
-    table.innerHTML = `<thead><tr><th>Article</th><th>Qté proposée</th><th>Prix affiché</th><th>MU ponctuel</th><th>${saleHeading}</th></tr></thead>`;
+    const actionHeading = proposalEditable ? "<th>Action</th>" : "";
+    table.innerHTML = `<thead><tr><th>Article</th><th>Qté proposée</th><th>Prix affiché</th><th>MU ponctuel</th><th>${saleHeading}</th>${actionHeading}</tr></thead>`;
     const body = document.createElement("tbody");
     const editors = [];
     (order.items || []).forEach((item) => {
@@ -267,6 +268,21 @@
       const estimateCell = document.createElement("td");
       estimateCell.textContent = `${ui.formatPed(item.lineSalePed)} PED`;
       row.append(quantityCell, priceCell, markupCell, estimateCell);
+      if (proposalEditable) {
+        const actionCell = document.createElement("td");
+        actionCell.className = "order-line-actions";
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "order-line-remove";
+        remove.textContent = "Supprimer";
+        remove.disabled = order.items.length <= 1;
+        remove.title = remove.disabled
+          ? "Une demande doit conserver au moins un article."
+          : `Supprimer ${item.itemName} de la demande`;
+        remove.addEventListener("click", () => removeOrderItem(order, item, remove));
+        actionCell.appendChild(remove);
+        row.appendChild(actionCell);
+      }
       body.appendChild(row);
       editors.push({ item, quantity, kind, amount, estimateCell, row });
     });
@@ -275,10 +291,23 @@
     const addItemControl = createAddItemControl(order);
     if (addItemControl) article.appendChild(addItemControl);
 
+    const totals = document.createElement("div");
+    totals.className = "order-totals";
+    const totalTt = document.createElement("p");
+    totalTt.className = "order-subtotal";
+    const totalMarkup = document.createElement("p");
+    totalMarkup.className = "order-subtotal";
     const total = document.createElement("p");
     total.className = "order-total";
-    total.textContent = `Estimation totale : ${ui.formatPed(order.totalSalePed)} PED`;
-    article.appendChild(total);
+    const renderTotals = (totalTtValue, totalSaleValue) => {
+      const values = ui.orderMarkupTotals(totalTtValue, totalSaleValue);
+      totalTt.textContent = `Total TT : ${ui.formatPed(values.totalTtPed)} PED`;
+      totalMarkup.textContent = `MU Total (%) : ${ui.formatPed(values.markupPed)} PED (${ui.formatPed(values.markupPercent)} %)`;
+      total.textContent = `${pricingStatus === "confirmed" ? "Prix de vente total" : "Estimation totale"} : ${ui.formatPed(values.totalSalePed)} PED`;
+    };
+    renderTotals(order.totalTtPed, order.totalSalePed);
+    totals.append(totalTt, totalMarkup, total);
+    article.appendChild(totals);
     const saveRow = document.createElement("div");
     saveRow.className = "order-save-row";
     const dirtyLabel = document.createElement("span");
@@ -318,7 +347,7 @@
         || markupKind !== editor.item.markupKind
         || (markupKind !== "none" && Math.abs(markupAmount - originalAmount) > 1e-7)
       );
-      return { lineNo: editor.item.lineNo, quantity, markupKind, markupAmount, lineSale, valid, dirty };
+      return { lineNo: editor.item.lineNo, quantity, markupKind, markupAmount, lineTt: valid ? ui.roundPed(unitTt * quantity) : null, lineSale, valid, dirty };
     };
 
     const recalculate = () => {
@@ -331,8 +360,9 @@
       });
       const valid = values.every((value) => value.valid);
       const dirtyCount = values.filter((value) => value.dirty).length;
+      const totalTtValue = valid ? ui.roundPed(values.reduce((sum, value) => sum + value.lineTt, 0)) : null;
       const totalValue = valid ? ui.roundPed(values.reduce((sum, value) => sum + value.lineSale, 0)) : null;
-      total.textContent = valid ? `Estimation totale : ${ui.formatPed(totalValue)} PED` : "Estimation totale : —";
+      if (valid) renderTotals(totalTtValue, totalValue); else totalTt.textContent = totalMarkup.textContent = total.textContent = "—";
       if (proposalEditable) dirtyLabel.textContent = dirtyCount ? `${dirtyCount} ligne(s) modifiée(s)` : "";
       save.disabled = !proposalEditable || !valid || dirtyCount === 0;
       return values;
@@ -1064,6 +1094,23 @@
       save.textContent = "Enregistrer les modifications";
     }
   }
+  async function removeOrderItem(order, item, button) {
+    if (!global.confirm(`Supprimer « ${item.itemName} » de la demande ${order.publicReference} ?`)) return;
+    button.disabled = true;
+    button.textContent = "Suppression…";
+    try {
+      await global.FRJ_API.fetchD1Admin(
+        `/admin/orders/${encodeURIComponent(order.id)}/items/${encodeURIComponent(item.lineNo)}`,
+        { method: "DELETE" }
+      );
+      await loadOrders();
+    } catch (error) {
+      global.alert(error.message);
+      button.disabled = false;
+      button.textContent = "Supprimer";
+    }
+  }
+
 
   document.getElementById("refreshOrders").addEventListener("click", loadOrders);
   initializeNewOrderForm();

@@ -84,6 +84,9 @@ test("la Console Admin applique les contraintes de saisie d.7", () => {
   assert.match(adminSource, /Number\.isInteger\(quantity\)/);
   assert.match(adminSource, /hasAtMostDecimals\(markupAmount, 6\)/);
   assert.match(adminSource, /await loadOrders\(\)/);
+  assert.match(adminSource, /method: "DELETE"/);
+  assert.match(adminSource, /removeOrderItem\(order, item, remove\)/);
+  assert.match(adminSource, /MU Total \(%\)/);
 });
 
 test("la console Admin charge et filtre une liste vide", async () => {
@@ -147,6 +150,7 @@ test("la Console Admin enregistre la précision autorisée puis recharge D1", as
   };
   const document = {
     getElementById: (id) => elements.get(id),
+    createTextNode: (value) => Object.assign(new FakeElement(), { textContent: String(value) }),
     createElement: () => {
       const element = new FakeElement();
       created.push(element);
@@ -247,7 +251,7 @@ test("d.5 ouvre et copie un lien de suivi Admin sans multiplier les jetons", asy
   await button.listeners.get("click")();
   await settle();
   const trackingRequests = requests.filter((request) => request.path.endsWith("/tracking-link"));
-  const expectedUrl = `https://example.test/${trackingPath}`;
+  const expectedUrl = `https://example.test/${trackingPath}&backend=d1`;
   assert.equal(trackingRequests.length, 1);
   assert.equal(trackingRequests[0].path, `/admin/orders/${order.id}/tracking-link`);
   assert.equal(trackingRequests[0].options.method, "POST");
@@ -496,6 +500,7 @@ test("d.12 ajoute un article à une proposition existante", async () => {
   ];
   const document = {
     getElementById: (id) => elements.get(id),
+    createTextNode: (value) => Object.assign(new FakeElement(), { textContent: String(value) }),
     createElement: () => {
       const element = new FakeElement();
       created.push(element);
@@ -589,6 +594,7 @@ test("le suivi public rend une demande et la mémorise une seule fois malgré pl
     updatedAt: "2026-08-20T11:00:00Z",
     frjMember: false,
     totalSalePed: 12.5,
+    totalTtPed: 10,
     items: []
   };
   const window = {
@@ -603,7 +609,7 @@ test("le suivi public rend une demande et la mémorise une seule fois malgré pl
     confirm: () => true,
     alert: () => {}
   };
-  const context = vm.createContext({ window, document, console, URLSearchParams });
+  const context = vm.createContext({ window, document, console, URL, URLSearchParams });
   vm.runInContext(commonSource, context);
   vm.runInContext(trackingSource, context);
   await settle();
@@ -616,8 +622,13 @@ test("le suivi public rend une demande et la mémorise une seule fois malgré pl
   assert.equal(statuses.children[1].className, "tracking-price-status confirmed");
   const trackingTable = elements.get("trackingContent").children[2].children[0];
   assert.match(trackingTable.innerHTML, /<th>Sale price<\/th>/);
-  const trackingTotal = elements.get("trackingContent").children[3];
-  assert.equal(trackingTotal.children[0].textContent, "Total sale price");
+  const trackingTotals = elements.get("trackingContent").children[3];
+  assert.equal(trackingTotals.className, "tracking-totals");
+  assert.equal(trackingTotals.children[0].children[0].textContent, "Total TT");
+  assert.equal(trackingTotals.children[0].children[1].textContent, "10.00 PED");
+  assert.equal(trackingTotals.children[1].children[0].textContent, "Total MU (%)");
+  assert.equal(trackingTotals.children[1].children[1].textContent, "2.50 PED (25.00 %)");
+  assert.equal(trackingTotals.children[2].children[0].textContent, "Total sale price");
   const note = elements.get("trackingContent").children.at(-1);
   assert.equal(note.textContent, "The prices in this request are confirmed. Stock is not reserved by this request.");
   assert.equal(document.documentElement.lang, "en");
@@ -643,6 +654,7 @@ test("un lien de suivi incomplet affiche l'erreur sans appeler l'API", async () 
   };
   const window = {
     location: { search: "?token=invalide", href: "https://example.test/suivi-commande.html?token=invalide" },
+    history: { replaceState: () => {} },
     localStorage: createStorage({ lang: "FR" }),
     FRJ_API: { getOrderStatus: async () => { apiCalled = true; } },
     navigator: { clipboard: { writeText: async () => {} } },
@@ -650,7 +662,7 @@ test("un lien de suivi incomplet affiche l'erreur sans appeler l'API", async () 
     confirm: () => true,
     alert: () => {}
   };
-  const context = vm.createContext({ window, document, console, URLSearchParams });
+  const context = vm.createContext({ window, document, console, URL, URLSearchParams });
   vm.runInContext(commonSource, context);
   vm.runInContext(trackingSource, context);
   await settle();

@@ -22,7 +22,12 @@ body { max-width: 1250px; margin: 0 auto; padding: 78px 18px 40px; box-sizing: b
     .order-card th, .order-card td { padding: 6px; border-bottom: 1px solid #e2dbcf; text-align: left; }
     .order-card th:not(:first-child), .order-card td:not(:first-child) { text-align: right; }
     .order-card tr.is-dirty td { background: #faf7ff; }
-    .order-total { margin: 10px 0 0; text-align: right; font-size: 1.05rem; }
+    .order-totals { display: grid; gap: 3px; margin: 10px 0 0; text-align: right; }
+    .order-subtotal, .order-total { margin: 0; }
+    .order-subtotal { color: #675e51; font-size: .9rem; }
+    .order-total { font-size: 1.05rem; font-weight: 800; }
+    .order-line-actions { white-space: nowrap; }
+    .order-line-remove { padding: 5px 8px; border: 1px solid #a94b43; border-radius: 6px; color: #8c241d; background: #fff1ef; cursor: pointer; }
     .order-comment { margin: 10px 0 0; padding: 8px; background: #f1ece3; white-space: pre-wrap; }
     .order-status { padding: 6px; border-radius: 5px; }
     .order-header-actions { display: grid; justify-items: end; gap: 8px; min-width: 185px; }
@@ -38,6 +43,7 @@ body { max-width: 1250px; margin: 0 auto; padding: 78px 18px 40px; box-sizing: b
     .line-editor input { width: 78px; padding: 5px; }
     .line-editor select, .line-editor button { padding: 5px; }
     .line-editor .markup-amount { width: 72px; }
+    .order-line-remove:disabled { opacity: .45; cursor: not-allowed; }
     .approval-hint { margin: 10px 0 0; padding: 8px 10px; border-radius: 6px; color: #563a87; background: #eee7ff; font-weight: 700; }
     .order-save-row { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 12px; }
     .order-save-row button { padding: 8px 13px; border: 1px solid #735117; border-radius: 6px; background: #d5aa54; cursor: pointer; font-weight: 800; }

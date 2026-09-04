@@ -1402,10 +1402,10 @@ async function readAllSyncStates(env) {
 
   for (const avatar of Object.keys(AVATAR_SHEETS)) {
     const datasetKey = inventoryDatasetKey(avatar);
-    if (!states[datasetKey]) {
-      const snapshot = await readInventorySnapshot(env, avatar);
-      if (snapshot.state) states[datasetKey] = snapshot.state;
-    }
+    // Recalculer l'empreinte permet notamment de migrer sans ambiguïté quand
+    // le contrat canonique d'inventaire gagne de nouvelles colonnes.
+    const snapshot = await readInventorySnapshot(env, avatar);
+    if (snapshot.state) states[datasetKey] = snapshot.state;
   }
 
   if (!states.mu) {
@@ -2080,6 +2080,71 @@ async function updateContainerConfig(env, payload) {
     state: stored.state,
     signal
   };
+}
+
+export async function handleAdminDelete(url, env) {
+  const orderItemMatch = url.pathname.match(/^\/admin\/orders\/([a-f0-9-]{36})\/items\/(\d+)$/i);
+  if (!orderItemMatch) throw new ApiError(404, "Endpoint administrateur inconnu");
+
+  const orderId = orderItemMatch[1].toLowerCase();
+  const lineNo = Number(orderItemMatch[2]);
+  const existing = await env.DB.prepare(`
+    SELECT oi.item_name, po.status, po.approval_required, po.proposal_version,
+           (SELECT COUNT(*) FROM purchase_order_items WHERE order_id = ?) AS item_count
+    FROM purchase_order_items oi
+    JOIN purchase_orders po ON po.id = oi.order_id
+    WHERE oi.order_id = ? AND oi.line_no = ?
+  `).bind(orderId, orderId, lineNo).first();
+  if (!existing) throw new ApiError(404, "Article de demande introuvable");
+  if (!canReviseOrder(existing.status, existing.approval_required)) {
+    throw new ApiError(409, "Un article ne peut être supprimé que des demandes À valider, Transmises ou Vues");
+  }
+  if (Number(existing.item_count) <= 1) {
+    throw new ApiError(409, "La dernière ligne d'une demande ne peut pas être supprimée");
+  }
+
+  const nextVersion = Number(existing.proposal_version || 0) + 1;
+  await env.DB.batch([
+    env.DB.prepare(`
+      DELETE FROM purchase_order_items WHERE order_id = ? AND line_no = ?
+    `).bind(orderId, lineNo),
+    env.DB.prepare(`
+      UPDATE purchase_orders
+      SET status = 'submitted', approval_required = 1,
+          proposal_version = proposal_version + 1,
+          total_tt_ped = (
+            SELECT ROUND(COALESCE(SUM(line_tt_ped), 0), 2)
+            FROM purchase_order_items WHERE order_id = ?
+          ),
+          total_sale_ped = (
+            SELECT ROUND(COALESCE(SUM(line_sale_ped), 0), 2)
+            FROM purchase_order_items WHERE order_id = ?
+          ),
+          pricing_status = CASE WHEN EXISTS (
+            SELECT 1 FROM purchase_order_items WHERE order_id = ? AND price_status = 'to-confirm'
+          ) THEN 'to-confirm' ELSE 'estimated' END,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(orderId, orderId, orderId, orderId),
+    prepareOrderHistoryEvent(env, {
+      orderId,
+      action: "proposal-line-removed",
+      actor: "admin",
+      details: {
+        lineNo,
+        itemName: existing.item_name,
+        proposalVersion: nextVersion
+      }
+    })
+  ]);
+  const discord = await synchronizeDiscordOrder(env, orderId);
+  return json({
+    ok: true,
+    status: "awaiting_approval",
+    proposalVersion: nextVersion,
+    removedLineNo: lineNo,
+    discord: publicDiscordResult(discord)
+  });
 }
 
 export async function handlePublicOrderGet(url, env) {

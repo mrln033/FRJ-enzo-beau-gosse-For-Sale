@@ -95,7 +95,7 @@ test("conserve le contrat de pré-vérification CORS", async () => {
   });
   const response = await worker.fetch(request, {});
   assert.equal(response.status, 204);
-  assert.equal(response.headers.get("Access-Control-Allow-Methods"), "GET, POST, OPTIONS");
+  assert.equal(response.headers.get("Access-Control-Allow-Methods"), "GET, POST, DELETE, OPTIONS");
 });
 
 test("conserve la réponse pour une méthode non autorisée", async () => {

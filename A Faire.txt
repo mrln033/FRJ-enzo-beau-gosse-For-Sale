@@ -22,19 +22,32 @@ POINT DE REPRISE — 31/08/2026
 Ordre recommandé déjà réalisé et validé : d.1 -> d.2 -> d.3 -> d.7 -> d.8 -> d.6 -> d.10 -> d.11 -> d.5 -> d.13 -> d.12.
 Les demandes d.13, d.12 et d.9 sont terminées. D.9 fournit les promotions quotidiennes et les soldes communs à GAS et D1.
 
-Les tâches T-001 à T-008 sont terminées et publiées.
+Les tâches T-001 à T-011 sont terminées et publiées.
 La seule demande encore ouverte est l'ancienne d.4, mise en attente à la demande du 29/08/2026 : son périmètre doit être mieux cadré avant toute analyse définitive ou implémentation.
 
 -------------------------------
 DEMANDES  => CE QUI EST A FAIRE
 
->>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-009 <<<
+>>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-012 <<<
 
 [EN ATTENTE DE CADRAGE]
 d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> ajouter un bouton 'Supprimer' à chaque demande avec message de confirmation. Celà supprimerais l'enregistrement complet dans D1. Propagation Discord avec modification du statut en 'SUPPRIMEE' pour archivage.
 
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
+
+04/09/2026 = Tâches T-009 à T-011 — fiabilisation des inventaires et enrichissement des demandes d'achat.
+Demandes d'origine :
+T-009  ==> Import Inventaires
+	Depuis hier, j'ai systématiquement une erreur lors de l'import de l'inventaire [enzo beau gosse], coté GAS. Pas d'erreur D1. Je pense savoir pourquoi : il y a un nouvel item nommé [Serpent's Scale]. L'apostrophe dans le nom d'article doit causer un blocage. Certes, la synchronisation va régler la chose, mais cette erreur n'est pas normale et une solution perenne doit être trouvée et implémentée.
+	Je m'aperçois également que lors d'une synchronisation, me semble-t-il, ceetaines colonnes ne sont pas ou sont mal renseignées dans le fichier Googlesheet "[FRJ] - Inventaire Enzo's" (id : 1C-TWYWKI7Vge3wywEUHjYAKm3GOBP4rgiaBbAch0Jng) : Id absent, Value(PED) non conforme, ContainerRefId absent). Celà cause une erreur dans les formules GoogleSheet servant à la vérification.
+
+T-010  ==>  Interface Admin > Demande d'achat
+	J'aimerais avoir la possibilité de supprimer une ligne d'article dans une demande 'A valider', 'Transmise' ou 'Vue'. Fonctionnalité 'Admin' uniquement, avec recalcul de l'estimation totale.
+
+T-011  ==>  Demande d'achat (Admin), Suivi demande (Admin, Panier)
+	J'aimerais également ajouter 2 lignes en bas des demandes : 'Total TT', avec la somme totale de la valeur de chaque article*quantité, et une ligne 'MU Total (%)', avec la somme totale des MU*quantité en PEDS de chaque article avec le pourcentage (2 décimale) entre parenthèses. La somme de ces 2 lignes doit être égal au montant figurant sur la ligne 'Estimation Totale'.
+Réalisation : l'apostrophe de « Serpent's Scale » n'était pas la cause de l'échec GAS. L'import écrivait correctement la feuille, puis tentait de reprendre le verrou global déjà détenu afin de rafraîchir les conteneurs ; l'attente expirait après l'écriture et produisait donc un faux échec. Ce rafraîchissement réutilise désormais le verrou courant. La synchronisation d'inventaire ne regroupe plus les lignes par article/conteneur et conserve les six colonnes source : Id, Item, Quantity, Value(PED), Container et ContainerRefId. Ces six valeurs participent également aux empreintes et à la fusion GAS/D1. Au premier audit suivant cette migration, chaque inventaire est volontairement restauré une seule fois depuis D1, qui possède encore les métadonnées complètes ; un marqueur par avatar rétablit ensuite le fonctionnement bidirectionnel habituel. Dans l'Admin, chaque ligne d'une demande « À valider », « Transmise » ou « Vue » possède un bouton de suppression avec confirmation. La dernière ligne ne peut pas être supprimée. D1 recalcule atomiquement Total TT, prix de vente, statut de prix et version de proposition, demande une nouvelle validation client, actualise Discord et inscrit un événement synchronisable dans l'historique GAS/D1. Les vues Admin et Suivi client affichent maintenant Total TT, MU Total en PED avec son pourcentage à deux décimales, puis Estimation totale ou Prix de vente total selon la confirmation des prix ; le recalcul Admin reste instantané pendant la saisie et le suivi est bilingue FR/EN. Les 215 tests complets du projet et les 83 tests Worker réussissent ; le dry-run Wrangler et les contrôles HTTP de production sont valides. Le Worker est publié sous la version '1a967e1f-200f-4350-8d7f-99b93ddca60a'. GAS est publié en version 28 sur le déploiement Web App existant ; un clone de contrôle confirme l'identité exacte des quinze sources et la route publique répond HTTP 200.
 
 04/09/2026 = Tâche T-008 — retour du suivi client vers le bon mode de catalogue.
 Demande d'origine :
@@ -65,7 +78,7 @@ Complément — éligibilité entre préparation et activation : seul le couple 
 Demandes d'origine :
 T-001 [ÉVOLUTION] => Demandes d'achat > Nouvelle demande directe.
 	Je veux que les articles soient triés par ordre alphabétique dans la liste déroulante d'ajout, indépendemment de leur catégorie/rayon.
-	J'aimerais également que les entêtes (Article / Quantité / MU) soient commun à toutes les lignes. Concrètement, chaque ligne ajoutées n'aurait pas ces entêtes qui se trouverait en haut du table de la zone des lignes d'articles. Par comtre, les mention en fin de lignses (Stock, prix et estimation) sont à conserver pour chaque ligne (peut être en plus petit pour l'ergonomie générale).
+	J'aimerais également que les entêtes (Article / Quantité / MU) soient commun à toutes les lignes. Concrètement, chaque ligne ajoutées n'aurait pas ces entêtes qui se trouverait en haut du table de la zone des lignes d'articles. Par comtre, les mention en fin de lignes (Stock, prix et estimation) sont à conserver pour chaque ligne (peut être en plus petit pour l'ergonomie générale).
 T-002 [CORRECTIF] => Demandes d'achat > Nouvelle demande directe.
 	j'ai eu un 'souci' (qui n'en est pas vraiment un) d'affichage... Après la création d'un nouvelle demande, une confirmation est affichée en bas du formlaire, avec un lien vers la demande à communiquer éventuellement au client. Si on masque le formulaire et qu'on le rouvre (dans la meme session surement), ces lignes de confirmation sont toujours affichées :s
 T-003 [ÉVOLUTION] => Demandes d'achat > Nouvelle demande directe.

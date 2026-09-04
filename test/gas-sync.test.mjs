@@ -197,3 +197,32 @@ test("l'outbox GAS conserve les datasets non traités et acquitte les autres", (
   ]);
   assert.equal(context.frjReadGasOutbox_()[0].id, "evt-enzo");
 });
+
+test("T-009 conserve les métadonnées d'inventaire et les apostrophes", async () => {
+  const row = {
+    sourceId: "item-123",
+    itemName: "Serpent's Scale",
+    quantity: 7,
+    valuePed: 3.5,
+    container: "STORAGE (Calypso)",
+    containerRefId: "container-456"
+  };
+  assert.notEqual(
+    context.frjHashInventory_([row]),
+    context.frjHashInventory_([{ ...row, sourceId: null, containerRefId: null }])
+  );
+  const importsSource = fs.readFileSync(new URL("../gas/Imports.gs", import.meta.url), "utf8");
+  assert.match(importsSource, /frjRefreshContainerConfigurationAfterInventoryUnlocked_\(inventoryId\)/);
+  assert.doesNotMatch(importsSource, /frjRefreshContainerConfigurationAfterInventory_\(inventoryId\)/);
+});
+
+test("T-009 répare une fois GAS depuis D1 avant de rétablir le bidirectionnel", () => {
+  const syncEngineSource = fs.readFileSync(new URL("../gas/SyncEngine.gs", import.meta.url), "utf8");
+  const applicationSource = fs.readFileSync(new URL("../cloudflare/for-sale-api/src/application.js", import.meta.url), "utf8");
+  assert.match(syncEngineSource, /inventoryMetadataUpgrade[\s\S]*direction = "d1-to-gas"/);
+  scriptProperties.clear();
+  assert.equal(context.frjInventoryMetadataSchemaIsCurrent_("inventory:enzo"), false);
+  context.frjMarkInventoryMetadataSchemaCurrent_("inventory:enzo");
+  assert.equal(context.frjInventoryMetadataSchemaIsCurrent_("inventory:enzo"), true);
+  assert.match(applicationSource, /const snapshot = await readInventorySnapshot\(env, avatar\)/);
+});

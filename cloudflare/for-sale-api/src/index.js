@@ -1,6 +1,7 @@
 import { PUBLIC_ORIGINS } from "./config.js";
 import {
   handleAdminGet,
+  handleAdminDelete,
   handleAdminPost,
   handleGet,
   handlePost,
@@ -80,6 +81,11 @@ export default {
         }
         if (isAdminRequest) return withCors(await handleAdminPost(request, url, env), origin);
         return withCors(await handlePost(request, url, env), origin);
+      }
+
+      if (request.method === "DELETE") {
+        if (isAdminRequest) return withCors(await handleAdminDelete(url, env), origin);
+        return withCors(json({ error: "Method not allowed" }, 405), origin);
       }
 
       return withCors(json({ error: "Method not allowed" }, 405), origin);

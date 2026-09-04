@@ -22,7 +22,6 @@ function frjReadLocalInventory_(avatar) {
   }
 
   if (!rows.length) throw new Error("Inventaire local vide : " + sheetName);
-  rows = frjAggregateInventoryRows_(rows);
   var updatedAt = frjToIso_(values[0][1], "1970-01-01T00:00:00.000Z");
   return { rows: rows, hash: frjHashInventory_(rows), updatedAt: updatedAt };
 }
@@ -154,39 +153,13 @@ function frjHashDataset_(dataset, rows) {
 }
 
 function frjHashInventory_(rows) {
-  var payload = frjAggregateInventoryRows_(rows).map(function(row) {
+  var payload = (rows || []).map(function(row) {
     return JSON.stringify([
-      frjText_(row.itemName), frjNumber_(row.quantity),
-      frjNullableNumberText_(row.valuePed), frjText_(row.container)
+      frjText_(row.sourceId), frjText_(row.itemName), frjNumber_(row.quantity),
+      frjNullableNumberText_(row.valuePed), frjText_(row.container), frjText_(row.containerRefId)
     ]);
   }).sort().join("\n");
   return frjSha256_(payload);
-}
-
-function frjAggregateInventoryRows_(rows) {
-  var grouped = {};
-  rows.forEach(function(row) {
-    var key = "inventory:" + [
-      frjText_(row.itemName).toLowerCase(),
-      frjText_(row.container).toLowerCase()
-    ].join("\u001f");
-    var quantity = Number(row.quantity);
-    var valuePed = frjNullableNumber_(row.valuePed);
-    if (!grouped[key]) {
-      grouped[key] = {
-        sourceId: null,
-        itemName: frjText_(row.itemName),
-        quantity: isFinite(quantity) ? quantity : 0,
-        valuePed: valuePed,
-        container: frjNullableText_(row.container),
-        containerRefId: null
-      };
-      return;
-    }
-    grouped[key].quantity += isFinite(quantity) ? quantity : 0;
-    if (valuePed !== null) grouped[key].valuePed = (grouped[key].valuePed || 0) + valuePed;
-  });
-  return Object.keys(grouped).sort().map(function(key) { return grouped[key]; });
 }
 
 function frjHashMarket_(rows) {

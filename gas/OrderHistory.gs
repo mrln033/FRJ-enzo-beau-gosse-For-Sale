@@ -240,6 +240,12 @@ function purchaseAutomaticHistoryComment_(action, details) {
   if (action === "proposal-line-changed") return details.itemName
     ? "Proposition modifiée pour « " + details.itemName + " »."
     : "Une ligne de la proposition a été modifiée.";
+  if (action === "proposal-line-added") return details.itemName
+    ? "Article « " + details.itemName + " » ajouté par l’administrateur."
+    : "Un article a été ajouté par l’administrateur.";
+  if (action === "proposal-line-removed") return details.itemName
+    ? "Article « " + details.itemName + " » supprimé par l’administrateur."
+    : "Un article a été supprimé par l’administrateur.";
   if (action === "proposal-accepted") return "Proposition acceptée par le client.";
   if (action === "client-cancelled") return "Demande annulée par le client.";
   if (action === "status-changed") {

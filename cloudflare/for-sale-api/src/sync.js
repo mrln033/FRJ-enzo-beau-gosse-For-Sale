@@ -45,11 +45,11 @@ export function shouldSignalSyncAfterImport(pairedBackend) {
 }
 
 export function canonicalInventoryPayload(rows) {
-  return aggregateInventoryRows(rows).map((row) => JSON.stringify([
-    cleanText(row.itemName),
+  return inventoryRowsWithKeys(rows).map((row) => JSON.stringify([
+    cleanText(row.sourceId), cleanText(row.itemName),
     cleanNumber(row.quantity),
     cleanNullableNumber(row.valuePed),
-    cleanText(row.container)
+    cleanText(row.container), cleanText(row.containerRefId)
   ])).sort().join("\n");
 }
 
@@ -101,40 +101,29 @@ export function canonicalContainerPayload(rows) {
   ])).sort().join("\n");
 }
 
-export function aggregateInventoryRows(rows) {
-  const grouped = new Map();
-  for (const row of rows) {
-    const key = inventoryRowKey(row);
-    const existing = grouped.get(key);
-    const quantity = Number(row.quantity);
-    const valuePed = cleanOptionalNumber(row.valuePed);
-    if (!existing) {
-      grouped.set(key, {
-        lineNo: Number(row.lineNo || 0),
-        sourceId: null,
-        itemName: cleanText(row.itemName),
-        quantity: Number.isFinite(quantity) ? quantity : 0,
-        valuePed,
-        container: cleanText(row.container) || null,
-        containerRefId: null,
-        rowKey: key
-      });
-      continue;
-    }
-    existing.quantity += Number.isFinite(quantity) ? quantity : 0;
-    if (valuePed !== null) existing.valuePed = (existing.valuePed || 0) + valuePed;
-    existing.lineNo = Math.min(existing.lineNo || Number.MAX_SAFE_INTEGER, Number(row.lineNo || 0));
-  }
-  return [...grouped.values()]
-    .sort((left, right) => left.rowKey.localeCompare(right.rowKey, "en"))
-    .map((row, index) => ({ ...row, lineNo: index + 2 }));
-}
-
 export function inventoryRowsWithKeys(rows) {
-  return aggregateInventoryRows(rows);
+  const occurrences = new Map();
+  return rows.map((row, index) => {
+    const baseKey = inventoryRowKey(row);
+    const occurrence = (occurrences.get(baseKey) || 0) + 1;
+    occurrences.set(baseKey, occurrence);
+    const quantity = Number(row.quantity);
+    return {
+      lineNo: Number(row.lineNo) || index + 2,
+      sourceId: cleanText(row.sourceId) || null,
+      itemName: cleanText(row.itemName),
+      quantity: Number.isFinite(quantity) ? quantity : 0,
+      valuePed: cleanOptionalNumber(row.valuePed),
+      container: cleanText(row.container) || null,
+      containerRefId: cleanText(row.containerRefId) || null,
+      rowKey: `${baseKey}#${occurrence}`
+    };
+  });
 }
 
 export function inventoryRowKey(row) {
+  const sourceId = cleanText(row.sourceId).toLocaleLowerCase("en-US");
+  if (sourceId) return `inventory:id:${sourceId}`;
   return `inventory:${[
     cleanText(row.itemName).toLocaleLowerCase("en-US"),
     cleanText(row.container).toLocaleLowerCase("en-US")

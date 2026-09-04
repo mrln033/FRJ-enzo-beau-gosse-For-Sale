@@ -12,7 +12,8 @@ const STATUS_LABELS = Object.freeze({
 
 const CLIENT_ACTIONS = new Set(["submitted", "proposal-accepted", "client-cancelled"]);
 const ADMIN_ACTIONS = new Set([
-  "admin-created", "status-changed", "proposal-changed", "proposal-line-changed", "proposal-line-added"
+  "admin-created", "status-changed", "proposal-changed", "proposal-line-changed", "proposal-line-added",
+  "proposal-line-removed"
 ]);
 const HIDDEN_ACTIONS = new Set(["history-comment-updated", "pricing-confirmed-backfill", "discount-refreshed"]);
 const SYNCED_ACTIONS = new Set([
@@ -22,6 +23,7 @@ const SYNCED_ACTIONS = new Set([
   "proposal-changed",
   "proposal-line-changed",
   "proposal-line-added",
+  "proposal-line-removed",
   "status-changed",
   "proposal-accepted",
   "client-cancelled"
@@ -55,6 +57,11 @@ export function automaticOrderHistoryComment(action, details = {}) {
     return details.itemName
       ? `Article « ${details.itemName} » ajouté par l’administrateur.`
       : "Un article a été ajouté par l’administrateur.";
+  }
+  if (action === "proposal-line-removed") {
+    return details.itemName
+      ? `Article « ${details.itemName} » supprimé par l’administrateur.`
+      : "Un article a été supprimé par l’administrateur.";
   }
   if (action === "proposal-accepted") return "Proposition acceptée par le client.";
   if (action === "client-cancelled") return "Demande annulée par le client.";

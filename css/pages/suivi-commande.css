@@ -42,7 +42,9 @@
     th, td { padding: 8px 7px; border-bottom: 1px solid #e3dccf; text-align: left; }
     th:not(:first-child), td:not(:first-child) { text-align: right; white-space: nowrap; }
     th { color: #6b6154; font-size: .8rem; }
-    .tracking-total { display: flex; justify-content: space-between; gap: 15px; margin: 18px 0 0; padding: 13px; background: #f1ebdf; font-size: 1.05rem; }
+    .tracking-totals { margin-top: 18px; background: #f1ebdf; }
+    .tracking-total { display: flex; justify-content: space-between; gap: 15px; margin: 0; padding: 7px 13px; font-size: .95rem; }
+    .tracking-total:last-child { padding-top: 10px; border-top: 1px solid #d8cdbb; font-size: 1.05rem; }
     .tracking-note { color: #6a6053; font-size: .86rem; }
     .tracking-message { padding: 26px 20px; text-align: center; white-space: pre-line; }
     .tracking-message.error { color: #932d29; }

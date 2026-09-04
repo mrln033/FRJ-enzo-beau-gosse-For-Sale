@@ -59,7 +59,7 @@ test("d.8.5 conserve les choix GAS et découvre uniquement par ajout", () => {
   assert.match(source, /insertColumnBefore\(1\)/);
   assert.match(source, /additions\.push\(\[avatar, container, false\]\)/);
   assert.doesNotMatch(source, /deleteRow|deleteRows|clearContent/);
-  assert.match(sources["Imports.gs"], /frjRefreshContainerConfigurationAfterInventory_\(inventoryId\)/);
+  assert.match(sources["Imports.gs"], /frjRefreshContainerConfigurationAfterInventoryUnlocked_\(inventoryId\)/);
   assert.match(sources["SyncSheets.gs"], /frjRefreshContainerConfigurationAfterInventoryUnlocked_\(avatar\)/);
 });
 

@@ -8,6 +8,7 @@
       reference: "Référence", avatar: "Avatar", created: "Transmise le", updated: "Dernière mise à jour",
       item: "Article", quantity: "Qté", price: "Prix affiché", markup: "MU appliqué", estimate: "Estimation", salePrice: "Prix de vente",
       total: "Estimation totale", totalSale: "Prix de Vente total", member: "MU FRJ", public: "MU", pending: "à confirmer",
+      totalTt: "Total TT", totalMarkup: "MU Total (%)",
       proposal: "Enzo a modifié une ou plusieurs quantités ou MU. Vérifiez les nouvelles conditions affichées ci-dessous, puis acceptez-les pour retransmettre la demande.",
       accept: "Accepter les modifications", accepting: "Validation…",
       acceptError: "La validation a échoué. Actualisez la page et réessayez.",
@@ -27,6 +28,7 @@
       reference: "Reference", avatar: "Avatar", created: "Submitted", updated: "Last update",
       item: "Item", quantity: "Qty", price: "Displayed price", markup: "Applied MU", estimate: "Estimate", salePrice: "Sale price",
       total: "Total estimate", totalSale: "Total sale price", member: "FRJ MU", public: "MU", pending: "to confirm",
+      totalTt: "Total TT", totalMarkup: "Total MU (%)",
       proposal: "Enzo changed one or more quantities or MUs. Review the new terms below, then accept them to resubmit the request.",
       accept: "Accept changes", accepting: "Accepting…",
       acceptError: "Acceptance failed. Refresh the page and try again.",
@@ -312,14 +314,24 @@
     tableWrap.appendChild(table);
     content.appendChild(tableWrap);
 
-    const total = document.createElement("p");
-    total.className = "tracking-total";
-    const totalLabel = document.createElement("span");
-    const totalValue = document.createElement("strong");
-    totalLabel.textContent = text(pricingStatus === "confirmed" ? "totalSale" : "total");
-    totalValue.textContent = `${ui.formatPed(order.totalSalePed, lang)} PED`;
-    total.append(totalLabel, totalValue);
-    content.appendChild(total);
+    const totalValues = ui.orderMarkupTotals(order.totalTtPed, order.totalSalePed);
+    const totals = document.createElement("div");
+    totals.className = "tracking-totals";
+    [
+      [text("totalTt"), `${ui.formatPed(totalValues.totalTtPed, lang)} PED`],
+      [text("totalMarkup"), `${ui.formatPed(totalValues.markupPed, lang)} PED (${ui.formatPed(totalValues.markupPercent, lang)} %)`],
+      [text(pricingStatus === "confirmed" ? "totalSale" : "total"), `${ui.formatPed(totalValues.totalSalePed, lang)} PED`]
+    ].forEach(([label, value]) => {
+      const total = document.createElement("p");
+      total.className = "tracking-total";
+      const totalLabel = document.createElement("span");
+      const totalValue = document.createElement("strong");
+      totalLabel.textContent = label;
+      totalValue.textContent = value;
+      total.append(totalLabel, totalValue);
+      totals.appendChild(total);
+    });
+    content.appendChild(totals);
     const note = document.createElement("p");
     note.className = "tracking-note";
     note.textContent = text(pricingStatus === "confirmed" ? "confirmedNote" : "estimatedNote");

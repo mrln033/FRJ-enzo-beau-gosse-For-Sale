@@ -313,8 +313,11 @@ function frjSynchronizeDataset_(dataset, remoteState, forceAudit, retryCount) {
     }
   }
 
+  var inventoryMetadataUpgrade = dataset.indexOf("inventory:") === 0
+    && !frjInventoryMetadataSchemaIsCurrent_(dataset);
   if (local.hash === remoteState.hash) {
     frjSetBaseHash_(dataset, local.hash);
+    if (inventoryMetadataUpgrade) frjMarkInventoryMetadataSchemaCurrent_(dataset);
     if (forceAudit) frjReportAudit_(dataset, "verified", local.hash, remoteState.hash, { rows: local.rows.length });
     return {
       dataset: dataset,
@@ -334,6 +337,11 @@ function frjSynchronizeDataset_(dataset, remoteState, forceAudit, retryCount) {
   if (dataset === "catalog") {
     // BDD_APP reste pour l'instant le référentiel maître : ses colonnes E:G sont des formules IMPORTRANGE.
     direction = "gas-to-d1";
+  } else if (inventoryMetadataUpgrade) {
+    // L'ancienne empreinte supprimait Id, Value(PED) et ContainerRefId.
+    // D1 ayant conservé l'import brut, il répare une seule fois la feuille GAS,
+    // puis les synchronisations suivantes redeviennent strictement bidirectionnelles.
+    direction = "d1-to-gas";
   } else if (dataset === "containers" && !baseHash) {
     // Premier raccordement : la feuille CONFIG_CONTAINER contient les choix
     // historiques explicites (18 activés) et initialise la base commune.
@@ -418,6 +426,7 @@ function frjSynchronizeDataset_(dataset, remoteState, forceAudit, retryCount) {
   if (finalLocal.hash !== finalRemote.state.hash || finalRemoteHash !== finalRemote.state.hash) {
     throw new Error("Réconciliation incomplète pour " + dataset);
   }
+  if (inventoryMetadataUpgrade) frjMarkInventoryMetadataSchemaCurrent_(dataset);
 
   frjReportAudit_(dataset, "reconciled", finalLocal.hash, finalRemote.state.hash, {
     direction: direction,
@@ -433,6 +442,18 @@ function frjSynchronizeDataset_(dataset, remoteState, forceAudit, retryCount) {
     hash: finalLocal.hash,
     updatedAt: finalLocal.updatedAt
   };
+}
+
+function frjInventoryMetadataSchemaProperty_(dataset) {
+  return "FRJ_INVENTORY_METADATA_SCHEMA_" + dataset.slice("inventory:".length).toUpperCase();
+}
+
+function frjInventoryMetadataSchemaIsCurrent_(dataset) {
+  return PropertiesService.getScriptProperties().getProperty(frjInventoryMetadataSchemaProperty_(dataset)) === "2";
+}
+
+function frjMarkInventoryMetadataSchemaCurrent_(dataset) {
+  PropertiesService.getScriptProperties().setProperty(frjInventoryMetadataSchemaProperty_(dataset), "2");
 }
 
 function frjRetryDatasetAfterConcurrentChange_(dataset, forceAudit, retryCount) {
@@ -543,14 +564,15 @@ function frjMergeInventoryQuantities_(baseRow, localRow, remoteRow, conflictWinn
   var remoteHasValue = remoteRow.valuePed !== null && remoteRow.valuePed !== undefined;
   var baseHasValue = Boolean(baseRow && baseRow.valuePed !== null && baseRow.valuePed !== undefined);
   return {
-    sourceId: null,
+    sourceId: winner.sourceId || localRow.sourceId || remoteRow.sourceId || (baseRow && baseRow.sourceId) || null,
     itemName: winner.itemName,
     quantity: (Number(localRow.quantity) || 0) + (Number(remoteRow.quantity) || 0) - baseQuantity,
     valuePed: localHasValue || remoteHasValue || baseHasValue
       ? (Number(localRow.valuePed) || 0) + (Number(remoteRow.valuePed) || 0) - baseValue
       : null,
     container: winner.container || null,
-    containerRefId: null
+    containerRefId: winner.containerRefId || localRow.containerRefId || remoteRow.containerRefId ||
+      (baseRow && baseRow.containerRefId) || null
   };
 }
 
@@ -575,10 +597,12 @@ function frjRowsByStableKey_(dataset, rows) {
     } else if (dataset === "discounts" || dataset === "discount-config") {
       baseKey = dataset + ":" + frjText_(row.id);
     } else {
-      baseKey = "inventory:" + [
-        frjText_(row.itemName).toLowerCase(),
-        frjText_(row.container).toLowerCase()
-      ].join("\u001f");
+      baseKey = row.sourceId
+        ? "inventory:id:" + frjText_(row.sourceId).toLowerCase()
+        : "inventory:" + [
+          frjText_(row.itemName).toLowerCase(),
+          frjText_(row.container).toLowerCase()
+        ].join("\u001f");
     }
     occurrences[baseKey] = (occurrences[baseKey] || 0) + 1;
     result[baseKey + "#" + occurrences[baseKey]] = row;
@@ -625,7 +649,7 @@ function frjRowSignature_(dataset, row) {
     row.selectionSeed || "frj-daily-promo", frjToIso_(row.updatedAt, "")
   ]);
   return JSON.stringify([
-    frjText_(row.itemName), frjNumber_(row.quantity),
-    frjNullableNumberText_(row.valuePed), frjText_(row.container)
+    frjText_(row.sourceId), frjText_(row.itemName), frjNumber_(row.quantity),
+    frjNullableNumberText_(row.valuePed), frjText_(row.container), frjText_(row.containerRefId)
   ]);
 }

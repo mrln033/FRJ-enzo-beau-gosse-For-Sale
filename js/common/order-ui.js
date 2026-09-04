@@ -61,6 +61,19 @@
     return Math.round((Number(value) + Number.EPSILON) * factor) / factor;
   }
 
+  function orderMarkupTotals(totalTtPed, totalSalePed) {
+    const totalTt = roundPed(totalTtPed);
+    const totalSale = roundPed(totalSalePed);
+    const markupPed = roundPed(totalSale - totalTt);
+    const markupPercent = totalTt > 0 ? roundPed((markupPed / totalTt) * 100) : 0;
+    return {
+      totalTtPed: totalTt,
+      markupPed,
+      markupPercent,
+      totalSalePed: totalSale
+    };
+  }
+
   function discountMarker(item, language = "FR") {
     const kind = item?.discountKind;
     const rate = Number(item?.discountRate);
@@ -85,6 +98,7 @@
     formatDate,
     roundPed,
     discountMarker,
+    orderMarkupTotals,
     canEditProposal,
     canCancel,
     canHide

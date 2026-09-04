@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
-import { handleAdminGet, handleAdminPost, refreshMutableOrderDiscounts } from "../src/application.js";
+import { handleAdminDelete, handleAdminGet, handleAdminPost, refreshMutableOrderDiscounts } from "../src/application.js";
 import { normalizeAdminOrderDraft, normalizeAdminOrderLine } from "../src/orders.js";
 
 class D1Statement {
@@ -297,5 +297,56 @@ test("d.12 ajoute une ligne, recalcule la proposition et refuse les doublons", a
   await assert.rejects(
     () => handleAdminPost(new Request(addUrl, { method: "POST", body: JSON.stringify(lineB) }), addUrl, env),
     (error) => error.status === 409 && /déjà présent/.test(error.message)
+  );
+});
+
+test("T-010 supprime une ligne modifiable et recalcule la proposition", async () => {
+  const database = setupDatabase();
+  const env = { DB: makeD1(database), CART_ENABLED: "true" };
+  const createUrl = new URL("https://api.example/admin/orders");
+  const created = await (await handleAdminPost(new Request(createUrl, {
+    method: "POST",
+    body: JSON.stringify({ buyerAvatar: "Direct Buyer", frjMember: false, items: [lineA, lineB] })
+  }), createUrl, env)).json();
+  const deleteUrl = new URL(`https://api.example/admin/orders/${created.order.id}/items/2`);
+  const response = await handleAdminDelete(deleteUrl, env);
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.equal(result.status, "awaiting_approval");
+  assert.equal(result.proposalVersion, 2);
+  assert.equal(result.removedLineNo, 2);
+
+  const stored = database.prepare(`
+    SELECT total_tt_ped, total_sale_ped, approval_required, proposal_version
+    FROM purchase_orders
+  `).get();
+  assert.equal(stored.total_tt_ped, 20);
+  assert.equal(stored.total_sale_ped, 22);
+  assert.equal(stored.approval_required, 1);
+  assert.equal(stored.proposal_version, 2);
+  assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM purchase_order_items`).get().count, 1);
+  const history = database.prepare(`
+    SELECT details FROM purchase_order_events WHERE action = 'proposal-line-removed'
+  `).get();
+  assert.deepEqual(JSON.parse(history.details), {
+    lineNo: 2,
+    itemName: "Item B",
+    proposalVersion: 2
+  });
+  assert.equal(database.prepare(`
+    SELECT comment FROM purchase_order_events WHERE action = 'proposal-line-removed'
+  `).get().comment, "Article « Item B » supprimé par l’administrateur.");
+
+  const lastDeleteUrl = new URL(`https://api.example/admin/orders/${created.order.id}/items/1`);
+  await assert.rejects(
+    () => handleAdminDelete(lastDeleteUrl, env),
+    (error) => error.status === 409 && /dernière ligne/.test(error.message)
+  );
+  database.prepare(`
+    UPDATE purchase_orders SET status = 'preparing', approval_required = 0 WHERE id = ?
+  `).run(created.order.id);
+  await assert.rejects(
+    () => handleAdminDelete(lastDeleteUrl, env),
+    (error) => error.status === 409 && /À valider, Transmises ou Vues/.test(error.message)
   );
 });
