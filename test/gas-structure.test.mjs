@@ -88,6 +88,19 @@ test("d.11.2 applique dans GAS la confirmation permanente des prix", () => {
   assert.match(sources["PurchaseOrders.gs"], /pricingStatus: order\.pricingStatus \|\| "estimated"/);
 });
 
+test("les erreurs POST GAS restent lisibles depuis le navigateur", () => {
+  const webApp = sources["WebApp.gs"];
+  assert.match(webApp, /catch\s*\(error\)/);
+  assert.match(webApp, /Utilities\.getUuid\(\)/);
+  assert.match(webApp, /"INV-WRITE": "écriture de la feuille d'inventaire"/);
+  assert.match(webApp, /publicMessage \+ " \[" \+ code \+ "\] \(référence " \+ reference/);
+  assert.match(webApp, /console\.error/);
+  assert.match(sources["Imports.gs"], /frjRunInventoryPhase_\("INV-OPEN"/);
+  assert.match(sources["Imports.gs"], /frjRunInventoryPhase_\("INV-DATA"/);
+  assert.match(sources["Imports.gs"], /frjRunInventoryPhase_\("INV-WRITE"/);
+  assert.match(sources["Imports.gs"], /frjRunInventoryPhase_\("INV-CONTAINERS"/);
+});
+
 test("T-009 conserve la feuille d'inventaire au format MindArk exact", () => {
   assert.match(
     sources["Imports.gs"],

@@ -93,59 +93,73 @@ function processInventory(csv, avatar) {
     throw new Error("Avatar d'inventaire inconnu : " + inventoryId);
   }
 
-  const sheet = SpreadsheetApp.openById(SS_ID).getSheetByName(SHEET_NAME);
+  const sheet = frjRunInventoryPhase_("INV-OPEN", () => {
+    const target = SpreadsheetApp.openById(SS_ID).getSheetByName(SHEET_NAME);
+    if (!target) throw new Error("Feuille introuvable : " + SHEET_NAME);
+    return target;
+  });
 
-  if (!sheet) {
-    throw new Error("Feuille introuvable : " + SHEET_NAME);
-  }
+  const sheetData = frjRunInventoryPhase_("INV-DATA", () => {
+    const data = Utilities.parseCsv(csv, "\t");
+    if (!data || data.length === 0) return [];
 
-  const data = Utilities.parseCsv(csv, "\t");
+    const expectedHeaders = ["Id", "Name", "Quantity", "Value(PED)", "Container", "ContainerRefId"];
+    const actualHeaders = data[0].map(value => String(value || "").trim());
+    if (actualHeaders.length !== expectedHeaders.length || actualHeaders.some((value, index) => value !== expectedHeaders[index])) {
+      throw new Error("Colonnes inventaire MindArk invalides : " + actualHeaders.join(" | "));
+    }
+    return frjNormalizeInventorySheetData_(data);
+  });
 
-  if (!data || data.length === 0) {
-    return "CSV vide";
-  }
-
-  const expectedHeaders = ["Id", "Name", "Quantity", "Value(PED)", "Container", "ContainerRefId"];
-  const actualHeaders = data[0].map(value => String(value || "").trim());
-  if (actualHeaders.length !== expectedHeaders.length || actualHeaders.some((value, index) => value !== expectedHeaders[index])) {
-    throw new Error("Colonnes inventaire MindArk invalides : " + actualHeaders.join(" | "));
-  }
-
-  const sheetData = frjNormalizeInventorySheetData_(data);
+  if (!sheetData.length) return "CSV vide";
   const numRows = sheetData.length;
   const numCols = sheetData[0].length;
 
-  // Agrandir avant l'écriture évite une troncature lorsque l'import dépasse la feuille.
-  if (sheet.getMaxRows() < numRows) {
-    sheet.insertRowsAfter(sheet.getMaxRows(), numRows - sheet.getMaxRows());
-  }
+  frjRunInventoryPhase_("INV-WRITE", () => {
+    // Agrandir avant l'écriture évite une troncature lorsque l'import dépasse la feuille.
+    if (sheet.getMaxRows() < numRows) {
+      sheet.insertRowsAfter(sheet.getMaxRows(), numRows - sheet.getMaxRows());
+    }
 
-  if (sheet.getMaxColumns() < numCols) {
-    sheet.insertColumnsAfter(sheet.getMaxColumns(), numCols - sheet.getMaxColumns());
-  }
+    if (sheet.getMaxColumns() < numCols) {
+      sheet.insertColumnsAfter(sheet.getMaxColumns(), numCols - sheet.getMaxColumns());
+    }
 
-  // Effacer seulement les cellules de données conserve le format de la feuille.
-  sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns()).clearContent();
+    // Effacer seulement les cellules de données conserve le format de la feuille.
+    sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns()).clearContent();
 
-  // Écrire le tableau complet en une opération limite les appels Google Sheets.
-  if (numRows > 1) {
-    // Contrat historique : Value(PED) reste du texte avec un point décimal.
-    sheet.getRange(2, 4, numRows - 1, 1).setNumberFormat("@");
-  }
-  sheet.getRange(1, 1, numRows, numCols).setValues(sheetData);
+    // Écrire le tableau complet en une opération limite les appels Google Sheets.
+    if (numRows > 1) {
+      // Contrat historique : Value(PED) reste du texte avec un point décimal.
+      sheet.getRange(2, 4, numRows - 1, 1).setNumberFormat("@");
+    }
+    sheet.getRange(1, 1, numRows, numCols).setValues(sheetData);
 
-  // Exception historique au TSV MindArk : B1 contient la date/heure d'import,
-  // tandis que les articles restent en colonne B à partir de la ligne 2.
-  const cell = sheet.getRange("B1");
-  cell.setValue(new Date());
-  cell.setNumberFormat("dd/MM/yyyy - HH:mm:ss");
+    // Exception historique au TSV MindArk : B1 contient la date/heure d'import,
+    // tandis que les articles restent en colonne B à partir de la ligne 2.
+    const cell = sheet.getRange("B1");
+    cell.setValue(new Date());
+    cell.setNumberFormat("dd/MM/yyyy - HH:mm:ss");
+  });
 
   // La configuration évolue uniquement par ajout ; les choix existants restent intacts.
   // Le verrou global est déjà détenu par frjMainDoPost_ pendant cet import.
   // Le reprendre ici faisait expirer la requête après une écriture pourtant réussie.
-  frjRefreshContainerConfigurationAfterInventoryUnlocked_(inventoryId);
+  frjRunInventoryPhase_("INV-CONTAINERS", () => {
+    frjRefreshContainerConfigurationAfterInventoryUnlocked_(inventoryId);
+  });
 
   return `✅ Import inventaire OK dans ${SHEET_NAME} (${numRows} lignes)`;
+}
+
+function frjRunInventoryPhase_(code, callback) {
+  try {
+    return callback();
+  } catch (error) {
+    const phaseError = error instanceof Error ? error : new Error(String(error));
+    phaseError.frjPublicCode = code;
+    throw phaseError;
+  }
 }
 
 function frjNormalizeInventorySheetData_(data) {
