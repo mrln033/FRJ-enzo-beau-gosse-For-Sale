@@ -36,6 +36,8 @@ d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> a
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
 
+05/09/2026 — T-009, investigation INV-DATA : le fichier exact fourni comporte 1 942 articles, six colonnes par article, des quantités et valeurs PED numériques valides, et un retour à la ligne final. D1 ignore les enregistrements vides ; GAS appliquait le contrôle strict des six colonnes à tous les enregistrements. Le correctif GAS normalise les fins de ligne, retire le BOM éventuel et ignore uniquement les enregistrements entièrement vides, sans supprimer les tabulations représentant des champs vides. Un test exécute le parcours d'import et vérifie aussi le refus d'un article incomplet avant écriture. Les 28 tests ciblés réussissent. Version GAS 34 déployée sur la même URL ; confirmation par un nouvel import réel encore attendue. Le fichier fourni n'a pas été réimporté automatiquement.
+
 04/09/2026 = Tâches T-009 à T-011 — fiabilisation des inventaires et enrichissement des demandes d'achat.
 Demandes d'origine :
 T-009  ==> Import Inventaires

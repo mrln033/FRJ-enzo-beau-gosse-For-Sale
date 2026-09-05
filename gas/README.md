@@ -56,4 +56,4 @@ Après chaque synchronisation différée susceptible de modifier le stock, le ca
 6. Mettre à jour le déploiement Web App existant avec son `deploymentId`, afin de conserver la même URL `/exec`.
 7. Cloner à nouveau le projet et comparer les empreintes des fichiers, puis tester les routes publiques sans écriture métier.
 
-Le déploiement de production actuel est la version 30. Son URL est référencée par `js/api-client.js` pour le secours des demandes et par le Worker pour la synchronisation ; elle doit rester stable.
+Le déploiement de production actuel est la version 34. Son URL est référencée par `js/api-client.js` pour les imports et le secours des demandes et par le Worker pour la synchronisation ; elle doit rester stable. Les imports ignorent les enregistrements entièrement vides du TSV et conservent les colonnes vides. Les erreurs renvoient une phase contrôlée et une référence ; leur détail reste dans les journaux privés GAS.

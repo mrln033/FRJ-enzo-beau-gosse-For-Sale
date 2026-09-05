@@ -100,7 +100,10 @@ function processInventory(csv, avatar) {
   });
 
   const sheetData = frjRunInventoryPhase_("INV-DATA", () => {
-    const data = Utilities.parseCsv(csv, "\t");
+    // Un collage MindArk peut inclure un BOM et un retour à la ligne final.
+    // Ne pas trim() les tabulations : elles représentent des colonnes vides.
+    const text = String(csv || "").replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").replace(/\n+$/, "");
+    const data = text ? Utilities.parseCsv(text, "\t").filter(row => row.some(value => String(value).trim() !== "")) : [];
     if (!data || data.length === 0) return [];
 
     const expectedHeaders = ["Id", "Name", "Quantity", "Value(PED)", "Container", "ContainerRefId"];

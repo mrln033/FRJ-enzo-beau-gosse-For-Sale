@@ -245,3 +245,37 @@ test("T-009 écrit les types de cellules comme un collage MindArk", () => {
     [2, "Article B", 1, "4.0000", "STORAGE (Calypso)", "null"]
   ]);
 });
+
+test("l'import ignore les lignes vides mais refuse une ligne article incomplète avant écriture", () => {
+  const header = ["Id", "Name", "Quantity", "Value(PED)", "Container", "ContainerRefId"];
+  const row = ["1", "Serpent's Scale", "2", "0.1000", "STORAGE (Calypso)", "null"];
+  const original = { parseCsv: context.Utilities.parseCsv, SpreadsheetApp: context.SpreadsheetApp, getInventorySheetName: context.getInventorySheetName, refresh: context.frjRefreshContainerConfigurationAfterInventoryUnlocked_ };
+  let writes = 0;
+  let written;
+  const range = { clearContent() {}, setNumberFormat() {}, setValue() {}, setValues(values) { writes++; written = values; } };
+  const sheet = { getMaxRows: () => 2000, getMaxColumns: () => 6, getRange: () => range };
+  context.SpreadsheetApp = { openById: () => ({ getSheetByName: () => sheet }) };
+  context.getInventorySheetName = () => "Inventaire Enzo";
+  context.frjRefreshContainerConfigurationAfterInventoryUnlocked_ = () => {};
+  context.Utilities.parseCsv = (text) => {
+    assert.equal(text.startsWith('\uFEFF'), false);
+    assert.equal(text.includes('\r'), false);
+    assert.equal(text.endsWith('\n'), false);
+    return text.split('\n').map(line => line.split('\t'));
+  };
+  try {
+    const input = '\uFEFF' + header.join('\t') + '\r\n\r\n' + row.join('\t') + '\r\n';
+    assert.match(context.processInventory(input, 'enzo'), /Import inventaire OK/);
+    assert.equal(written.length, 2);
+    assert.equal(written[1][1], "Serpent's Scale");
+    assert.equal(written[1][3], '0.1000');
+    writes = 0;
+    assert.throws(() => context.processInventory(header.join('\t') + '\n1\tArticle', 'enzo'), /2 colonnes/);
+    assert.equal(writes, 0);
+  } finally {
+    context.Utilities.parseCsv = original.parseCsv;
+    context.SpreadsheetApp = original.SpreadsheetApp;
+    context.getInventorySheetName = original.getInventorySheetName;
+    context.frjRefreshContainerConfigurationAfterInventoryUnlocked_ = original.refresh;
+  }
+});
