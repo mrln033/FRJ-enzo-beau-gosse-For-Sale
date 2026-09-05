@@ -122,7 +122,9 @@ export function computeWeightedMarkup(row) {
 }
 
 export function normalizeInventoryRows(text) {
-  const { headers, rows } = parseTsv(text);
+  const records = parseInventoryTsv(text);
+  const headers = (records[0] || []).map(value => value.trim());
+  const rows = records.slice(1).map(values => Object.fromEntries(headers.map((header, i) => [header, values[i]])));
   const expected = ["Id", "Quantity", "Value(PED)", "Container", "ContainerRefId"];
   const missing = expected.filter((header) => !headers.includes(header));
   const itemHeader = resolveInventoryItemHeader(headers);
@@ -140,6 +142,23 @@ export function normalizeInventoryRows(text) {
       containerRefId: String(row.ContainerRefId || "").trim() || null
     }))
     .filter((row) => row.itemName && Number.isFinite(row.quantity));
+}
+
+function parseInventoryTsv(text) {
+  // MindArk : une ligne physique par article, six champs séparés par tabulations.
+  // Un guillemet non refermé dans un nom ne doit jamais absorber la ligne suivante.
+  return String(text || "").replace(/^\uFEFF/, "").split(/\r\n|\n|\r/)
+    .filter(line => line.trim() !== "")
+    .map((line, index) => {
+      const cells = line.split("\t");
+      if (cells.length !== 6) throw new Error("Ligne inventaire MindArk " + (index + 1) + " invalide : " + cells.length + " colonnes");
+      return cells.map(value => {
+        if (/^"(?:[^"]|"")*"$/.test(value)) return value.slice(1, -1).replace(/""/g, '"');
+        // Export observé : guillemet enveloppant final manquant, doubles internes valides.
+        if (/^"(?:[^"]|"")*$/.test(value)) return value.slice(1).replace(/""/g, '"');
+        return value;
+      });
+    });
 }
 
 function resolveInventoryItemHeader(headers) {

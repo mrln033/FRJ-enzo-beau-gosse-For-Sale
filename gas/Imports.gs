@@ -103,7 +103,7 @@ function processInventory(csv, avatar) {
     // Un collage MindArk peut inclure un BOM et un retour à la ligne final.
     // Ne pas trim() les tabulations : elles représentent des colonnes vides.
     const text = String(csv || "").replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").replace(/\n+$/, "");
-    const data = text ? Utilities.parseCsv(text, "\t").filter(row => row.some(value => String(value).trim() !== "")) : [];
+    const data = frjParseInventoryTsv_(text);
     if (!data || data.length === 0) return [];
 
     const expectedHeaders = ["Id", "Name", "Quantity", "Value(PED)", "Container", "ContainerRefId"];
@@ -163,6 +163,23 @@ function frjRunInventoryPhase_(code, callback) {
     phaseError.frjPublicCode = code;
     throw phaseError;
   }
+}
+
+function frjParseInventoryTsv_(text) {
+  // MindArk : une ligne physique par article, six champs séparés par tabulations.
+  // Un guillemet non refermé dans un nom ne doit jamais absorber la ligne suivante.
+  return String(text || "").replace(/^\uFEFF/, "").split(/\r\n|\n|\r/)
+    .filter(line => line.trim() !== "")
+    .map((line, index) => {
+      const cells = line.split("\t");
+      if (cells.length !== 6) throw new Error("Ligne inventaire MindArk " + (index + 1) + " invalide : " + cells.length + " colonnes");
+      return cells.map(value => {
+        if (/^"(?:[^"]|"")*"$/.test(value)) return value.slice(1, -1).replace(/""/g, '"');
+        // Export observé : guillemet enveloppant final manquant, doubles internes valides.
+        if (/^"(?:[^"]|"")*$/.test(value)) return value.slice(1).replace(/""/g, '"');
+        return value;
+      });
+    });
 }
 
 function frjNormalizeInventorySheetData_(data) {

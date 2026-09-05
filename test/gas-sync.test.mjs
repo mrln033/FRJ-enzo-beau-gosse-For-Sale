@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import vm from "node:vm";
+import { normalizeInventoryRows } from "../cloudflare/for-sale-api/src/domain.js";
 import {
   catalogContentHash,
   containerContentHash,
@@ -231,6 +232,29 @@ test("T-009 répare les métadonnées depuis le côté le plus complet", () => {
   context.frjMarkInventoryMetadataSchemaCurrent_("inventory:enzo");
   assert.equal(context.frjInventoryMetadataSchemaIsCurrent_("inventory:enzo"), true);
   assert.match(applicationSource, /const snapshot = await readInventorySnapshot\(env, avatar\)/);
+});
+
+test("un guillemet MindArk non refermé ne fusionne pas les articles GAS ou D1", () => {
+  const raw = [
+    'Id\tName\tQuantity\tValue(PED)\tContainer\tContainerRefId',
+    '1851\t"Umbranoid ""Medicine""\t1\t0.1000\tCARRIED\tnull',
+    '1852\tUniversal Ammo\t45\t0.0000\tCARRIED\tnull',
+    '1861\tVehicle Parts (Vol. 1)\t1\t1.0000\t"Pitbull Mk. 1 (C,L)"\t1398'
+  ].join("\r\n") + "\r\n";
+  const gas = context.frjNormalizeInventorySheetData_(context.frjParseInventoryTsv_(raw)).slice(1);
+  const d1 = normalizeInventoryRows(raw);
+  assert.equal(gas.length, 3);
+  assert.equal(d1.length, 3);
+  assert.equal(d1[0].itemName, 'Umbranoid "Medicine"');
+  assert.equal(d1[1].itemName, 'Universal Ammo');
+  assert.equal(d1[2].container, 'Pitbull Mk. 1 (C,L)');
+  for (let i = 0; i < gas.length; i++) {
+    assert.equal(gas[i][1], d1[i].itemName);
+    assert.equal(gas[i][2], d1[i].quantity);
+    assert.equal(Number(gas[i][3]), d1[i].valuePed);
+    assert.equal(gas[i][4], d1[i].container);
+  }
+  assert.throws(() => normalizeInventoryRows(raw + "999\tArticle incomplet"), /2 colonnes/);
 });
 
 test("T-009 écrit les types de cellules comme un collage MindArk", () => {

@@ -47,7 +47,7 @@ test("computeWeightedMarkup reproduit la pondération Google Sheet", () => {
 });
 
 test("normalizeInventoryRows refuse un format incomplet", () => {
-  assert.throws(() => normalizeInventoryRows("Item\tQuantity\nA\t1"), /Colonnes inventaire manquantes/);
+  assert.throws(() => normalizeInventoryRows("Item\tQuantity\nA\t1"), /2 colonnes/);
 });
 
 test("normalizeInventoryRows accepte la date GAS comme en-tête de la colonne Item", () => {
