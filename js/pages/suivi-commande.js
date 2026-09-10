@@ -3,7 +3,7 @@
 
   const COPY = {
     FR: {
-      title: "Suivi de votre demande", subtitle: "Ce lien est privé : conservez-le pour consulter l’avancement.",
+      title: "Suivi de votre demande", subtitle: "Conservez ce lien pour consulter l’avancement.",
       back: "Retour au catalogue", refresh: "Actualiser", copy: "Copier le lien", copied: "Lien copié",
       reference: "Référence", avatar: "Avatar", created: "Transmise le", updated: "Dernière mise à jour",
       item: "Article", quantity: "Qté", price: "Prix affiché", markup: "MU appliqué", estimate: "Estimation", salePrice: "Prix de vente",
@@ -23,7 +23,7 @@
       unavailable: "Le suivi est momentanément indisponible. Réessayez dans quelques minutes."
     },
     EN: {
-      title: "Track your request", subtitle: "This link is private: keep it to check progress.",
+      title: "Track your request", subtitle: "Keep this link to check progress.",
       back: "Back to catalogue", refresh: "Refresh", copy: "Copy link", copied: "Link copied",
       reference: "Reference", avatar: "Avatar", created: "Submitted", updated: "Last update",
       item: "Item", quantity: "Qty", price: "Displayed price", markup: "Applied MU", estimate: "Estimate", salePrice: "Sale price",
@@ -47,7 +47,9 @@
   const HIDDEN_REQUESTS_KEY = "FRJ_HIDDEN_PURCHASE_REQUESTS_V1";
   const searchParams = new URLSearchParams(global.location.search);
   const token = searchParams.get("token") || "";
-  const catalogBackend = resolveCatalogBackend(searchParams, token);
+  const publicReference = (searchParams.get("ref") || "").trim().toUpperCase();
+  const trackingIdentifier = publicReference || token;
+  const catalogBackend = resolveCatalogBackend(searchParams, trackingIdentifier);
   const ui = global.FRJ_ORDER_UI;
   let lang = global.localStorage.getItem("lang") === "FR" ? "FR" : "EN";
   let refreshing = false;
@@ -65,7 +67,8 @@
     try {
       const requests = JSON.parse(global.localStorage.getItem(REQUESTS_KEY) || "[]");
       const remembered = Array.isArray(requests)
-        ? requests.find((request) => request?.accessToken === accessToken)
+        ? requests.find((request) => request?.accessToken === accessToken
+          || String(request?.reference || "").toUpperCase() === String(accessToken || "").toUpperCase())
         : null;
       const rememberedBackend = normalizeBackend(remembered?.catalogBackend);
       if (rememberedBackend) return rememberedBackend;
@@ -107,9 +110,11 @@
     try {
       const last = JSON.parse(global.localStorage.getItem("FRJ_LAST_PURCHASE_REQUEST") || "null");
       const requests = JSON.parse(global.localStorage.getItem(REQUESTS_KEY) || "[]");
-      return (last?.backend === "gas" && last?.accessToken === token)
+      const matches = (request) => request?.accessToken === token
+        || String(request?.reference || "").toUpperCase() === publicReference;
+      return (last?.backend === "gas" && matches(last))
         || (Array.isArray(requests)
-          && requests.some((request) => request?.backend === "gas" && request?.accessToken === token));
+          && requests.some((request) => request?.backend === "gas" && matches(request)));
     } catch {
       return false;
     }
@@ -117,7 +122,9 @@
 
   function rememberOrder(order) {
     try {
-      const hiddenTokens = readHiddenTokens().filter((hiddenToken) => hiddenToken !== token);
+      const hiddenTokens = readHiddenTokens().filter((hiddenToken) => (
+        hiddenToken !== token && hiddenToken.toUpperCase() !== String(order.publicReference || "").toUpperCase()
+      ));
       if (hiddenTokens.length) {
         global.localStorage.setItem(HIDDEN_REQUESTS_KEY, JSON.stringify(hiddenTokens));
       } else {
@@ -125,9 +132,11 @@
       }
       const stored = JSON.parse(global.localStorage.getItem(REQUESTS_KEY) || "[]");
       const requests = Array.isArray(stored) ? stored : [];
+      const knownRequest = requests.find((request) => request?.accessToken === token
+        || String(request?.reference || "").toUpperCase() === String(order.publicReference || "").toUpperCase());
       const current = {
         reference: String(order.publicReference || ""),
-        accessToken: token,
+        accessToken: token || String(knownRequest?.accessToken || ""),
         backend: "d1",
         catalogBackend,
         submittedAt: String(order.createdAt || ""),
@@ -159,7 +168,7 @@
   }
 
   function rememberHiddenToken() {
-    const tokens = [...new Set([...readHiddenTokens(), token])].slice(-100);
+    const tokens = [...new Set([...readHiddenTokens(), publicReference || token])].slice(-100);
     global.localStorage.setItem(HIDDEN_REQUESTS_KEY, JSON.stringify(tokens));
   }
 
@@ -171,7 +180,7 @@
 
   async function loadOrder() {
     if (refreshing) return;
-    if (!/^[a-f0-9-]{70,80}$/i.test(token)) {
+    if (!/^(?:FRJ-\d{8}-[A-F0-9]{6}|[a-f0-9-]{70,80})$/i.test(trackingIdentifier)) {
       applyLanguage();
       showMessage(text("missing"), "error");
       return;
@@ -180,7 +189,7 @@
     refreshing = true;
     showMessage(text("loading"));
     try {
-      const order = await global.FRJ_API.getOrderStatus(token);
+      const order = await global.FRJ_API.getOrderStatus(trackingIdentifier);
       lang = order.language === "FR" ? "FR" : "EN";
       global.localStorage.setItem("lang", lang);
       applyLanguage();
@@ -223,7 +232,7 @@
     copy.type = "button";
     copy.textContent = text("copy");
     copy.addEventListener("click", async () => {
-      await global.navigator.clipboard.writeText(global.location.href);
+      await global.navigator.clipboard.writeText(global.FRJ_API.shortTrackingUrl(order.publicReference, catalogBackend));
       copy.textContent = text("copied");
     });
     actions.append(refresh, copy);
@@ -342,7 +351,7 @@
     button.disabled = true;
     button.textContent = text("accepting");
     try {
-      await global.FRJ_API.acceptOrderProposal(token, order.proposalVersion);
+      await global.FRJ_API.acceptOrderProposal(trackingIdentifier, order.proposalVersion);
       await loadOrder();
     } catch (error) {
       global.alert(error.message || text("acceptError"));
@@ -356,7 +365,7 @@
     button.disabled = true;
     button.textContent = text("cancelling");
     try {
-      await global.FRJ_API.cancelOrder(token, "d1");
+      await global.FRJ_API.cancelOrder(trackingIdentifier, "d1");
       await loadOrder();
     } catch (error) {
       global.alert(error.message || text("cancelError"));
@@ -370,11 +379,13 @@
       rememberHiddenToken();
       const stored = JSON.parse(global.localStorage.getItem(REQUESTS_KEY) || "[]");
       const remaining = Array.isArray(stored)
-        ? stored.filter((request) => request?.accessToken !== token)
+        ? stored.filter((request) => request?.accessToken !== token
+          && String(request?.reference || "").toUpperCase() !== publicReference)
         : [];
       global.localStorage.setItem(REQUESTS_KEY, JSON.stringify(remaining));
       const legacy = JSON.parse(global.localStorage.getItem("FRJ_LAST_PURCHASE_REQUEST") || "null");
-      if (legacy?.accessToken === token) {
+      if (legacy?.accessToken === token
+        || String(legacy?.reference || "").toUpperCase() === publicReference) {
         if (remaining[0]) {
           global.localStorage.setItem("FRJ_LAST_PURCHASE_REQUEST", JSON.stringify(remaining[0]));
         } else {

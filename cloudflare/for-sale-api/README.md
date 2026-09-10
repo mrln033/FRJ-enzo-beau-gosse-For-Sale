@@ -34,6 +34,12 @@ Les lectures restent publiques. Les écritures exigent `Authorization: Bearer <A
 
 ## Bascule progressive du frontend
 
+Les imports MindArk conservent six champs par ligne physique et décodent les guillemets champ par champ. Un guillemet enveloppant final manquant, comme dans l'export observé pour `Umbranoid "Medicine"`, ne doit pas absorber les articles suivants. Les lignes entièrement vides sont ignorées ; une ligne non vide de largeur incorrecte est rejetée. Le parseur des autres imports reste indépendant.
+
+D1 utilise des valeurs PED numériques ; la restauration GAS respecte le [contrat historique des feuilles](../../gas/README.md#contrat-des-feuilles-dinventaire-mindark) : texte avec point et quatre décimales, date/heure en B1. Le bilan inclut l'en-tête : 1 942 articles donnent 1 943 lignes. « Déjà traité, 0 écriture D1 » indique un snapshot identique.
+
+Validation utilisateur du 05/09/2026 : quatre inventaires réimportés et contrôles finaux validés, après publication de GAS version 35 et du Worker `dd1b2566-145a-478a-9663-3376a19fd1c3`. Le fichier Enzo a été comparé ligne par ligne dans les deux moteurs ; les 220 tests réussissaient lors de la publication.
+
 - URL normale : GAS reste prioritaire et D1 sert de repli en lecture seule.
 - URL avec `?backend=d1` : D1 devient prioritaire et GAS sert de repli en lecture seule.
 - Après activation du mode Admin dans l'onglet, les pages ouvertes avec `?backend=d1` utilisent D1 comme backend explicite ; les imports jumelés continuent de cibler GAS et D1 selon leur action dédiée.
@@ -72,8 +78,9 @@ Conserver les URLs GAS et D1 stables : les mécanismes de repli et les liens de 
 ## Stockage différentiel et retour arrière
 
 Les imports ne créent plus de versions complètes. Un import identique ne modifie aucune ligne métier ; sinon,
-seules les lignes ajoutées, modifiées ou supprimées sont écrites. Les inventaires sont consolidés sur le triplet
-`avatar + item + container` : quantité et valeur PED sont additionnées. Les MU sont identifiées par item et le
+seules les lignes ajoutées, modifiées ou supprimées sont écrites. Les inventaires conservent les six champs de
+chaque ligne source sans regroupement par article/conteneur. Les agrégations du catalogue sont distinctes
+du snapshot d'inventaire. Les MU sont identifiées par item et le
 catalogue conserve toutes les lignes BDD_APP, y compris ses doublons, tout en gardant ses tables publiques
 normalisées.
 
@@ -144,8 +151,9 @@ derniers événements par dataset.
 
 Depuis d.12, la Console Admin peut aussi créer une demande directement dans D1 et ajouter une ligne à une
 proposition encore modifiable. `GET /admin/orders/catalog`, `POST /admin/orders` et
-`POST /admin/orders/:id/items` exigent tous `ADMIN_TOKEN`. Les références, dates et jetons de suivi sont
-générés côté Worker ; seule l'empreinte du jeton est stockée. Chaque création ou ajout repasse la proposition
+`POST /admin/orders/:id/items` exigent tous `ADMIN_TOKEN`. Les références et dates sont générées côté Worker.
+Les liens partagés utilisent directement la référence publique depuis la page relais statique `s.html`, et
+les anciens liens à jeton restent acceptés. Chaque création ou ajout repasse la proposition
 en attente de validation du client, maintient `purchase_order_events` et actualise le message Discord.
 
 La page `promotions.html` utilise `GET /admin/discounts` et les routes `POST /admin/discounts/*`, toutes

@@ -373,7 +373,7 @@
       const reference = document.createElement("span");
       reference.textContent = `${request.reference} — ${requestStatusLabel(request.status)}`;
       const link = document.createElement("a");
-      link.href = trackingUrl(request.accessToken, request.catalogBackend);
+      link.href = trackingUrl(request.reference, request.catalogBackend);
       link.target = "_self";
       link.textContent = label("trackRequest");
       const copy = button(label("copyTracking"), "cart-secondary", async () => {
@@ -615,7 +615,7 @@
       const legacy = JSON.parse(global.localStorage.getItem("FRJ_LAST_PURCHASE_REQUEST") || "null");
       const hidden = new Set(readHiddenRequestTokens());
       return mergeRequests(Array.isArray(stored) ? stored : [], legacy ? [legacy] : [])
-        .filter((request) => !hidden.has(request.accessToken));
+        .filter((request) => !hidden.has(request.accessToken) && !hidden.has(request.reference));
     } catch {
       return [];
     }
@@ -625,7 +625,7 @@
     try {
       const stored = JSON.parse(global.localStorage.getItem(HIDDEN_REQUESTS_KEY) || "[]");
       return Array.isArray(stored)
-        ? stored.filter((value) => /^[a-f0-9-]{70,80}$/i.test(String(value || "")))
+        ? stored.filter((value) => /^(?:FRJ-\d{8}-[A-F0-9]{6}|[a-f0-9-]{70,80})$/i.test(String(value || "")))
         : [];
     } catch {
       return [];
@@ -719,14 +719,11 @@
     return global.FRJ_API?.activeBackend === "d1" ? "d1" : "gas";
   }
 
-  function trackingUrl(accessToken, storedCatalogBackend = null) {
-    const url = new URL("./suivi-commande.html", global.location.href);
-    url.searchParams.set("token", accessToken);
+  function trackingUrl(publicReference, storedCatalogBackend = null) {
     const backend = storedCatalogBackend === "d1" || storedCatalogBackend === "gas"
       ? storedCatalogBackend
       : currentCatalogBackend();
-    url.searchParams.set("backend", backend);
-    return url.toString();
+    return global.FRJ_API.shortTrackingUrl(publicReference, backend);
   }
 
   function saveCart() {

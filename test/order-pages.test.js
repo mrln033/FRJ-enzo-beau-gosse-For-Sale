@@ -6,6 +6,7 @@ import vm from "node:vm";
 const commonSource = await readFile(new URL("../js/common/order-ui.js", import.meta.url), "utf8");
 const adminSource = await readFile(new URL("../js/pages/commandes.js", import.meta.url), "utf8");
 const trackingSource = await readFile(new URL("../js/pages/suivi-commande.js", import.meta.url), "utf8");
+const shortTrackingSource = await readFile(new URL("../js/pages/short-tracking.js", import.meta.url), "utf8");
 const adminHtml = await readFile(new URL("../commandes.html", import.meta.url), "utf8");
 const trackingHtml = await readFile(new URL("../suivi-commande.html", import.meta.url), "utf8");
 
@@ -193,7 +194,7 @@ test("la Console Admin enregistre la précision autorisée puis recharge D1", as
   assert.equal(requests.filter((request) => request.path === "/admin/orders").length, 2);
 });
 
-test("d.5 ouvre et copie un lien de suivi Admin sans multiplier les jetons", async () => {
+test("ouvre et copie directement le lien court d'une demande Admin", async () => {
   const ids = ["ordersList", "ordersSummary", "ordersError", "ordersFilters", "refreshOrders"];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id)]));
   const created = [];
@@ -212,7 +213,8 @@ test("d.5 ouvre et copie un lien de suivi Admin sans multiplier les jetons", asy
     items: []
   };
   const accessToken = `${"a".repeat(36)}-${"b".repeat(36)}`;
-  const trackingPath = `suivi-commande.html?token=${accessToken}`;
+  const trackingPath = `suivi-commande.html?ref=${order.publicReference}`;
+  const shortTrackingUrl = `https://example.test/s.html#${order.publicReference}`;
   const document = {
     getElementById: (id) => elements.get(id),
     createElement: () => {
@@ -230,8 +232,9 @@ test("d.5 ouvre et copie un lien de suivi Admin sans multiplier les jetons", asy
         if (path === "/admin/orders") {
           return { json: async () => ({ orders: [order], enabled: true, generatedAt: order.updatedAt }) };
         }
-        return { json: async () => ({ ok: true, accessToken, trackingPath }) };
-      }
+        return { json: async () => ({ ok: true, publicReference: order.publicReference, trackingPath }) };
+      },
+      shortTrackingUrl: () => shortTrackingUrl
     },
     localStorage: createStorage(),
     navigator: { clipboard: { writeText: async (value) => copied.push(value) } },
@@ -251,10 +254,8 @@ test("d.5 ouvre et copie un lien de suivi Admin sans multiplier les jetons", asy
   await button.listeners.get("click")();
   await settle();
   const trackingRequests = requests.filter((request) => request.path.endsWith("/tracking-link"));
-  const expectedUrl = `https://example.test/${trackingPath}&backend=d1`;
-  assert.equal(trackingRequests.length, 1);
-  assert.equal(trackingRequests[0].path, `/admin/orders/${order.id}/tracking-link`);
-  assert.equal(trackingRequests[0].options.method, "POST");
+  const expectedUrl = shortTrackingUrl;
+  assert.equal(trackingRequests.length, 0);
   assert.equal(popups[0].location.href, expectedUrl);
   assert.equal(popups[0].opener, null);
   assert.deepEqual(copied, [expectedUrl]);
@@ -265,7 +266,7 @@ test("d.5 ouvre et copie un lien de suivi Admin sans multiplier les jetons", asy
 
   await button.listeners.get("click")();
   await settle();
-  assert.equal(requests.filter((request) => request.path.endsWith("/tracking-link")).length, 1);
+  assert.equal(requests.filter((request) => request.path.endsWith("/tracking-link")).length, 0);
   assert.deepEqual(copied, [expectedUrl, expectedUrl]);
   assert.equal(popups[1].location.href, expectedUrl);
 });
@@ -311,6 +312,7 @@ test("la Console Admin charge l'historique à la demande et modifie un commentai
   const window = {
     FRJ_ADMIN: { require: () => true },
     FRJ_API: {
+      shortTrackingUrl: (reference) => `https://example.test/s.html#${reference}`,
       fetchD1Admin: async (path, options) => {
         requests.push({ path, options });
         if (path === "/admin/orders") {
@@ -398,6 +400,7 @@ test("d.12 crée une demande directe et propose son lien de suivi", async () => 
     location: { href: "https://example.test/commandes.html" },
     FRJ_ADMIN: { require: () => true },
     FRJ_API: {
+      shortTrackingUrl: (reference) => `https://example.test/s.html#${reference}`,
       fetchD1Admin: async (path, options) => {
         requests.push({ path, options });
         if (path === "/admin/orders/catalog") return { json: async () => ({ items: catalog }) };
@@ -405,7 +408,7 @@ test("d.12 crée une demande directe et propose son lien de suivi", async () => 
           return { json: async () => ({
             order: { id: "123e4567-e89b-42d3-a456-426614174000", publicReference: "FRJ-20260829-ABC123" },
             accessToken: token,
-            trackingPath: `suivi-commande.html?token=${token}`
+            trackingPath: "suivi-commande.html?ref=FRJ-20260829-ABC123"
           }) };
         }
         return { json: async () => ({ orders: [], enabled: true, generatedAt: "2026-08-29T12:00:00Z" }) };
@@ -458,7 +461,10 @@ test("d.12 crée une demande directe et propose son lien de suivi", async () => 
   assert.equal(body.items[0].markupAmount, 110);
   assert.equal(elements.get("newOrderResult").hidden, false);
   assert.match(elements.get("newOrderResult").children[0].textContent, /FRJ-20260829-ABC123/);
-  assert.match(elements.get("newOrderResult").children[1].href, /suivi-commande\.html\?token=/);
+  assert.equal(
+    elements.get("newOrderResult").children[1].href,
+    "https://example.test/s.html#FRJ-20260829-ABC123"
+  );
   elements.get("newOrderToggle").listeners.get("click")();
   assert.equal(elements.get("newOrderResult").hidden, true);
   assert.equal(elements.get("newOrderResult").children.length, 0);
@@ -670,4 +676,23 @@ test("un lien de suivi incomplet affiche l'erreur sans appeler l'API", async () 
   assert.equal(apiCalled, false);
   assert.equal(elements.get("trackingContent").className, "tracking-message error");
   assert.equal(elements.get("trackingContent").textContent, "Lien de suivi invalide ou incomplet.");
+});
+
+test("la page courte du domaine applicatif redirige la référence vers le suivi", () => {
+  let redirectedTo = "";
+  const status = new FakeElement("shortTrackingStatus");
+  const window = {
+    location: {
+      href: "https://example.test/s.html#FRJ-20260910-ABC123",
+      search: "",
+      hash: "#FRJ-20260910-ABC123",
+      replace: (url) => { redirectedTo = url; }
+    },
+    document: { getElementById: () => status }
+  };
+  vm.runInContext(shortTrackingSource, vm.createContext({ window, URL, URLSearchParams }));
+  assert.equal(
+    redirectedTo,
+    "https://example.test/suivi-commande.html?ref=FRJ-20260910-ABC123&backend=d1"
+  );
 });

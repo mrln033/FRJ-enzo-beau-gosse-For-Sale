@@ -90,6 +90,14 @@ test("le suivi client interroge D1 sans demander de jeton administrateur", async
   assert.equal(requests[0].options.headers, undefined);
 });
 
+test("construit un lien court à partir de la référence publique", () => {
+  const { api } = loadClient("", async () => new Response("{}", { status: 200 }));
+  assert.equal(
+    api.shortTrackingUrl("frj-20260910-abc123", "gas"),
+    "https://mrln033.github.io/app/s.html?backend=gas#FRJ-20260910-ABC123"
+  );
+});
+
 test("une écriture D1 envoie le jeton sans repli automatique", async () => {
   const requests = [];
   const { api, values } = loadClient("?backend=d1", async (url, options) => {

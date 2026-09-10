@@ -241,7 +241,7 @@ test("T-007 actualise les remises des demandes modifiables puis les fige à pré
   assert.equal(line.discount_rate, 0.25);
 });
 
-test("d.12 crée atomiquement une demande directe à valider et son lien privé", async () => {
+test("d.12 crée atomiquement une demande directe à valider et son lien par référence", async () => {
   const database = setupDatabase();
   const env = { DB: makeD1(database), CART_ENABLED: "true" };
   const url = new URL("https://api.example/admin/orders");
@@ -256,7 +256,7 @@ test("d.12 crée atomiquement une demande directe à valider et son lien privé"
   assert.equal(result.order.proposalVersion, 1);
   assert.equal(result.order.totalSalePed, 28.25);
   assert.match(result.accessToken, /^[a-f0-9-]{70,80}$/i);
-  assert.match(result.trackingPath, /^suivi-commande\.html\?token=/);
+  assert.equal(result.trackingPath, `suivi-commande.html?ref=${result.order.publicReference}`);
 
   const stored = database.prepare(`SELECT * FROM purchase_orders`).get();
   assert.equal(stored.source_backend, "d1-admin");

@@ -837,21 +837,10 @@
     button.addEventListener("click", async () => {
       const trackingWindow = openTrackingWindow();
       button.disabled = true;
-      button.textContent = trackingUrl ? "Ouverture…" : "Création du lien…";
+      button.textContent = trackingUrl ? "Ouverture…" : "Préparation du lien…";
       feedback.hidden = true;
       try {
-        if (!trackingUrl) {
-          const response = await global.FRJ_API.fetchD1Admin(
-            `/admin/orders/${encodeURIComponent(order.id)}/tracking-link`,
-            { method: "POST", cache: "no-store" }
-          );
-          const result = await response.json();
-          if (!result.trackingPath || !result.accessToken) {
-            throw new Error("Le Worker n’a pas renvoyé de lien de suivi valide.");
-          }
-          trackingUrl = adminTrackingUrl(result.trackingPath);
-        }
-
+        if (!trackingUrl) trackingUrl = global.FRJ_API.shortTrackingUrl(order.publicReference, "d1");
         const copied = await copyTrackingUrl(trackingUrl);
         if (trackingWindow) {
           trackingWindow.opener = null;
@@ -907,8 +896,8 @@
 
   function adminTrackingUrl(trackingPath) {
     const url = new URL(trackingPath, global.location.href);
-    url.searchParams.set("backend", "d1");
-    return url.href;
+    const reference = url.searchParams.get("ref");
+    return global.FRJ_API.shortTrackingUrl(reference, "d1");
   }
 
   function createHistoryPanel(order) {

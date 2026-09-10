@@ -29,6 +29,8 @@ Le booléen de session ne donne aucun droit supplémentaire. Les routes D1 `/adm
 
 ### Synchronisation GAS ↔ D1
 
+Les inventaires conservent les six champs et chaque ligne source MindArk sans regroupement ni tri. Les parseurs GAS et D1 lisent une ligne physique par article et décodent les guillemets champ par champ : un guillemet d'enveloppe non refermé ne peut pas absorber les articles suivants. Dans Google Sheets, B1 contient la date/heure et Value(PED) reste du texte avec point et quatre décimales pour les IMPORTRANGE historiques. Ce contrat, détaillé dans [le README GAS](../gas/README.md#contrat-des-feuilles-dinventaire-mindark), a été validé par l'utilisateur pour les quatre inventaires le 05/09/2026.
+
 `gas/SyncD1.gs` et les routes `/sync/*` du Worker échangent catalogue, MU, configuration des conteneurs, inventaires et demandes. `CONFIG_CONTAINER` et l'interface D1 modifient le même dataset bidirectionnel `containers`, également visible dans le Rapport de synchronisation. Les détails opérationnels sont documentés dans `cloudflare/for-sale-api/README.md`.
 
 ## Organisation du frontend
@@ -58,6 +60,7 @@ Les pages d'import chargent désormais leur contrôleur homonyme depuis `js/page
 Le rendu partagé des bilans GAS/D1 se trouve dans `js/common/import-feedback.js`.
 Le contrôleur du rapport D1 se trouve dans `js/pages/rapport-sync.js` ; la page HTML ne contient plus de logique intégrée.
 Les contrôleurs des demandes sont `js/pages/commandes.js` et `js/pages/suivi-commande.js`.
+Les liens partagés de suivi passent par la page relais statique `s.html#référence`, sur le domaine GitHub Pages habituel. La référence publique identifie ensuite la demande auprès du Worker pour sa consultation et ses actions client ; les anciens liens à jeton restent pris en charge.
 Leurs statuts, règles d'action et formats communs sont centralisés dans `js/common/order-ui.js` ; leurs textes et parcours propres restent séparés.
 Le catalogue conserve `index.html` comme point d'entrée stable et charge sa logique depuis `js/pages/index.js`, avant le composant panier.
 La gestion des conteneurs conserve elle aussi une séparation complète entre `conteneurs.html`, `js/pages/conteneurs.js` et `css/pages/conteneurs.css`.

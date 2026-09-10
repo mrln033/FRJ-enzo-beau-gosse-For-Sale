@@ -8,7 +8,7 @@ Le frontend statique est publié par GitHub Pages. Il peut lire les données dep
 
 - `index.html` : catalogue public et panier.
 - `aide-panier.html` : aide bilingue affichée dans le panier.
-- `suivi-commande.html` : suivi client par lien privé.
+- `suivi-commande.html` : suivi client par référence de demande.
 - `commandes.html` : console des demandes d'achat.
 - `conteneurs.html` : configuration D1 des conteneurs inclus dans les quantités.
 - `promotions.html` : gestion des promotions quotidiennes et des soldes.
@@ -38,6 +38,10 @@ Le paramètre d'entrée `?admin=1` active le menu Admin dans l'onglet courant, p
 ## Liens directs du catalogue
 
 Le paramètre public `category` ouvre directement une catégorie du catalogue. Il peut être combiné avec `backend=d1` ou `backend=gas`, par exemple `?backend=d1&category=WEAPONS`. Lorsqu'un visiteur change de catégorie, l'URL est mise à jour afin de pouvoir être copiée et partagée.
+
+## Liens courts de suivi
+
+Le panier, la Console Admin et la page de suivi copient une adresse courte sur le domaine habituel, fondée sur la référence publique, par exemple `https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/s.html#FRJ-20260910-ABC123`. La page relais ouvre le suivi correspondant. Les anciens liens contenant un jeton restent compatibles.
 
 ## Vérifications locales
 

@@ -42,6 +42,14 @@ Les feuilles d'inventaire sont un contrat externe historique, utilisé par plusi
 
 La seule exception volontaire au fichier source se trouve en `B1` : l'en-tête `Name` y est remplacé par la date et l'heure d'import, au format `dd/MM/yyyy - HH:mm:ss`. Les noms d'articles occupent la colonne B à partir de la ligne 2. La colonne `Value(PED)` est volontairement stockée comme texte brut sur quatre décimales (`0.1000`) afin de conserver le point décimal indépendamment de la locale Google Sheets et de préserver les `IMPORTRANGE` historiques. L'import direct et une restauration depuis D1 appliquent exactement ce même contrat. Aucun contenu technique ne subsiste en dehors des six colonnes contractuelles.
 
+### Validation et diagnostic des imports
+
+Le 05/09/2026, l'utilisateur a confirmé les imports des quatre inventaires et les contrôles finaux de synchronisation et de format. Enzo compte 1 943 lignes avec l'en-tête, soit 1 942 articles. Un bilan D1 « déjà traité, 0 écriture » est normal lorsque les données sont identiques.
+
+Le défaut observé dans l'export de `Umbranoid "Medicine"` était un guillemet enveloppant final manquant. Un parseur CSV multiligne pouvait alors absorber les articles suivants. GAS et D1 lisent désormais chaque ligne physique MindArk séparément, contrôlent ses six champs et décodent les guillemets dans chaque champ. Cette règle doit rester cohérente entre les deux moteurs.
+
+En cas d'incident, conserver le TSV exact et comparer le nombre d'articles au bilan, même s'il indique un succès. Le code public `INV-OPEN`, `INV-DATA`, `INV-WRITE` ou `INV-CONTAINERS` indique la phase en échec ; la référence permet de retrouver le détail dans les journaux privés GAS. Ne pas modifier la locale du classeur pour réparer le séparateur décimal : le contrat de la colonne D est le texte brut avec point.
+
 ## Promotion préparée pour le lendemain
 
 Après chaque synchronisation différée susceptible de modifier le stock, le catalogue, les conteneurs ou les MU, GAS contrôle uniquement le couple de la promotion de J+1. S'il n'est plus éligible, il est remplacé en conservant sa date, son taux et son identifiant. Le couple de J n'est jamais remplacé automatiquement ; dans l'Admin, seul son taux demeure modifiable. Un trigger quotidien supplémentaire effectue un dernier contrôle de J+1 vers 23 h 55 dans le fuseau `Europe/Paris`.

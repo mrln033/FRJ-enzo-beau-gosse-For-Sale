@@ -7,6 +7,7 @@
   const GAS_APP_URL = "https://script.google.com/macros/s/AKfycbxa0B_4R6tsn8aQCLy1Y3LEqbDj4SY22xbascJfMRd1I1thQkCRPySAjszdHoxX1h2a/exec";
   const D1_URL = "https://frj-for-sale-api.merlin-merzhin-lesage.workers.dev";
   const ADMIN_TOKEN_KEY = "FRJ_D1_ADMIN_TOKEN";
+  const TRACKING_IDENTIFIER_PATTERN = /^(?:FRJ-\d{8}-[A-F0-9]{6}|[a-f0-9-]{70,80})$/i;
   const requestedBackend = new URLSearchParams(global.location.search).get("backend");
   const preferredBackend = requestedBackend === "d1" ? "d1" : "gas";
   let activeBackend = preferredBackend;
@@ -158,7 +159,7 @@
 
   async function getOrderStatus(accessToken) {
     const token = String(accessToken || "").trim();
-    if (!/^[a-f0-9-]{70,80}$/i.test(token)) {
+    if (!TRACKING_IDENTIFIER_PATTERN.test(token)) {
       const error = new Error("Lien de suivi invalide");
       error.status = 400;
       throw error;
@@ -180,7 +181,7 @@
   async function acceptOrderProposal(accessToken, proposalVersion) {
     const token = String(accessToken || "").trim();
     const version = Number(proposalVersion);
-    if (!/^[a-f0-9-]{70,80}$/i.test(token) || !Number.isInteger(version) || version < 1) {
+    if (!TRACKING_IDENTIFIER_PATTERN.test(token) || !Number.isInteger(version) || version < 1) {
       const error = new Error("Proposition de demande invalide");
       error.status = 400;
       throw error;
@@ -202,7 +203,7 @@
 
   async function cancelOrder(accessToken, sourceBackend = "d1") {
     const token = String(accessToken || "").trim();
-    if (!/^[a-f0-9-]{70,80}$/i.test(token)) {
+    if (!TRACKING_IDENTIFIER_PATTERN.test(token)) {
       const error = new Error("Lien de suivi invalide");
       error.status = 400;
       throw error;
@@ -250,6 +251,15 @@
     const result = await readJsonResponse(response);
     if (!response.ok) throw new Error(result.error || `D1 répond ${response.status}`);
     return result;
+  }
+
+  function shortTrackingUrl(publicReference, catalogBackend = "d1") {
+    const reference = String(publicReference || "").trim().toUpperCase();
+    if (!/^FRJ-\d{8}-[A-F0-9]{6}$/.test(reference)) throw new Error("Référence de demande invalide");
+    const url = new URL("./s.html", global.location.href);
+    if (catalogBackend === "gas") url.searchParams.set("backend", "gas");
+    url.hash = reference;
+    return url.toString();
   }
 
   async function readJsonResponse(response) {
@@ -475,6 +485,7 @@
     cancelOrder,
     recordVisit,
     getVisitCounter,
+    shortTrackingUrl,
     backend: preferredBackend,
     get activeBackend() { return activeBackend; },
     label: preferredBackend === "d1" ? "Cloudflare D1" : "Google Sheets / GAS",

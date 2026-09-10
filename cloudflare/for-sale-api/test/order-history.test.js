@@ -285,7 +285,7 @@ test("l'acceptation et l'annulation client écrivent leur événement dans le m�
     "client-cancelled");
 });
 
-test("d.5 crée des liens de suivi secondaires sans invalider les précédents", async () => {
+test("le lien de suivi par référence est stable et pilote les actions client", async () => {
   const database = new DatabaseSync(":memory:");
   applyMigration(database, "0007_purchase_requests.sql");
   applyMigration(database, "0008_order_discord_notifications.sql");
@@ -311,17 +311,15 @@ test("d.5 crée des liens de suivi secondaires sans invalider les précédents",
 
   assert.equal(firstResponse.status, 201);
   assert.equal(firstResponse.headers.get("Cache-Control"), "no-store");
-  assert.match(first.accessToken, /^[a-f0-9-]{73}$/);
-  assert.equal(first.trackingPath, `suivi-commande.html?token=${first.accessToken}`);
-  assert.notEqual(second.accessToken, first.accessToken);
+  assert.equal(first.publicReference, "FRJ-20260827-ABC123");
+  assert.equal(first.trackingPath, "suivi-commande.html?ref=FRJ-20260827-ABC123");
+  assert.deepEqual(second, first);
   const stored = database.prepare(`
     SELECT token_hash FROM purchase_order_tracking_tokens WHERE order_id = ? ORDER BY created_at
   `).all(ORDER_ID);
-  assert.equal(stored.length, 2);
-  assert.equal(stored.some((row) => row.token_hash === first.accessToken), false);
-  assert.equal(stored.some((row) => row.token_hash === createHash("sha256").update(first.accessToken).digest("hex")), true);
+  assert.equal(stored.length, 0);
 
-  for (const token of [originalToken, first.accessToken, second.accessToken]) {
+  for (const token of [originalToken, first.publicReference]) {
     const response = await handlePublicOrderGet(
       new URL(`https://api.example/orders/status/${token}`),
       env
@@ -333,7 +331,7 @@ test("d.5 crée des liens de suivi secondaires sans invalider les précédents",
   database.prepare(`
     UPDATE purchase_orders SET approval_required = 1, proposal_version = 2 WHERE id = ?
   `).run(ORDER_ID);
-  const acceptUrl = new URL(`https://api.example/orders/status/${first.accessToken}/accept`);
+  const acceptUrl = new URL(`https://api.example/orders/status/${first.publicReference}/accept`);
   const acceptResponse = await handlePublicOrderAcceptance(
     new Request(acceptUrl, { method: "POST", body: JSON.stringify({ proposalVersion: 2 }) }),
     acceptUrl,
@@ -343,7 +341,7 @@ test("d.5 crée des liens de suivi secondaires sans invalider les précédents",
   assert.equal(database.prepare(`SELECT approval_required FROM purchase_orders WHERE id = ?`).get(ORDER_ID)
     .approval_required, 0);
 
-  const cancelUrl = new URL(`https://api.example/orders/status/${second.accessToken}/cancel`);
+  const cancelUrl = new URL(`https://api.example/orders/status/${second.publicReference}/cancel`);
   const cancelResponse = await handlePublicOrderCancellation(cancelUrl, env);
   assert.equal(cancelResponse.status, 200);
   assert.equal(database.prepare(`SELECT status FROM purchase_orders WHERE id = ?`).get(ORDER_ID).status, "cancelled");

@@ -61,7 +61,7 @@ export default {
           }
           return withCors(await handleVisitPost(request, env), origin);
         }
-        if (/^\/orders\/status\/[a-f0-9-]{70,80}\/(?:accept|cancel)$/i.test(url.pathname)) {
+        if (/^\/orders\/status\/(?:FRJ-\d{8}-[A-F0-9]{6}|[a-f0-9-]{70,80})\/(?:accept|cancel)$/i.test(url.pathname)) {
           if (!PUBLIC_ORIGINS.has(String(origin || ""))) {
             return withCors(json({ error: "Origine non autorisée" }, 403), origin);
           }

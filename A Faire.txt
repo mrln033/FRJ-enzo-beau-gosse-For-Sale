@@ -17,24 +17,32 @@ Convention d'identification à compter du 31/08/2026 :
 - les anciennes références d.N restent inchangées dans l'historique afin de préserver la trace des échanges passés.
 
 ----------------------------------------
-POINT DE REPRISE — 31/08/2026
+POINT DE REPRISE — 05/09/2026
 
 Ordre recommandé déjà réalisé et validé : d.1 -> d.2 -> d.3 -> d.7 -> d.8 -> d.6 -> d.10 -> d.11 -> d.5 -> d.13 -> d.12.
 Les demandes d.13, d.12 et d.9 sont terminées. D.9 fournit les promotions quotidiennes et les soldes communs à GAS et D1.
 
 Les tâches T-001 à T-011 sont terminées et publiées.
+T-009 : validation finale utilisateur reçue le 05/09/2026 après réimport des quatre inventaires et contrôles finaux. GAS version 35 et Worker dd1b2566-145a-478a-9663-3376a19fd1c3 en production. Les attentes mentionnées dans les étapes historiques ci-dessous sont levées ; les derniers commits locaux restent à pousser sur GitHub.
 La seule demande encore ouverte est l'ancienne d.4, mise en attente à la demande du 29/08/2026 : son périmètre doit être mieux cadré avant toute analyse définitive ou implémentation.
 
 -------------------------------
 DEMANDES  => CE QUI EST A FAIRE
 
->>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-012 <<<
+>>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-013 <<<
+
+
+
 
 [EN ATTENTE DE CADRAGE]
 d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> ajouter un bouton 'Supprimer' à chaque demande avec message de confirmation. Celà supprimerais l'enregistrement complet dans D1. Propagation Discord avec modification du statut en 'SUPPRIMEE' pour archivage.
 
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
+
+10/09/2026 — T-012 [ÉVOLUTION] [PUBLIÉE] — Demandes d'Achat  ==>  les liens générés pour accéder à une demande ou suivi d'achat sont trop longs :s existe-t-il une solution pour générer un lien court directement depuis l'applicatif ? Précision : un lien contenant simplement le numéro de la commande, sans jeton sécurisé, est suffisant. Réalisation : le panier, la Console Admin et la page de suivi génèrent maintenant directement une adresse courte sur le domaine habituel, sous la forme `s.html#FRJ-AAAAMMJJ-XXXXXX`. Cette page relais ouvre le suivi et les API de consultation, d'acceptation et d'annulation reconnaissent la référence de demande. Les anciens liens à jeton restent utilisables. Aucune migration D1 ni modification des données existantes n'est requise. Les 222 tests réussissent et le dry-run Wrangler est valide. Le Worker est publié sous la version `ae516477-be69-4d21-b011-bd9b823649c2` ; le frontend est publié par GitHub Pages depuis la branche `main`.
+
+05/09/2026 — T-009 [VALIDÉ EN PRODUCTION] : la capture utilisateur confirme l'import Enzo réussi dans GAS et les mêmes 1 943 lignes dans D1 (1 942 articles + en-tête). « Déjà traité, 0 écriture D1 » est normal pour un inventaire déjà identique. L'utilisateur a ensuite confirmé les imports ArkaMan, Kenza et Nocturnal, puis validé les contrôles finaux proposés : audit de synchronisation et format Google Sheets. Le contrat permanent conserve six colonnes MindArk, une ligne par article source sans regroupement ni tri, les Id et ContainerRefId, les valeurs PED en texte avec point et quatre décimales, et la date/heure en B1. Les deux parseurs traitent les guillemets champ par champ pour empêcher la fusion d'articles. Cette validation clôt l'incident ; les étapes d'investigation restent conservées ci-dessous pour mémoire.
 
 05/09/2026 — T-009, cause reproduite : à la ligne physique 1 852 du fichier fourni, le champ Umbranoid "Medicine" comporte un guillemet enveloppant final manquant. L'ancien parseur D1 absorbait les dix lignes suivantes dans ce nom et retournait 1 932 articles au lieu de 1 942, malgré un bilan de succès. La piste du retour à la ligne final était insuffisante. Les deux imports lisent désormais le TSV MindArk par ligne physique, exigent six colonnes et décodent les guillemets à l'intérieur de chaque champ, y compris ce défaut d'enveloppe. Les noms et conteneurs cités, apostrophes, points décimaux et date en B1 sont préservés. Le fichier exact produit 1 942 articles dans les deux moteurs ; les noms, quantités et valeurs PED ont été comparés ligne par ligne. Un test reproduit le défaut et protège les articles suivants. Les 220 tests réussissent. GAS version 35 et Worker dd1b2566-145a-478a-9663-3376a19fd1c3 publiés. La réparation des données existantes nécessite un nouvel import du fichier complet ; bilan attendu : 1 943 lignes avec en-tête.
 
