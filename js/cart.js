@@ -6,6 +6,8 @@
   const STORAGE_KEY = "FRJ_PURCHASE_CART_V1";
   const REQUESTS_KEY = "FRJ_PURCHASE_REQUESTS_V1";
   const HIDDEN_REQUESTS_KEY = "FRJ_HIDDEN_PURCHASE_REQUESTS_V1";
+  const REFERENCE_PATTERN = /^FRJ-\d{8}-[A-F0-9]{6}$/i;
+  const ACCESS_TOKEN_PATTERN = /^[a-f0-9-]{70,80}$/i;
   const MAX_LINES = 10;
   const MAX_CLOSED_REQUEST_HISTORY = 20;
   const CLOSED_REQUEST_STATUSES = new Set(["completed", "cancelled", "expired"]);
@@ -373,7 +375,7 @@
       const reference = document.createElement("span");
       reference.textContent = `${request.reference} — ${requestStatusLabel(request.status)}`;
       const link = document.createElement("a");
-      link.href = trackingUrl(request.reference, request.catalogBackend);
+      link.href = trackingUrl(request);
       link.target = "_self";
       link.textContent = label("trackRequest");
       const copy = button(label("copyTracking"), "cart-secondary", async () => {
@@ -384,7 +386,7 @@
       if (CANCELLABLE_REQUEST_STATUSES.has(request.status)) {
         section.appendChild(button(label("cancelRequest"), "cart-secondary cart-cancel-request", () => cancelRequest(request)));
       } else if (CLOSED_REQUEST_STATUSES.has(request.status)) {
-        section.appendChild(button(label("hideRequest"), "cart-secondary cart-hide-request", () => hideRequest(request.accessToken)));
+        section.appendChild(button(label("hideRequest"), "cart-secondary cart-hide-request", () => hideRequest(request)));
       }
       if (request.status === "awaiting_approval") {
         const alert = document.createElement("strong");
@@ -405,7 +407,10 @@
     if (!global.confirm(label("cancelConfirm"))) return;
     setStatus("");
     try {
-      const result = await global.FRJ_API.cancelOrder(request.accessToken, request.backend);
+      const identifier = request.backend === "gas" && ACCESS_TOKEN_PATTERN.test(request.accessToken)
+        ? request.accessToken
+        : requestIdentifier(request);
+      const result = await global.FRJ_API.cancelOrder(identifier, request.backend);
       request.status = "cancelled";
       request.backend = result.backend === "gas" ? "gas" : "d1";
       request.updatedAt = new Date().toISOString();
@@ -419,9 +424,10 @@
     }
   }
 
-  function hideRequest(accessToken) {
-    saveHiddenRequestTokens([...readHiddenRequestTokens(), accessToken]);
-    requests = requests.filter((request) => request.accessToken !== accessToken);
+  function hideRequest(hiddenRequest) {
+    const identifier = requestIdentifier(hiddenRequest);
+    saveHiddenRequestTokens([...readHiddenRequestTokens(), identifier]);
+    requests = requests.filter((request) => requestIdentifier(request) !== identifier);
     saveRequests();
     setStatus(label("hiddenRequest"), "success");
     render();
@@ -641,10 +647,13 @@
     const byRequest = new Map();
     groups.flat().forEach((request) => {
       const accessToken = String(request?.accessToken || "");
-      if (!/^[a-f0-9-]{70,80}$/i.test(accessToken)) return;
+      const normalizedReference = String(request?.reference || "").trim().toLocaleUpperCase("en-US");
+      const hasReference = REFERENCE_PATTERN.test(normalizedReference);
+      const hasAccessToken = ACCESS_TOKEN_PATTERN.test(accessToken);
+      if (!hasReference && !hasAccessToken) return;
       const normalized = {
-        reference: String(request.reference || "").trim(),
-        accessToken,
+        reference: hasReference ? normalizedReference : "",
+        accessToken: hasAccessToken ? accessToken : "",
         backend: request.backend === "gas" ? "gas" : "d1",
         catalogBackend: request.catalogBackend === "d1" || request.catalogBackend === "gas"
           ? request.catalogBackend
@@ -653,10 +662,10 @@
         updatedAt: String(request.updatedAt || ""),
         status: String(request.status || "")
       };
-      const normalizedReference = normalized.reference.toLocaleUpperCase("en-US");
-      const requestKey = normalizedReference ? `reference:${normalizedReference}` : `token:${accessToken}`;
+      const requestKey = normalized.reference ? `reference:${normalized.reference}` : `token:${normalized.accessToken}`;
       const existing = byRequest.get(requestKey);
       if (existing && !normalized.catalogBackend) normalized.catalogBackend = existing.catalogBackend || null;
+      if (existing && !normalized.accessToken) normalized.accessToken = existing.accessToken || "";
       const normalizedTime = Date.parse(normalized.updatedAt || normalized.submittedAt || 0);
       const existingTime = Date.parse(existing?.updatedAt || existing?.submittedAt || 0);
       if (
@@ -665,8 +674,9 @@
         || (normalizedTime === existingTime && existing.backend === "gas" && normalized.backend === "d1")
       ) {
         byRequest.set(requestKey, normalized);
-      } else if (existing && !existing.catalogBackend && normalized.catalogBackend) {
-        existing.catalogBackend = normalized.catalogBackend;
+      } else if (existing) {
+        if (!existing.catalogBackend && normalized.catalogBackend) existing.catalogBackend = normalized.catalogBackend;
+        if (!existing.accessToken && normalized.accessToken) existing.accessToken = normalized.accessToken;
       }
     });
     const sorted = [...byRequest.values()]
@@ -698,7 +708,7 @@
     let changed = false;
     await Promise.all(requests.map(async (request) => {
       try {
-        const order = await global.FRJ_API.getOrderStatus(request.accessToken);
+        const order = await global.FRJ_API.getOrderStatus(requestIdentifier(request));
         if (request.status !== order.status || request.backend !== "d1") changed = true;
         request.status = order.status;
         request.backend = "d1";
@@ -719,11 +729,21 @@
     return global.FRJ_API?.activeBackend === "d1" ? "d1" : "gas";
   }
 
-  function trackingUrl(publicReference, storedCatalogBackend = null) {
-    const backend = storedCatalogBackend === "d1" || storedCatalogBackend === "gas"
-      ? storedCatalogBackend
+  function requestIdentifier(request) {
+    const reference = String(request?.reference || "").trim().toLocaleUpperCase("en-US");
+    return REFERENCE_PATTERN.test(reference) ? reference : String(request?.accessToken || "");
+  }
+
+  function trackingUrl(request) {
+    const backend = request?.catalogBackend === "d1" || request?.catalogBackend === "gas"
+      ? request.catalogBackend
       : currentCatalogBackend();
-    return global.FRJ_API.shortTrackingUrl(publicReference, backend);
+    const reference = String(request?.reference || "").trim().toLocaleUpperCase("en-US");
+    if (REFERENCE_PATTERN.test(reference)) return global.FRJ_API.shortTrackingUrl(reference, backend);
+    const url = new URL("./suivi-commande.html", global.location.href);
+    url.searchParams.set("token", String(request?.accessToken || ""));
+    url.searchParams.set("backend", backend);
+    return url.toString();
   }
 
   function saveCart() {
