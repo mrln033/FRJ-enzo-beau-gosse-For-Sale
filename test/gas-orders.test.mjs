@@ -4,6 +4,23 @@ import test from "node:test";
 import vm from "node:vm";
 import { buildDiscordOrderPayload } from "../cloudflare/for-sale-api/src/discord.js";
 
+test("T-017 le titre Discord ouvre le lien court de la bonne demande dans GAS et D1", () => {
+  const gas = loadPurchaseOrders();
+  for (const reference of ["FRJ-20260911-ABC123", " frj-20260911-def456 "]) {
+    const order = { publicReference: reference };
+    const expected = "https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/s.html#" + reference.trim().toUpperCase();
+    assert.equal(buildDiscordOrderPayload(order, []).embeds[0].url, expected);
+    assert.equal(gas.purchaseDiscordPayload_(order, []).embeds[0].url, expected);
+  }
+  for (const reference of ["", "https://example.org", "FRJ-20260911-ABC123?admin=1"]) {
+    const order = { publicReference: reference };
+    assert.equal(buildDiscordOrderPayload(order, []).embeds[0].url,
+      "https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/commandes.html");
+    assert.equal(gas.purchaseDiscordPayload_(order, []).embeds[0].url,
+      buildDiscordOrderPayload(order, []).embeds[0].url);
+  }
+});
+
 test("T-015 Discord GAS et D1 : totaux et retour au statut estimé", () => {
   const gas = loadPurchaseOrders();
   for (const status of ["preparing", "ready", "completed", "viewed", "submitted", "awaiting_approval"]) {

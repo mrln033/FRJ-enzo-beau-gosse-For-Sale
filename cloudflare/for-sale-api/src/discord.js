@@ -1,5 +1,6 @@
 const DISCORD_RESPONSE_LIMIT = 20_000;
 const ADMIN_ORDERS_URL = "https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/commandes.html";
+const SHORT_TRACKING_URL = "https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/s.html";
 
 const STATUS_LABELS = {
   submitted: "Demande transmise",
@@ -24,6 +25,9 @@ const STATUS_COLORS = {
 };
 
 export function buildDiscordOrderPayload(order, items) {
+  const reference = String(order?.publicReference || "").trim().toUpperCase();
+  const trackingUrl = /^FRJ-\d{8}-[A-F0-9]{6}$/.test(reference)
+    ? `${SHORT_TRACKING_URL}#${reference}` : ADMIN_ORDERS_URL;
   const status = String(order?.status || "submitted").toLowerCase();
   const memberLabel = order?.frjMember ? "MU FRJ" : "MU";
   const tt = Math.round(Number(order?.totalTtPed || 0) * 100) / 100;
@@ -58,7 +62,7 @@ export function buildDiscordOrderPayload(order, items) {
     allowed_mentions: { parse: [] },
     embeds: [{
       title: `🛒 ${discordText(order?.publicReference || "Nouvelle demande", 220)}`,
-      url: ADMIN_ORDERS_URL,
+      url: trackingUrl,
       description: `État actuel : **${STATUS_LABELS[status] || discordText(status, 200)}**`,
       color: STATUS_COLORS[status] || STATUS_COLORS.submitted,
       fields,

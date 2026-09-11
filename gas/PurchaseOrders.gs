@@ -405,6 +405,10 @@ function purchasePublishDiscord_(order, items) {
 }
 
 function purchaseDiscordPayload_(order, items) {
+  var reference = String(order.publicReference || "").trim().toUpperCase();
+  var trackingUrl = /^FRJ-\d{8}-[A-F0-9]{6}$/.test(reference)
+    ? "https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/s.html#" + reference
+    : "https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/commandes.html";
   var statusLabels = {
     submitted: "Demande transmise", viewed: "Demande consultée", preparing: "Préparation en cours",
     ready: "Prête", completed: "Terminée", cancelled: "Annulée", expired: "Expirée"
@@ -438,7 +442,7 @@ function purchaseDiscordPayload_(order, items) {
     allowed_mentions: { parse: [] },
     embeds: [{
       title: "🛒 " + purchaseDiscordText_(order.publicReference || "Nouvelle demande", 220),
-      url: "https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/commandes.html",
+      url: trackingUrl,
       description: "État actuel : **" + (statusLabels[status] || status) + "**",
       color: statusColors[status] || statusColors.submitted,
       fields: fields,
