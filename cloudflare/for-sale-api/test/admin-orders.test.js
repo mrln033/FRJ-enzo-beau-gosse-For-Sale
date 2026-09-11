@@ -159,6 +159,47 @@ function setupDatabase() {
 const lineA = { itemName: "Item A", storage: "ARMORS", aisle: "PARTS", quantity: 2, markupKind: "percent", markupAmount: 110 };
 const lineB = { itemName: "Item B", storage: "MATERIALS", aisle: "MINERALS", quantity: 1, markupKind: "ped", markupAmount: 1.25 };
 
+test("T-018 copie indépendante, contact et contrôle du catalogue sans écriture du modèle", async () => {
+  const database = setupDatabase();
+  const env = { DB: makeD1(database), CART_ENABLED: "true" };
+  const url = new URL("https://api.example/admin/orders");
+  const create = async payload => (await handleAdminPost(new Request(url, {
+    method: "POST", body: JSON.stringify(payload)
+  }), url, env)).json();
+  const model = await create({ buyerAvatar: " Soc ", frjMember: true, items: [lineA] });
+  database.prepare("UPDATE purchase_orders SET status = 'completed', approval_required = 0 WHERE id = ?").run(model.order.id);
+  const before = database.prepare("SELECT * FROM purchase_orders WHERE id = ?").get(model.order.id);
+  const oldItems = database.prepare("SELECT * FROM purchase_order_items WHERE order_id = ?").all(model.order.id);
+  const previewUrl = new URL(`https://api.example/admin/orders/${model.order.id}/duplicate-preview`);
+  const preview = await (await handleAdminGet(previewUrl, env)).json();
+  assert.equal(preview.source.id, model.order.id);
+  assert.equal(preview.source.accessTokenHash, undefined);
+  assert.deepEqual(database.prepare("SELECT * FROM purchase_orders WHERE id = ?").get(model.order.id), before);
+  const snapshot = preview.catalog.items.find(item => item.itemName === lineA.itemName);
+  const payload = { buyerAvatar: "Client", buyerContact: " Discord : client ", frjMember: false,
+    duplicateSourceId: model.order.id, items: [{ ...lineA, markupAmount: 120, catalogSnapshot: snapshot }] };
+  const result = await create(payload);
+  assert.notEqual(result.order.id, model.order.id);
+  assert.notEqual(result.order.publicReference, model.order.publicReference);
+  assert.equal(result.order.status, "awaiting_approval");
+  assert.equal(result.order.proposalVersion, 1);
+  assert.equal(database.prepare("SELECT buyer_contact FROM purchase_orders WHERE id = ?").get(result.order.id).buyer_contact, "Discord : client");
+  assert.deepEqual(database.prepare("SELECT * FROM purchase_orders WHERE id = ?").get(model.order.id), before);
+  assert.deepEqual(database.prepare("SELECT * FROM purchase_order_items WHERE order_id = ?").all(model.order.id), oldItems);
+  for (const field of ["unitTtPed", "markupValue", "discountRate", "discountCampaignId"]) {
+    const stale = structuredClone(payload);
+    stale.items[0].catalogSnapshot[field] = "outdated";
+    await assert.rejects(() => create(stale), error => error.status === 409);
+  }
+  await assert.rejects(() => create({ ...payload, items: [{ ...payload.items[0], quantity: 99 }] }),
+    error => error.status === 409);
+  assert.equal(database.prepare("SELECT COUNT(*) AS n FROM purchase_orders").get().n, 2);
+  await assert.rejects(() => create({ ...payload, duplicateSourceId: result.order.id }),
+    error => error.status === 400);
+  await assert.rejects(() => handleAdminGet(new URL(`https://api.example/admin/orders/${result.order.id}/duplicate-preview`), env),
+    error => error.status === 400);
+});
+
 test("d.12 valide les saisies directes et limite la MU à deux décimales", () => {
   assert.equal(normalizeAdminOrderDraft({ buyerAvatar: " Enzo ", frjMember: true, items: [lineA] }).buyerAvatar, "Enzo");
   assert.throws(() => normalizeAdminOrderLine({ ...lineA, markupAmount: 1.234 }), /2 décimales/);

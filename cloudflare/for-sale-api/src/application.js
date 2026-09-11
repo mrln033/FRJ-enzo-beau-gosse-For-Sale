@@ -189,6 +189,20 @@ export async function handleAdminGet(url, env) {
   if (url.pathname === "/admin/orders/catalog") {
     return json(await readAdminOrderCatalog(env));
   }
+  const duplicatePreview = url.pathname.match(/^\/admin\/orders\/([a-f0-9-]{36})\/duplicate-preview$/i);
+  if (duplicatePreview) {
+    const source = await env.DB.prepare("SELECT * FROM purchase_orders WHERE id = ?").bind(duplicatePreview[1]).first();
+    if (!source || source.source_backend !== "d1-admin"
+      || !["public", "soc", "membre frj"].includes(String(source.buyer_avatar).trim().toLowerCase())) {
+      throw new ApiError(400, "Cette demande n'est pas un devis duplicable.");
+    }
+    const items = await env.DB.prepare("SELECT * FROM purchase_order_items WHERE order_id = ? ORDER BY line_no")
+      .bind(source.id).all();
+    return json({
+      source: { ...mapAdminOrder(source), items: items.results.map(mapOrderItem) },
+      catalog: await readAdminOrderCatalog(env)
+    });
+  }
   const orderHistoryMatch = url.pathname.match(/^\/admin\/orders\/([a-f0-9-]{36})\/history$/i);
   if (orderHistoryMatch) {
     return json(await readOrderHistory(env, orderHistoryMatch[1].toLowerCase()));
@@ -2709,6 +2723,26 @@ async function createAdminOrder(env, payload) {
   if (!isCartEnabled(env)) throw new ApiError(503, "Transmission des paniers désactivée");
   const draft = parseOrderValue(() => normalizeAdminOrderDraft(payload));
   const catalog = await readAdminOrderCatalog(env);
+  if (payload.duplicateSourceId) {
+    const source = await env.DB.prepare(
+      "SELECT buyer_avatar, source_backend FROM purchase_orders WHERE id = ?"
+    ).bind(String(payload.duplicateSourceId)).first();
+    if (!source || source.source_backend !== "d1-admin"
+      || !["public", "soc", "membre frj"].includes(String(source.buyer_avatar).trim().toLowerCase())) {
+      throw new ApiError(400, "Cette demande n'est pas un devis duplicable.");
+    }
+    // Ne jamais enregistrer silencieusement un devis basé sur un catalogue périmé.
+    const currentByKey = new Map(catalog.items.map(item => [orderItemKey(item), item]));
+    for (const item of payload.items) {
+      const current = currentByKey.get(orderItemKey(item));
+      const snapshot = item.catalogSnapshot;
+      const fields = ["unitTtPed", "markupKind", "markupValue", "discountKind", "discountCampaignId", "discountRate"];
+      if (!current || Number(item.quantity) > current.availableStock || !snapshot
+        || fields.some(field => (current[field] ?? null) !== (snapshot[field] ?? null))) {
+        throw new ApiError(409, `Stock, prix ou MU modifié pour ${item.itemName}. Relancez la duplication pour actualiser le devis.`);
+      }
+    }
+  }
   const lines = priceAdminOrderLines(draft.items, catalog.items, draft.frjMember);
   const totals = orderLineTotals(lines);
   const now = new Date().toISOString();
@@ -2722,7 +2756,7 @@ async function createAdminOrder(env, payload) {
     approvalRequired: true,
     proposalVersion: 1,
     buyerAvatar: draft.buyerAvatar,
-    buyerContact: null,
+    buyerContact: draft.buyerContact,
     buyerComment: null,
     language: "FR",
     frjMember: draft.frjMember,

@@ -26,7 +26,7 @@ Les demandes d.13, d.12 et d.9 sont terminées. D.9 fournit les promotions quoti
 Les tâches T-001 à T-012 sont terminées et publiées. T-014 puis T-015 sont réalisées le 11/09/2026 ; frontend poussé sur GitHub (436eeb9), backend publié. Validation utilisateur attendue après tests en production. T-013 n'apparaît pas dans le fichier : les identifiants attribués sont conservés sans renumérotation.
 T-009 : validation finale utilisateur reçue le 05/09/2026 après réimport des quatre inventaires et contrôles finaux. Les attentes mentionnées dans les étapes historiques ci-dessous sont levées. Le contrat des inventaires n'est pas modifié par T-014/T-015.
 T-016 terminée : ordre Discord publié et 31 messages actualisés et vérifiés ; 3 identifiants introuvables (HTTP 404), sans recréation. L'ancienne d.4 reste en attente de cadrage.
-T-017 terminée : liens courts des titres Discord publiés et anciens messages actualisés. T-018 nouvellement ajoutée : étude de faisabilité à présenter avant tout développement.
+T-017 terminée : liens courts des titres Discord publiés et anciens messages actualisés. T-018 développée après validation de faisabilité ; tests utilisateur en production attendus. Retour arrière documenté dans docs/PANIER.md. Seule d.4 reste en attente de cadrage.
 
 -------------------------------
 DEMANDES  => CE QUI EST A FAIRE
@@ -34,17 +34,21 @@ DEMANDES  => CE QUI EST A FAIRE
 >>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-019 <<<
 
 	
-T-018  ==>  Demande d'Achat coté Admin
-	Il peut m'arriver de créer des demandes factices, afin de préparer notamment des sets d'armures complets, pour avoir un accès rapide aux divers prix. Il s'agit en quelque sorte de Devis que je devrait pouvoir communiquer simplement à tout client en faisant la demande. Dans ces demandes factices, je spécifie comme nom d'avatar 'Public' ou 'Soc' (ou 'Membre FRJ') pour les identifier facilement selon le profil de prix appliqué.
-	J'aimerais avoir un bouton uniquement sur ces 'devis' permettant de dupliquer la totalité de la demande (sous un nouveau numéro), d'entrer en modification immédiatement après la copie, et surtout de pouvoir modifier les infos d'entête (Nom d'avatar, profil du joueur, contact). Je pourrais ensuite communiquer le lien généré au client pour validation.
-	Il faudrait veiller à vérifier et mettre à jour les informations de quantité (si le stock est inférieur à la quantité proposée), de prix et de MU lors de la duplication, selon les régles déjà établies dans le projet, sans oublier un éventuel MU/Prix promotionnel ou soldé. Et également signaler (soit par un popup, soit par une mise en évidence de la ligne, en rouge par exemple, les article 'en erreur' (quantité insuffisante ou absente).
-	Indique-moi la faisabilité avant de commencer le développement.
 
 [EN ATTENTE DE CADRAGE]
 d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> ajouter un bouton 'Supprimer' à chaque demande avec message de confirmation. Celà supprimerais l'enregistrement complet dans D1. Propagation Discord avec modification du statut en 'SUPPRIMEE' pour archivage.
 
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
+
+11/09/2026 — T-018 [RÉALISÉE — VALIDATION PRODUCTION ATTENDUE] — Duplication des devis Admin.
+Demande d'origine :
+T-018  ==>  Demande d'Achat coté Admin
+	Il peut m'arriver de créer des demandes factices, afin de préparer notamment des sets d'armures complets, pour avoir un accès rapide aux divers prix. Il s'agit en quelque sorte de Devis que je devrait pouvoir communiquer simplement à tout client en faisant la demande. Dans ces demandes factices, je spécifie comme nom d'avatar 'Public' ou 'Soc' (ou 'Membre FRJ') pour les identifier facilement selon le profil de prix appliqué.
+	J'aimerais avoir un bouton uniquement sur ces 'devis' permettant de dupliquer la totalité de la demande (sous un nouveau numéro), d'entrer en modification immédiatement après la copie, et surtout de pouvoir modifier les infos d'entête (Nom d'avatar, profil du joueur, contact). Je pourrais ensuite communiquer le lien généré au client pour validation.
+	Il faudrait veiller à vérifier et mettre à jour les informations de quantité (si le stock est inférieur à la quantité proposée), de prix et de MU lors de la duplication, selon les régles déjà établies dans le projet, sans oublier un éventuel MU/Prix promotionnel ou soldé. Et également signaler (soit par un popup, soit par une mise en évidence de la ligne, en rouge par exemple, les article 'en erreur' (quantité insuffisante ou absente).
+	Indique-moi la faisabilité avant de commencer le développement.
+Réalisation : après étude et accord utilisateur, un bouton Dupliquer ce devis apparaît seulement pour les demandes directes Admin nommées Public, Soc ou Membre FRJ (casse et espaces autour ignorés). Une lecture dédiée sans écriture prépare le formulaire avec les articles du modèle et le catalogue actuel. Avatar, profil et contact sont modifiables avant enregistrement ; le modèle reste intact. TT, MU, profil et remises sont recalculés selon les mécanismes existants, sans recopier les anciens prix confirmés ni cumuler une ancienne remise. Les quantités trop élevées sont réduites au stock avec indication avant/après ; les articles absents et les MU non renseignés restent visibles, en erreur, et bloquent la création jusqu'à correction/retrait. Le serveur revérifie l'éligibilité du modèle, les stocks et l'instantané des TT/MU/campagnes avant toute création. La nouvelle référence, l'historique neuf, le statut À valider, le lien court et le message Discord ne sont créés qu'à l'enregistrement. Le contact est aussi disponible sur les demandes directes ordinaires. Les 228 tests passent et le dry-run est valide. Worker publié : 35239112-3a59-4656-9eca-05438a36ce59. Aucune migration D1 ni modification GAS/inventaire. Retour arrière : commit de référence a47e5e5 et Worker 0487003b-bc44-4516-84fb-1ac124042e7d ; annuler uniquement le commit dédié T-018 et restaurer le Worker, sans effacer les demandes de test ni leurs messages.
 
 11/09/2026 — T-017 [TERMINÉE] — Liens courts dans les titres Discord.
 Demande d'origine :

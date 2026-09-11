@@ -17,6 +17,7 @@
   let lastOrdersReport = null;
   let lastOrders = [];
   let newOrderEditors = [];
+  let duplicateSourceId = null;
   let directOrderListSequence = 0;
 
   function hasAtMostDecimals(value, decimals) {
@@ -201,6 +202,14 @@
     const headerActions = document.createElement("div");
     headerActions.className = "order-header-actions";
     headerActions.append(select, createTrackingControl(order));
+    if (order.sourceBackend === "d1-admin"
+      && ["public", "soc", "membre frj"].includes(String(order.buyerAvatar || "").trim().toLowerCase())) {
+      const duplicate = document.createElement("button");
+      duplicate.type = "button";
+      duplicate.textContent = "Dupliquer ce devis";
+      duplicate.addEventListener("click", () => duplicateQuote(order, duplicate));
+      headerActions.appendChild(duplicate);
+    }
     header.append(identity, headerActions);
     article.appendChild(header);
 
@@ -485,7 +494,11 @@
     discount.appendChild(discountEmphasis);
     const displayedPrice = document.createElement("span");
     const estimate = document.createElement("strong");
-    output.append(stock, discount, displayedPrice, estimate);
+    const warning = document.createElement("small");
+    warning.className = "direct-order-warning";
+    warning.setAttribute("role", "status");
+    let adjustmentNote = "";
+    output.append(stock, discount, displayedPrice, estimate, warning);
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "direct-order-remove";
@@ -513,7 +526,10 @@
           : storedValue * profileFactor * campaignFactor;
       }
       kind.value = itemKind;
-      amount.value = ui.roundPed(displayedAmount).toFixed(2);
+      const missingMarkup = !["percent", "ped"].includes(item.markupKind)
+        || item.markupValue == null || !Number.isFinite(storedValue) || storedValue < 0;
+      amount.value = options.requireCatalogMarkup && missingMarkup
+        ? "" : ui.roundPed(displayedAmount).toFixed(2);
     };
 
     const read = () => {
@@ -521,6 +537,7 @@
       const itemQuantity = Number(quantity.value);
       const markupAmount = Number(amount.value);
       const valid = Boolean(item)
+        && amount.value.trim() !== ""
         && Number.isInteger(itemQuantity)
         && itemQuantity > 0
         && itemQuantity <= Number(item.availableStock || 0)
@@ -546,7 +563,12 @@
           markupAmount,
           discountKind: item.discountKind || null,
           discountCampaignId: item.discountCampaignId || null,
-          discountRate: item.discountRate ?? null
+          discountRate: item.discountRate ?? null,
+          catalogSnapshot: {
+            unitTtPed: item.unitTtPed, markupKind: item.markupKind, markupValue: item.markupValue,
+            discountKind: item.discountKind ?? null, discountCampaignId: item.discountCampaignId ?? null,
+            discountRate: item.discountRate ?? null
+          }
         } : null
       };
     };
@@ -560,10 +582,19 @@
       discount.hidden = !discountLabel;
       displayedPrice.textContent = item ? `Prix affiché : ${ui.formatPed(item.unitTtPed)} PED` : "Prix affiché : —";
       estimate.textContent = value.valid ? `Estimation : ${ui.formatPed(value.lineSale)} PED` : "Estimation : —";
+      if (options.requireCatalogMarkup) {
+        warning.textContent = !item ? "Article indisponible : retirez ou remplacez cette ligne."
+          : Number(quantity.value) <= 0 || Number(quantity.value) > Number(item.availableStock)
+            ? "Quantité indisponible : corrigez la ligne."
+            : !value.valid ? "MU ou quantité invalide : saisissez une valeur valide."
+              : adjustmentNote;
+        root.classList.toggle("direct-order-line-error", !value.valid);
+      }
       options.onChange?.();
       return value;
     };
     const refreshSelectedItem = () => {
+      adjustmentNote = "";
       renderSuggestions();
       applyCatalogMarkup();
       refresh();
@@ -582,6 +613,18 @@
       read,
       refresh,
       remove,
+      prefill(source) {
+        const key = value => [value.itemName, value.storage, value.aisle].join("\u001f").toLowerCase();
+        const current = sortedCatalogItems.find(item => key(item) === key(source));
+        article.value = current ? catalogItemChoiceLabel(current) : `${source.itemName} — ${source.storage} / ${source.aisle}`;
+        quantity.value = String(current ? Math.min(Number(source.quantity), Math.floor(current.availableStock)) : source.quantity);
+        if (current && Number(quantity.value) < Number(source.quantity)) {
+          adjustmentNote = `Quantité réduite de ${source.quantity} à ${quantity.value} selon le stock disponible.`;
+        }
+        applyCatalogMarkup();
+        renderSuggestions();
+        refresh();
+      },
       setProfile(frjMember) {
         options.frjMember = frjMember === true;
         applyCatalogMarkup(options.frjMember);
@@ -602,6 +645,40 @@
     emphasis.textContent = `(${label})`;
     marker.appendChild(emphasis);
     parent.append(" ", marker);
+  }
+
+  async function duplicateQuote(order, button) {
+    if (newOrderEditors.length && !global.confirm("Remplacer le formulaire en cours par la copie de ce devis ?")) return;
+    button.disabled = true;
+    try {
+      const response = await global.FRJ_API.fetchD1Admin(
+        `/admin/orders/${encodeURIComponent(order.id)}/duplicate-preview`, { cache: "no-store" }
+      );
+      const { source, catalog } = await response.json();
+      if (!source || source.sourceBackend !== "d1-admin"
+        || !["public", "soc", "membre frj"].includes(String(source.buyerAvatar || "").trim().toLowerCase())) {
+        throw new Error("Ce devis n'est plus disponible pour duplication.");
+      }
+      if (!source.items?.length || source.items.length > 10) throw new Error("Un devis doit contenir entre 1 et 10 articles.");
+      resetNewOrderForm();
+      clearNewOrderResult();
+      orderCatalog = [...(catalog.items || [])].sort(compareCatalogItems);
+      duplicateSourceId = source.id;
+      document.getElementById("newOrderAvatar").value = source.buyerAvatar;
+      document.getElementById("newOrderProfile").value = source.frjMember ? "frj" : "public";
+      document.getElementById("newOrderContact").value = source.buyerContact || "";
+      source.items.forEach(item => addNewOrderLine(item));
+      document.getElementById("newOrderPanel").hidden = false;
+      document.getElementById("newOrderToggle").textContent = "Masquer le formulaire";
+      document.getElementById("newOrderFeedback").textContent =
+        `Copie du devis ${source.publicReference} : vérifiez les coordonnées et les lignes signalées. Aucun enregistrement avant validation du formulaire.`;
+      document.getElementById("newOrderPanel").scrollIntoView?.({ behavior: "smooth", block: "start" });
+      document.getElementById("newOrderAvatar").focus?.();
+    } catch (error) {
+      global.alert(error.message);
+    } finally {
+      button.disabled = false;
+    }
   }
 
   function initializeNewOrderForm() {
@@ -630,12 +707,13 @@
     form.addEventListener("submit", submitNewOrder);
   }
 
-  function addNewOrderLine() {
-    if (!orderCatalog.length || newOrderEditors.length >= 10) return;
+  function addNewOrderLine(source = null) {
+    if ((!orderCatalog.length && !source?.itemName) || newOrderEditors.length >= 10) return;
     let editor;
     editor = createDirectLineEditor(orderCatalog, {
       frjMember: document.getElementById("newOrderProfile").value === "frj",
       sharedHeadings: true,
+      requireCatalogMarkup: Boolean(duplicateSourceId),
       onChange: updateNewOrderForm,
       onRemove: () => {
         newOrderEditors = newOrderEditors.filter((candidate) => candidate !== editor);
@@ -643,6 +721,7 @@
       }
     });
     newOrderEditors.push(editor);
+    if (source?.itemName) editor.prefill(source);
     renderNewOrderLines();
   }
 
@@ -697,6 +776,7 @@
   function resetNewOrderForm() {
     document.getElementById("newOrderForm")?.reset();
     newOrderEditors = [];
+    duplicateSourceId = null;
     document.getElementById("newOrderLines")?.replaceChildren();
     const feedback = document.getElementById("newOrderFeedback");
     if (feedback) {
@@ -731,6 +811,8 @@
         body: JSON.stringify({
           buyerAvatar: document.getElementById("newOrderAvatar").value,
           frjMember: document.getElementById("newOrderProfile").value === "frj",
+          buyerContact: document.getElementById("newOrderContact")?.value || "",
+          ...(duplicateSourceId ? { duplicateSourceId } : {}),
           items: values.map((value) => value.payload)
         })
       });

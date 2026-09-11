@@ -69,6 +69,91 @@ async function settle() {
   await new Promise((resolve) => setImmediate(resolve));
 }
 
+test("T-018 duplication : profil, remises, stock, MU absent et en-tête éditable avant création", async () => {
+  const ids = ["ordersList", "ordersSummary", "ordersError", "ordersFilters", "refreshOrders",
+    "newOrderToggle", "newOrderPanel", "newOrderForm", "newOrderAvatar", "newOrderProfile", "newOrderContact",
+    "newOrderLines", "newOrderAddLine", "newOrderTotal", "newOrderTotalTt", "newOrderTotalMarkup",
+    "newOrderFeedback", "newOrderCancel", "newOrderSave", "newOrderResult"];
+  const elements = new Map(ids.map(id => [id, new FakeElement(id)]));
+  const created = [];
+  const requests = [];
+  const catalog = [
+    { itemName: "Armor", storage: "ARMORS", aisle: "PARTS", availableStock: 2, unitTtPed: 10,
+      markupKind: "percent", markupValue: 1.2, discountRate: 0.25, discountKind: "daily_promo", discountCampaignId: "promo" },
+    { itemName: "Unknown MU", storage: "ARMORS", aisle: "PARTS", availableStock: 1, unitTtPed: 5,
+      markupKind: "none", markupValue: null }
+  ];
+  const source = { id: "123e4567-e89b-42d3-a456-426614174000", publicReference: "FRJ-20260911-ABC123",
+    buyerAvatar: " Soc ", buyerContact: "old contact", frjMember: true, sourceBackend: "d1-admin",
+    status: "completed", items: [
+      { ...catalog[0], quantity: 4, markupValue: 99 },
+      { ...catalog[1], quantity: 1 },
+      { itemName: "Missing", storage: "ARMORS", aisle: "PARTS", quantity: 1 }
+    ] };
+  const original = JSON.stringify(source);
+  const makeElement = () => { const element = new FakeElement(); created.push(element); return element; };
+  const document = { getElementById: id => elements.get(id), createElement: makeElement,
+    createTextNode: text => ({ textContent: text }) };
+  const window = {
+    location: { href: "https://example.test/commandes.html" }, FRJ_ADMIN: { require: () => true },
+    localStorage: createStorage(), confirm: () => true, alert: message => { throw new Error(message); },
+    navigator: { clipboard: { writeText: async () => {} } },
+    FRJ_API: {
+      shortTrackingUrl: ref => `https://example.test/s.html#${ref}`,
+      fetchD1Admin: async (path, options) => {
+        requests.push({ path, options });
+        if (path.endsWith("/duplicate-preview")) return { json: async () => ({ source, catalog: { items: catalog } }) };
+        if (path.endsWith("/catalog")) return { json: async () => ({ items: catalog }) };
+        if (options?.method === "POST") return { json: async () => ({
+          order: { publicReference: "FRJ-20260911-DEF456" },
+          trackingPath: "suivi-commande.html?ref=FRJ-20260911-DEF456"
+        }) };
+        return { json: async () => ({ orders: [source, { ...source, id: "other", buyerAvatar: "Client" },
+          { ...source, id: "public-order", sourceBackend: "d1", buyerAvatar: "Public" }],
+          enabled: true, generatedAt: "2026-09-11T10:00:00Z" }) };
+      }
+    }
+  };
+  const context = vm.createContext({ window, document, console, URL });
+  vm.runInContext(commonSource, context);
+  vm.runInContext(adminSource, context);
+  await settle(); await settle();
+  const walk = element => [element, ...(element.children || []).flatMap(walk)];
+  const buttons = walk(elements.get("ordersList")).filter(e => e.textContent === "Dupliquer ce devis");
+  assert.equal(buttons.length, 1);
+  await buttons[0].listeners.get("click")();
+  const rows = elements.get("newOrderLines").children.slice(1);
+  const control = (row, label) => walk(row).find(e => e.attributes?.get("aria-label") === label);
+  const amount = row => control(row, "Valeur de MU de la demande directe");
+  assert.equal(control(rows[0], "Quantité de la demande directe").value, "2");
+  assert.equal(amount(rows[0]).value, "107.50");
+  assert.ok(walk(rows[0]).some(e => /réduite de 4 à 2/.test(e.textContent)));
+  assert.equal(amount(rows[1]).value, "");
+  assert.equal(rows[2].classList.contains("direct-order-line-error"), true);
+  assert.equal(elements.get("newOrderSave").disabled, true);
+  assert.equal(requests.some(r => r.options?.method === "POST"), false);
+  elements.get("newOrderProfile").value = "public";
+  elements.get("newOrderProfile").listeners.get("change")({ target: elements.get("newOrderProfile") });
+  assert.equal(amount(rows[0]).value, "115.00");
+  amount(rows[1]).value = "105";
+  amount(rows[1]).listeners.get("input")();
+  walk(rows[2]).find(e => e.textContent === "Retirer").listeners.get("click")();
+  assert.equal(elements.get("newOrderSave").disabled, false);
+  elements.get("newOrderAvatar").value = "Real Buyer";
+  elements.get("newOrderContact").value = "Discord: buyer";
+  await elements.get("newOrderForm").listeners.get("submit")({ preventDefault() {} });
+  const post = requests.find(r => r.options?.method === "POST");
+  const body = JSON.parse(post.options.body);
+  assert.equal(body.buyerAvatar, "Real Buyer");
+  assert.equal(body.buyerContact, "Discord: buyer");
+  assert.equal(body.frjMember, false);
+  assert.equal(body.duplicateSourceId, source.id);
+  assert.equal(body.items.length, 2);
+  assert.equal(body.items[0].markupAmount, 115);
+  assert.equal(body.items[0].catalogSnapshot.markupValue, 1.2);
+  assert.equal(JSON.stringify(source), original);
+});
+
 test("les deux pages ne chargent plus que des scripts externes", () => {
   assert.match(adminHtml, /src="\.\/js\/pages\/commandes\.js/);
   assert.match(trackingHtml, /src="\.\/js\/pages\/suivi-commande\.js/);

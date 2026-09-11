@@ -88,6 +88,7 @@ export function normalizeAdminOrderDraft(payload) {
   if (keys.size !== items.length) throw new Error("Un article ne peut apparaître qu'une seule fois");
   return {
     buyerAvatar,
+    buyerContact: cleanOptionalText(payload.buyerContact, 160),
     frjMember: payload.frjMember === true,
     items
   };
