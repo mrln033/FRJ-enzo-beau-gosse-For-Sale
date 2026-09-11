@@ -25,14 +25,14 @@ Les demandes d.13, d.12 et d.9 sont terminées. D.9 fournit les promotions quoti
 
 Les tâches T-001 à T-012 sont terminées et publiées. T-014 puis T-015 sont réalisées le 11/09/2026 ; frontend poussé sur GitHub (436eeb9), backend publié. Validation utilisateur attendue après tests en production. T-013 n'apparaît pas dans le fichier : les identifiants attribués sont conservés sans renumérotation.
 T-009 : validation finale utilisateur reçue le 05/09/2026 après réimport des quatre inventaires et contrôles finaux. Les attentes mentionnées dans les étapes historiques ci-dessous sont levées. Le contrat des inventaires n'est pas modifié par T-014/T-015.
-T-016 : nouvel ordre Discord réalisé ; actualisation des 34 anciens messages référencés en D1 en attente d'accès au webhook. L'ancienne d.4 reste en attente de cadrage depuis le 29/08/2026.
+T-016 terminée : ordre Discord publié et 31 messages actualisés et vérifiés ; 3 identifiants introuvables (HTTP 404), sans recréation. L'ancienne d.4 reste en attente de cadrage.
 
 -------------------------------
 DEMANDES  => CE QUI EST A FAIRE
 
 >>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-017 <<<
 
-T-016 [ÉVOLUTION] [EN ATTENTE] — Ordre des champs publié (voir REALISATIONS). Reste l'actualisation ponctuelle des anciens messages : 34 identifiants référencés dans D1 ; accès au webhook requis.
+
 
 [EN ATTENTE DE CADRAGE]
 d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> ajouter un bouton 'Supprimer' à chaque demande avec message de confirmation. Celà supprimerais l'enregistrement complet dans D1. Propagation Discord avec modification du statut en 'SUPPRIMEE' pour archivage.
@@ -40,7 +40,7 @@ d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> a
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
 
-11/09/2026 — T-016 [PARTIELLEMENT RÉALISÉE] — Ordre des champs Discord.
+11/09/2026 — T-016 [TERMINÉE] — Ordre des champs Discord.
 Demande d'origine :
 T-016  ==>  WebHook Demande d'achat
 	Dans le msg Discord des demandes d'achat (que nous avons précédemment modifié en T-015), je voudrais changer l'ordre des champ comme suit :
@@ -51,7 +51,7 @@ T-016  ==>  WebHook Demande d'achat
 	
 	D'autre part si tu as les ID des messages déjà publiés, peux-tu les actualiser avec ce nouveau format ?
 
-Réalisation : les champs sont ordonnés Avatar / Statut / Contact, puis Total TT / Total MU / Total Estimé ou Confirmé, puis Origine / Profil tarifaire, puis Articles. D1 et GAS appliquent le même ordre ; les articles restent non-inline. Discord adapte le nombre de colonnes à la largeur disponible, notamment sur mobile. Les 225 tests passent, dont le contrôle de l'ordre pour les six statuts concernés. Worker publié : 0afe67e8-efd7-48d8-a23b-6267879797d1. GAS version 37 publiée sur le déploiement existant. Aucun changement des données métier. Les 34 anciens messages référencés ne sont pas encore actualisés : le secret du webhook n'est pas accessible dans la session. Ils adopteront naturellement le format lors de leur prochaine modification ; l'actualisation ponctuelle demandée reste à effectuer après accès au webhook. Identifiant corrigé par l'utilisateur pendant l'intervention : T-016 (initialement T-017). Prochain identifiant : T-017.
+Réalisation : les champs sont ordonnés Avatar / Statut / Contact, puis Total TT / Total MU / Total Estimé ou Confirmé, puis Origine / Profil tarifaire, puis Articles. D1 et GAS appliquent le même ordre ; les articles restent non-inline. Discord adapte le nombre de colonnes à la largeur disponible, notamment sur mobile. Les 225 tests passent, dont le contrôle de l'ordre pour les six statuts concernés. Worker publié : 0afe67e8-efd7-48d8-a23b-6267879797d1. GAS version 37 publiée sur le déploiement existant. Aucun changement des données métier. Actualisation ponctuelle effectuée : 34 identifiants examinés, 31 messages modifiés puis relus et vérifiés, 3 introuvables (HTTP 404) non recréés. Aucune écriture métier D1/GAS. Le fichier secret discord-webhook.local.txt est exclu de Git et non publié. Identifiant corrigé par l'utilisateur pendant l'intervention : T-016 (initialement T-017). Prochain identifiant : T-017.
 
 11/09/2026 — T-014 puis T-015 — Totaux de demande et message Discord.
 Demandes d'origine :

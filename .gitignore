@@ -1,4 +1,5 @@
 # Sauvegardes et données privées : ne jamais publier sur GitHub Pages.
+/discord-webhook.local.txt
 /save/
 /cloudflare/for-sale-api/seed/initial.sql
 

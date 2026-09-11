@@ -66,7 +66,7 @@ Après chaque synchronisation différée susceptible de modifier le stock, le ca
 
 Le déploiement de production actuel est la version 37. Son URL est référencée par `js/api-client.js` pour les imports et le secours des demandes et par le Worker pour la synchronisation ; elle doit rester stable. Les imports MindArk lisent une ligne physique par article avec six champs, ignorent les lignes entièrement vides et décodent les guillemets champ par champ pour empêcher toute fusion d'articles. Les erreurs renvoient une phase contrôlée et une référence ; leur détail reste dans les journaux privés GAS.
 
-T-016 (11/09/2026) : ordre des champs Discord commun à GAS et D1 : Avatar / Statut / Contact, Total TT / Total MU / Total Estimé ou Confirmé, Origine / Profil tarifaire, puis Articles. La disposition en colonnes reste adaptée par Discord à la largeur d'écran. L'actualisation ponctuelle des anciens messages reste en attente d'accès au webhook.
+T-016 (11/09/2026) : ordre des champs Discord commun à GAS et D1 : Avatar / Statut / Contact, Total TT / Total MU / Total Estimé ou Confirmé, Origine / Profil tarifaire, puis Articles. La disposition en colonnes reste adaptée par Discord à la largeur d'écran. Actualisation ponctuelle réalisée : 31 messages modifiés et vérifiés, 3 identifiants introuvables (HTTP 404) non recréés ; aucune écriture métier D1/GAS. Le secret local est exclu de Git.
 
 ## Totaux Discord (T-015, 11/09/2026)
 
