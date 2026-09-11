@@ -10,6 +10,11 @@ test("T-015 Discord GAS et D1 : totaux et retour au statut estimé", () => {
     const order = { status, pricingStatus: "confirmed", totalTtPed: 20, totalSalePed: 24 };
     for (const payload of [gas.purchaseDiscordPayload_(order, []), buildDiscordOrderPayload(order, [])]) {
       const fields = payload.embeds[0].fields;
+      assert.deepEqual(Array.from(fields.slice(0, 8), f => f.name), [
+        "Avatar", "Statut", "Contact", "Total TT", "Total MU",
+        ["preparing", "ready", "completed"].includes(status) ? "Total Confirmé" : "Total Estimé",
+        "Origine", "Profil tarifaire"
+      ]);
       assert.match(fields.find(f => f.name === "Total TT").value, /^20(?:,00)? PED$/);
       assert.match(fields.find(f => f.name === "Total MU").value, /^4(?:,00)? PED \(20(?:,00)? %\)$/);
       const label = ["preparing", "ready", "completed"].includes(status) ? "Total Confirmé" : "Total Estimé";

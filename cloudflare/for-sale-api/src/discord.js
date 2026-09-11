@@ -34,10 +34,10 @@ export function buildDiscordOrderPayload(order, items) {
   const fields = [
     { name: "Avatar", value: discordText(order?.buyerAvatar || "—", 1024), inline: true },
     { name: "Statut", value: STATUS_LABELS[status] || discordText(status, 1024), inline: true },
+    { name: "Contact", value: discordText(order?.buyerContact || "Non renseigné", 1024), inline: true },
     { name: "Total TT", value: `${formatNumber(tt)} PED`, inline: true },
     { name: "Total MU", value: `${formatNumber(markup)} PED (${formatNumber(markupPercent)} %)`, inline: true },
     { name: confirmed ? "Total Confirmé" : "Total Estimé", value: `${formatNumber(order?.totalSalePed)} PED`, inline: true },
-    { name: "Contact", value: discordText(order?.buyerContact || "Non renseigné", 1024), inline: true },
     {
       name: "Origine",
       value: order?.sourceBackend === "gas-fallback"

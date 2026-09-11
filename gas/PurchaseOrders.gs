@@ -422,10 +422,10 @@ function purchaseDiscordPayload_(order, items) {
   var fields = [
     { name: "Avatar", value: purchaseDiscordText_(order.buyerAvatar || "—", 1024), inline: true },
     { name: "Statut", value: statusLabels[status] || status, inline: true },
+    { name: "Contact", value: purchaseDiscordText_(order.buyerContact || "Non renseigné", 1024), inline: true },
     { name: "Total TT", value: purchaseDiscordNumber_(tt, 2) + " PED", inline: true },
     { name: "Total MU", value: purchaseDiscordNumber_(markup, 2) + " PED (" + purchaseDiscordNumber_(markupPercent, 2) + " %)", inline: true },
     { name: confirmed ? "Total Confirmé" : "Total Estimé", value: purchaseDiscordNumber_(order.totalSalePed, 2) + " PED", inline: true },
-    { name: "Contact", value: purchaseDiscordText_(order.buyerContact || "Non renseigné", 1024), inline: true },
     { name: "Origine", value: "Secours GAS", inline: true },
     { name: "Profil tarifaire", value: order.frjMember ? "Membre FRJ" : "Public", inline: true }
   ];
