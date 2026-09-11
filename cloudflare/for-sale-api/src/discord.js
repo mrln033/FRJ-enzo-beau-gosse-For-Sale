@@ -26,10 +26,17 @@ const STATUS_COLORS = {
 export function buildDiscordOrderPayload(order, items) {
   const status = String(order?.status || "submitted").toLowerCase();
   const memberLabel = order?.frjMember ? "MU FRJ" : "MU";
+  const tt = Math.round(Number(order?.totalTtPed || 0) * 100) / 100;
+  const markup = Math.round((Number(order?.totalSalePed || 0) - tt) * 100) / 100;
+  const markupPercent = tt > 0 ? markup / tt * 100 : 0;
+  // Le libellé Discord suit le statut courant, même après une réouverture.
+  const confirmed = ["preparing", "ready", "completed"].includes(status);
   const fields = [
     { name: "Avatar", value: discordText(order?.buyerAvatar || "—", 1024), inline: true },
     { name: "Statut", value: STATUS_LABELS[status] || discordText(status, 1024), inline: true },
-    { name: "Total estimé", value: `${formatNumber(order?.totalSalePed)} PED`, inline: true },
+    { name: "Total TT", value: `${formatNumber(tt)} PED`, inline: true },
+    { name: "Total MU", value: `${formatNumber(markup)} PED (${formatNumber(markupPercent)} %)`, inline: true },
+    { name: confirmed ? "Total Confirmé" : "Total Estimé", value: `${formatNumber(order?.totalSalePed)} PED`, inline: true },
     { name: "Contact", value: discordText(order?.buyerContact || "Non renseigné", 1024), inline: true },
     {
       name: "Origine",

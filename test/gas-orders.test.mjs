@@ -2,6 +2,22 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 import vm from "node:vm";
+import { buildDiscordOrderPayload } from "../cloudflare/for-sale-api/src/discord.js";
+
+test("T-015 Discord GAS et D1 : totaux et retour au statut estimé", () => {
+  const gas = loadPurchaseOrders();
+  for (const status of ["preparing", "ready", "completed", "viewed", "submitted", "awaiting_approval"]) {
+    const order = { status, pricingStatus: "confirmed", totalTtPed: 20, totalSalePed: 24 };
+    for (const payload of [gas.purchaseDiscordPayload_(order, []), buildDiscordOrderPayload(order, [])]) {
+      const fields = payload.embeds[0].fields;
+      assert.match(fields.find(f => f.name === "Total TT").value, /^20(?:,00)? PED$/);
+      assert.match(fields.find(f => f.name === "Total MU").value, /^4(?:,00)? PED \(20(?:,00)? %\)$/);
+      const label = ["preparing", "ready", "completed"].includes(status) ? "Total Confirmé" : "Total Estimé";
+      assert.match(fields.find(f => f.name === label).value, /^24(?:,00)? PED$/);
+      assert.equal(fields.filter(f => /^Total (Confirmé|Estimé)$/.test(f.name)).length, 1);
+    }
+  }
+});
 import {
   normalizeOrderSubmission,
   priceOrderLines

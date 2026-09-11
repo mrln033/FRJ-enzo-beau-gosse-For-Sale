@@ -64,4 +64,8 @@ Après chaque synchronisation différée susceptible de modifier le stock, le ca
 6. Mettre à jour le déploiement Web App existant avec son `deploymentId`, afin de conserver la même URL `/exec`.
 7. Cloner à nouveau le projet et comparer les empreintes des fichiers, puis tester les routes publiques sans écriture métier.
 
-Le déploiement de production actuel est la version 35. Son URL est référencée par `js/api-client.js` pour les imports et le secours des demandes et par le Worker pour la synchronisation ; elle doit rester stable. Les imports MindArk lisent une ligne physique par article avec six champs, ignorent les lignes entièrement vides et décodent les guillemets champ par champ pour empêcher toute fusion d'articles. Les erreurs renvoient une phase contrôlée et une référence ; leur détail reste dans les journaux privés GAS.
+Le déploiement de production actuel est la version 36. Son URL est référencée par `js/api-client.js` pour les imports et le secours des demandes et par le Worker pour la synchronisation ; elle doit rester stable. Les imports MindArk lisent une ligne physique par article avec six champs, ignorent les lignes entièrement vides et décodent les guillemets champ par champ pour empêcher toute fusion d'articles. Les erreurs renvoient une phase contrôlée et une référence ; leur détail reste dans les journaux privés GAS.
+
+## Totaux Discord (T-015, 11/09/2026)
+
+Le message affiche le total TT et le MU global (vente moins TT), en PED et en pourcentage du TT ; pour un TT nul, le pourcentage vaut zéro. Le libellé de vente suit le statut courant : « Total Confirmé » pour preparing/ready/completed, « Total Estimé » sinon, y compris après retour à awaiting_approval/submitted/viewed. Le champ pricingStatus ne doit pas empêcher ce retour. D1 applique la même règle. Les anciens messages sont enrichis lors de leur prochaine actualisation normale.

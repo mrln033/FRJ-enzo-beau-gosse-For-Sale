@@ -366,6 +366,7 @@ test("la Console Admin charge l'historique à la demande et modifie un commentai
 
 test("d.12 crée une demande directe et propose son lien de suivi", async () => {
   const ids = [
+    "newOrderTotalTt", "newOrderTotalMarkup",
     "ordersList", "ordersSummary", "ordersError", "ordersFilters", "refreshOrders",
     "newOrderToggle", "newOrderPanel", "newOrderForm", "newOrderAvatar", "newOrderProfile",
     "newOrderLines", "newOrderAddLine", "newOrderTotal", "newOrderFeedback", "newOrderCancel",
@@ -443,9 +444,12 @@ test("d.12 crée une demande directe et propose son lien de suivi", async () => 
   article.listeners.get("input")();
   assert.equal(amount.step, "0.01");
   assert.equal(amount.value, "110.00");
+  assert.match(elements.get("newOrderTotalTt").textContent, /10,00 PED/);
+  assert.match(elements.get("newOrderTotalMarkup").textContent, /1,00 PED \(10,00 %\)/);
   elements.get("newOrderProfile").value = "public";
   elements.get("newOrderProfile").listeners.get("change")({ target: elements.get("newOrderProfile") });
   assert.equal(amount.value, "120.00");
+  assert.match(elements.get("newOrderTotalMarkup").textContent, /2,00 PED \(20,00 %\)/);
   elements.get("newOrderProfile").value = "frj";
   elements.get("newOrderProfile").listeners.get("change")({ target: elements.get("newOrderProfile") });
   assert.equal(amount.value, "110.00");

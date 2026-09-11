@@ -535,6 +535,7 @@
       return {
         valid,
         lineSale,
+        lineTt: valid ? ui.roundPed(Number(item.unitTtPed || 0) * itemQuantity) : null,
         key: item ? `${item.itemName}\u001f${item.storage}\u001f${item.aisle}`.toLocaleLowerCase("en-US") : "",
         payload: item ? {
           itemName: item.itemName,
@@ -675,6 +676,16 @@
     const keys = values.map((value) => value.key).filter(Boolean);
     const duplicates = new Set(keys).size !== keys.length;
     const valid = values.length > 0 && values.every((value) => value.valid) && !duplicates;
+    const totals = valid ? ui.orderMarkupTotals(
+      values.reduce((sum, value) => sum + value.lineTt, 0),
+      values.reduce((sum, value) => sum + value.lineSale, 0)
+    ) : null;
+    const totalTt = document.getElementById("newOrderTotalTt");
+    const totalMarkup = document.getElementById("newOrderTotalMarkup");
+    if (totalTt) totalTt.textContent = totals ? `Total TT : ${ui.formatPed(totals.totalTtPed)} PED` : "Total TT : —";
+    if (totalMarkup) totalMarkup.textContent = totals
+      ? `MU Total (%) : ${ui.formatPed(totals.markupPed)} PED (${ui.formatPed(totals.markupPercent)} %)`
+      : "MU Total (%) : —";
     total.textContent = valid
       ? `Estimation totale : ${ui.formatPed(values.reduce((sum, value) => sum + value.lineSale, 0))} PED`
       : (duplicates ? "Un même article ne peut pas être ajouté deux fois." : "Estimation totale : —");

@@ -415,10 +415,16 @@ function purchaseDiscordPayload_(order, items) {
   };
   var status = String(order.status || "submitted").toLowerCase();
   var memberLabel = order.frjMember ? "MU FRJ" : "MU";
+  var tt = purchaseRound_(Number(order.totalTtPed || 0));
+  var markup = purchaseRound_(Number(order.totalSalePed || 0) - tt);
+  var markupPercent = tt > 0 ? markup / tt * 100 : 0;
+  var confirmed = ["preparing", "ready", "completed"].indexOf(status) !== -1;
   var fields = [
     { name: "Avatar", value: purchaseDiscordText_(order.buyerAvatar || "—", 1024), inline: true },
     { name: "Statut", value: statusLabels[status] || status, inline: true },
-    { name: "Total estimé", value: purchaseDiscordNumber_(order.totalSalePed, 2) + " PED", inline: true },
+    { name: "Total TT", value: purchaseDiscordNumber_(tt, 2) + " PED", inline: true },
+    { name: "Total MU", value: purchaseDiscordNumber_(markup, 2) + " PED (" + purchaseDiscordNumber_(markupPercent, 2) + " %)", inline: true },
+    { name: confirmed ? "Total Confirmé" : "Total Estimé", value: purchaseDiscordNumber_(order.totalSalePed, 2) + " PED", inline: true },
     { name: "Contact", value: purchaseDiscordText_(order.buyerContact || "Non renseigné", 1024), inline: true },
     { name: "Origine", value: "Secours GAS", inline: true },
     { name: "Profil tarifaire", value: order.frjMember ? "Membre FRJ" : "Public", inline: true }

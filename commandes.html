@@ -11,7 +11,7 @@
   <script defer src="./js/visit-tracking.js?v=20260831-1"></script>
   <script defer src="./js/common/order-ui.js?v=20260904-2"></script>
 <script defer src="./js/admin-menu.js?v=20260830-1"></script>
-  <script defer src="./js/pages/commandes.js?v=20260910-1"></script>
+  <script defer src="./js/pages/commandes.js?v=20260911-1"></script>
   <title>[FRJ] — Demandes d'achat</title>
   <link rel="stylesheet" href="./css/pages/commandes.css?v=20260904-1">
 </head>
@@ -49,7 +49,11 @@
       <div id="newOrderLines" class="direct-order-lines"></div>
       <div class="new-order-toolbar">
         <button type="button" id="newOrderAddLine">Ajouter un article</button>
-        <strong id="newOrderTotal">Estimation totale : —</strong>
+        <div class="order-totals" aria-live="polite">
+          <p id="newOrderTotalTt" class="order-subtotal">Total TT : —</p>
+          <p id="newOrderTotalMarkup" class="order-subtotal">MU Total (%) : —</p>
+          <strong id="newOrderTotal">Estimation totale : —</strong>
+        </div>
       </div>
       <p id="newOrderFeedback" class="new-order-feedback" aria-live="polite"></p>
       <div class="new-order-actions">
