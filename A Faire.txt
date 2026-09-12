@@ -41,6 +41,9 @@ d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> a
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
 
+12/09/2026 — Correction ponctuelle de deux noms d'avatar à la demande utilisateur.
+FRJ-20260910-7F2CD6 : Publiec devient Public. FRJ-20260904-D37391 : Prix Public devient Public. Les deux corrections sont effectuées et relues dans D1 ; seul le champ Avatar des deux messages Discord est modifié puis vérifié. Les prix, quantités, profils et statuts restent inchangés. Deux événements buyer-avatar-corrected consignent les anciennes valeurs et rendent ces demandes disponibles au prochain passage du miroir D1 vers GAS ; la réception GAS n'a pas été contrôlée directement. Cette réparation ne corrige pas la limite actuelle : les modifications directes d'avatar/contact dans COMMANDES_APP ne sont pas capturées par le mécanisme GAS vers D1 (qui gère les statuts et les commentaires d'historique). Une prise en charge durable reste à cadrer et implémenter séparément.
+
 11/09/2026 — T-018 [RÉALISÉE — VALIDATION PRODUCTION ATTENDUE] — Duplication des devis Admin.
 Demande d'origine :
 T-018  ==>  Demande d'Achat coté Admin
