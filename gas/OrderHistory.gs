@@ -79,7 +79,7 @@ function purchaseHistoryEventFromRow_(row, indexes) {
   };
 }
 
-function upsertPurchaseOrderHistoryMirror_(events) {
+function upsertPurchaseOrderHistoryMirror_(events, force) {
   if (!Array.isArray(events) || !events.length) return 0;
   var ss = SpreadsheetApp.openById(FRJ_SYNC_CONFIG.appSpreadsheetId);
   var sheet = getOrCreatePurchaseOrderHistorySheet_(ss);
@@ -100,7 +100,10 @@ function upsertPurchaseOrderHistoryMirror_(events) {
     var row = purchaseHistoryRow_(event, true, "");
     var key = String(event.eventKey || "").trim().toLowerCase();
     var targetRow = rowsByKey[key];
-    if (targetRow) sheet.getRange(targetRow, 1, 1, headers.length).setValues([row]);
+    if (targetRow) {
+      if (!force && !values[targetRow-2][indexes.SYNCED_D1_AT]) return;
+      sheet.getRange(targetRow, 1, 1, headers.length).setValues([row]);
+    }
     else {
       additions.push(row);
       rowsByKey[key] = sheet.getLastRow() + additions.length;
@@ -134,7 +137,8 @@ function purchaseMarkHistorySyncResult_(pending, results) {
   var canonicalEvents = [];
   pending.entries.forEach(function(entry) {
     var result = resultsByKey[entry.event.eventKey];
-    if (result && result.ok && result.event) {
+    if (result && result.ok && result.event
+      && String(pending.sheet.getRange(entry.rowNumber,pending.indexes.COMMENTAIRE+1).getValue() || "") === entry.event.comment) {
       canonicalEvents.push(result.event);
       return;
     }
@@ -142,13 +146,37 @@ function purchaseMarkHistorySyncResult_(pending, results) {
     pending.sheet.getRange(entry.rowNumber, pending.indexes.SYNC_ERROR + 1)
       .setValue(new Date().toISOString() + " — " + message);
   });
-  if (canonicalEvents.length) upsertPurchaseOrderHistoryMirror_(canonicalEvents);
+  if (canonicalEvents.length) upsertPurchaseOrderHistoryMirror_(canonicalEvents,true);
   return canonicalEvents.length;
 }
 
 /** Capture uniquement les changements autorisés : statut de commande ou commentaire d'historique. */
 function frjCapturePurchaseOrderEdit_(e) {
   var range = e && e.range;
+  if (range && typeof frjEnsureOrderEditing_ === "function") {
+    var name = range.getSheet().getName();
+    if (name === "COMMANDES_APP" || name === "COMMANDES_LIGNES") {
+      frjEnsureOrderEditing_();
+      if (name === "COMMANDES_APP" && range.getColumn() <= 24
+        && range.getColumn()+range.getNumColumns()-1 >= 24) {
+        frjSyncEditableOrders_();
+        return false;
+      }
+      // Pas de requête D1 à chaque touche : envoi groupé au poll ou via le menu.
+      var lock = LockService.getScriptLock();
+      if (lock.tryLock(1000)) {
+        try { frjScanOrderEdits_(frjOrderSheetState_()); } finally { lock.releaseLock(); }
+      }
+      return false;
+    }
+    if (name === "COMMANDES_HISTORIQUE" && range.getColumn() <= 6
+      && range.getColumn()+range.getNumColumns()-1 >= 6) {
+      for (var at=Math.max(2,range.getRow()); at<range.getRow()+range.getNumRows(); at++) {
+        purchaseCaptureHistoryCommentEdit_(range.getSheet(),range.getSheet().getRange(at,6));
+      }
+      return true;
+    }
+  }
   if (!range || range.getNumRows() !== 1 || range.getNumColumns() !== 1 || range.getRow() < 2) return false;
   var sheet = range.getSheet();
   var sheetName = sheet.getName();

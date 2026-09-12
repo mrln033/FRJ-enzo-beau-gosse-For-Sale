@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
-import { handleAdminDelete, handleAdminGet, handleAdminPost, refreshMutableOrderDiscounts } from "../src/application.js";
+import { handleAdminDelete, handleAdminGet, handleAdminPost, handleSyncGet, handleSyncPost, refreshMutableOrderDiscounts } from "../src/application.js";
+import { editableSheetDraft } from "../src/order-sheet-sync.js";
 import { normalizeAdminOrderDraft, normalizeAdminOrderLine } from "../src/orders.js";
 
 class D1Statement {
@@ -158,6 +159,134 @@ function setupDatabase() {
 
 const lineA = { itemName: "Item A", storage: "ARMORS", aisle: "PARTS", quantity: 2, markupKind: "percent", markupAmount: 110 };
 const lineB = { itemName: "Item B", storage: "MATERIALS", aisle: "MINERALS", quantity: 1, markupKind: "ped", markupAmount: 1.25 };
+
+async function sheetFixture() {
+  const db = setupDatabase(), env = { DB: makeD1(db), CART_ENABLED: "true" };
+  const url = new URL("https://api.example/admin/orders");
+  const created = await (await handleAdminPost(new Request(url,{method:"POST",
+    body:JSON.stringify({buyerAvatar:"Public",frjMember:false,items:[lineA,lineB]})}),url,env)).json();
+  const id = created.order.id;
+  const get = async () => (await (await handleSyncGet(new URL("https://api.example/sync/order-edit?id="+id),env)).json()).snapshot;
+  const initial = await get();
+  const operation = () => ({ orderId:id,operationId:"sheet-"+crypto.randomUUID(),
+    baseRevision:initial.editRevision,draft:editableSheetDraft(initial) });
+  const send = async payload => {
+    const endpoint = new URL("https://api.example/sync/order-edit");
+    return (await handleSyncPost(new Request(endpoint,{method:"POST",body:JSON.stringify(payload)}),endpoint,env)).json();
+  };
+  const items = () => db.prepare("SELECT * FROM purchase_order_items WHERE order_id=? ORDER BY line_no").all(id);
+  const writes = () => Number(db.prepare("SELECT total_changes() AS n").get().n);
+  return {db,env,id,initial,get,operation,send,items,writes};
+}
+
+test("Sheets : entête seule, aucune écriture de ligne ; reprises et absence de changement sans écriture",async () => {
+  const f=await sheetFixture(), before=f.items(), noop=f.operation(), zero=f.writes();
+  assert.equal((await f.send(noop)).noChange,true);
+  assert.equal(f.writes(),zero);
+  const edit=f.operation(); edit.draft.buyerAvatar="Avatar corrigé"; edit.draft.buyerContact="contact"; edit.draft.language="EN";
+  const result=await f.send(edit);
+  assert.equal(result.ok,true); assert.equal(result.snapshot.buyerAvatar,"Avatar corrigé");
+  assert.equal(f.writes()-zero,2); // entête + reçu historique ; aucun webhook configuré dans la fixture
+  assert.deepEqual(f.items(),before);
+  assert.equal(result.snapshot.proposalVersion,f.initial.proposalVersion);
+  const settled=f.writes();
+  assert.equal((await f.send(edit)).duplicate,true);
+  assert.equal(f.writes(),settled);
+  edit.draft.buyerAvatar="Autre";
+  await assert.rejects(()=>f.send(edit),e=>e.status===409);
+});
+
+test("Sheets : version concurrente conservée, même si la date à la seconde est identique",async () => {
+  const f=await sheetFixture(), edit=f.operation();
+  edit.draft.buyerAvatar="Ancien";
+  f.db.prepare("INSERT INTO purchase_order_events(order_id,action) VALUES (?, 'status-changed')").run(f.id);
+  const before=f.writes(), result=await f.send(edit);
+  assert.equal(result.conflict,true); assert.equal(f.writes(),before);
+  assert.equal(result.snapshot.buyerAvatar,"Public");
+});
+
+test("Sheets : concurrence entre lecture et transaction n'écrit aucune valeur locale",async () => {
+  const f=await sheetFixture(), edit=f.operation(); edit.draft.buyerAvatar="Concurrent";
+  const original=f.env.DB.batch;
+  let injected=false;
+  f.env.DB.batch=statements=>{
+    if (!injected && statements[0].sql.includes("INSERT OR IGNORE")) {
+      injected=true;
+      f.db.prepare("INSERT INTO purchase_order_events(order_id,action) VALUES (?, 'status-changed')").run(f.id);
+    }
+    return original(statements);
+  };
+  const before=f.writes(), result=await f.send(edit);
+  assert.equal(result.conflict,true);
+  assert.equal(f.writes()-before,1); // seulement l'événement concurrent simulé
+  assert.equal(result.snapshot.buyerAvatar,"Public");
+});
+
+test("Sheets : deux transactions portant le même reçu ne réappliquent pas la proposition",async () => {
+  const f=await sheetFixture(), edit=f.operation(); edit.draft.items[0].quantity=3;
+  const original=f.env.DB.batch;
+  let injected=false;
+  f.env.DB.batch=statements=>{
+    if (!injected && statements[0].sql.includes("INSERT OR IGNORE")) {
+      injected=true;
+      const details=JSON.parse(statements[0].values[2]); details.attempt="concurrent-attempt";
+      f.db.prepare("INSERT INTO purchase_order_events(order_id,action,event_key,details) VALUES (?, 'sheet-order-edited',?,?)")
+        .run(f.id,edit.operationId,JSON.stringify(details));
+    }
+    return original(statements);
+  };
+  const before=f.writes(), result=await f.send(edit);
+  assert.equal(result.conflict,true);
+  assert.equal(f.writes()-before,1);
+  assert.equal(result.snapshot.items[0].quantity,2);
+});
+
+test("Sheets : une seule ligne modifiée, totaux recalculés et nouvelle validation client",async () => {
+  const f=await sheetFixture(), before=f.items(), edit=f.operation(), zero=f.writes();
+  edit.draft.items[0].quantity=3;
+  const result=await f.send(edit);
+  assert.equal(result.ok,true); assert.equal(f.writes()-zero,3);
+  assert.deepEqual(f.items()[1],before[1]);
+  assert.equal(result.snapshot.totalTtPed,35); assert.equal(result.snapshot.totalSalePed,39.25);
+  assert.equal(result.snapshot.status,"awaiting_approval");
+  assert.equal(result.snapshot.proposalVersion,f.initial.proposalVersion+1);
+});
+
+test("Sheets : profils et MU auto suivent les marges, sans cumuler la réduction FRJ",async () => {
+  const f=await sheetFixture(), edit=f.operation();
+  edit.draft.frjMember=true;
+  const member=await f.send(edit);
+  assert.equal(member.snapshot.items[0].markupValue,1.05);
+  assert.equal(member.snapshot.items[1].markupValue,0.625);
+  const back={...f.operation(),baseRevision:member.snapshot.editRevision,draft:editableSheetDraft(member.snapshot)};
+  back.draft.frjMember=false; back.draft.items[0].markupKind="auto"; back.draft.items[0].markupAmount=null;
+  const publicOrder=await f.send(back);
+  assert.equal(publicOrder.snapshot.items[0].markupValue,1.2);
+  assert.equal(publicOrder.snapshot.items[1].markupValue,1.25);
+});
+
+test("Sheets : articles retirés, quantités invalides et confirmation séparée",async () => {
+  const f=await sheetFixture(), invalid=f.operation(), before=f.writes();
+  invalid.draft.items[0].quantity=99;
+  await assert.rejects(()=>f.send(invalid),e=>e.status===400);
+  assert.equal(f.writes(),before);
+  invalid.draft.items[0].quantity=3; invalid.draft.status="ready";
+  await assert.rejects(()=>f.send(invalid),e=>e.status===400);
+  const remove=f.operation(); remove.draft.items.pop();
+  const result=await f.send(remove); assert.equal(result.snapshot.items.length,1);
+  assert.equal(result.snapshot.totalSalePed,22);
+  const confirm={...f.operation(),baseRevision:result.snapshot.editRevision,draft:editableSheetDraft(result.snapshot)};
+  f.db.exec("UPDATE inventory_current SET quantity=0; UPDATE catalog_items SET unit_price_ped=999");
+  confirm.draft.status="preparing";
+  const confirmed=await f.send(confirm);
+  assert.equal(confirmed.snapshot.pricingStatus,"confirmed");
+  assert.equal(confirmed.snapshot.items[0].unitTtPed,10);
+  const frozen={...f.operation(),baseRevision:confirmed.snapshot.editRevision,draft:editableSheetDraft(confirmed.snapshot)};
+  frozen.draft.items[0].quantity=1;
+  await assert.rejects(()=>f.send(frozen),e=>e.status===409);
+  frozen.draft=editableSheetDraft(confirmed.snapshot); frozen.draft.buyerAvatar="Correction tardive";
+  assert.equal((await f.send(frozen)).snapshot.buyerAvatar,"Correction tardive");
+});
 
 test("T-018 copie indépendante, contact et contrôle du catalogue sans écriture du modèle", async () => {
   const database = setupDatabase();

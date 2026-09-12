@@ -18,7 +18,7 @@ Convention d'identification à compter du 31/08/2026 :
 - les anciennes références d.N restent inchangées dans l'historique afin de préserver la trace des échanges passés.
 
 ----------------------------------------
-POINT DE REPRISE — 11/09/2026
+POINT DE REPRISE — 12/09/2026
 
 Ordre recommandé déjà réalisé et validé : d.1 -> d.2 -> d.3 -> d.7 -> d.8 -> d.6 -> d.10 -> d.11 -> d.5 -> d.13 -> d.12.
 Les demandes d.13, d.12 et d.9 sont terminées. D.9 fournit les promotions quotidiennes et les soldes communs à GAS et D1.
@@ -27,6 +27,7 @@ Les tâches T-001 à T-012 sont terminées et publiées. T-014 puis T-015 sont r
 T-009 : validation finale utilisateur reçue le 05/09/2026 après réimport des quatre inventaires et contrôles finaux. Les attentes mentionnées dans les étapes historiques ci-dessous sont levées. Le contrat des inventaires n'est pas modifié par T-014/T-015.
 T-016 terminée : ordre Discord publié et 31 messages actualisés et vérifiés ; 3 identifiants introuvables (HTTP 404), sans recréation. L'ancienne d.4 reste en attente de cadrage.
 T-017 terminée : liens courts des titres Discord publiés et anciens messages actualisés. T-018 développée après validation de faisabilité ; tests utilisateur en production attendus. Retour arrière documenté dans docs/PANIER.md. Seule d.4 reste en attente de cadrage.
+12/09 : évolution hors numéro réalisée pour les corrections métier des demandes depuis Sheets vers D1, sans modifier les inventaires. Tests production utilisateur attendus, notamment l'apparition de COMMANDES_LIGNES et ACTION_EDITION après le poll GAS. Voir la réalisation datée ci-dessous ; prochain identifiant toujours T-019.
 
 -------------------------------
 DEMANDES  => CE QUI EST A FAIRE
@@ -40,6 +41,12 @@ d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> a
 
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
+
+12/09/2026 — Évolution hors numéro : édition des demandes Google Sheets vers D1 [PUBLIÉE — VALIDATION PRODUCTION ATTENDUE].
+Demande d'origine : « oui, imlémente ça : toutes les modifications faites dans googlesheet doivent remonter dans D1 désormais », puis « si ce n'est pas trop lourd, ni couteux en 'rows read' et 'rows written', et surtout si tu juges que cela est nécessaire, fais-le ».
+Réalisation : capture différentielle des champs métier d'entête dans COMMANDES_APP ; nouvel onglet COMMANDES_LIGNES pour les articles, quantités et MU ; commentaires d'historique conservés. Envoi via le poll existant toutes les cinq minutes, dix demandes maximum par passage, ou colonne ACTION_EDITION dans COMMANDES_APP. Aucun appel D1 supplémentaire de ce circuit sans édition. Révision par demande, reçu atomique/idempotent, erreurs et conflits explicites sans écrasement des saisies locales. Prix/quantités/profil soumis aux règles métier, totaux calculés et nouvelle validation client après changement des conditions ; identifiants et champs techniques exclus. Une correction d'avatar seule ne réécrit pas les articles. Stock lu par index et noms ciblés ; contrôle de révision observé en production : 2 rows read, 0 rows written. Aucun changement des inventaires ni migration D1. Guide, limites et retour arrière dans docs/PANIER.md. 242 tests passent. Le connecteur Google refuse la lecture directe du classeur (403) ; l'initialisation réelle de l'onglet reste à vérifier après publication. Cette évolution traite la limite signalée dans la réparation ponctuelle ci-dessous. Le prochain identifiant libre reste T-019.
+
+Publication de cette évolution : Worker 24930711-fdab-411f-99c9-38cd62840fb0 ; GAS version 41 sur l'URL de déploiement existante. Les routes publiques contrôlées répondent 200 et /sync/order-edit refuse GET/POST sans jeton (401). Aucun achat factice créé pour les tests. Validation fonctionnelle dans le classeur à effectuer par l'utilisateur, faute de lecture directe autorisée par le connecteur.
 
 12/09/2026 — Correction ponctuelle de deux noms d'avatar à la demande utilisateur.
 FRJ-20260910-7F2CD6 : Publiec devient Public. FRJ-20260904-D37391 : Prix Public devient Public. Les deux corrections sont effectuées et relues dans D1 ; seul le champ Avatar des deux messages Discord est modifié puis vérifié. Les prix, quantités, profils et statuts restent inchangés. Deux événements buyer-avatar-corrected consignent les anciennes valeurs et rendent ces demandes disponibles au prochain passage du miroir D1 vers GAS ; la réception GAS n'a pas été contrôlée directement. Cette réparation ne corrige pas la limite actuelle : les modifications directes d'avatar/contact dans COMMANDES_APP ne sont pas capturées par le mécanisme GAS vers D1 (qui gère les statuts et les commentaires d'historique). Une prise en charge durable reste à cadrer et implémenter séparément.

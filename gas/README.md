@@ -11,6 +11,7 @@ Ce dossier contient la totalité du projet Apps Script autonome. Apps Script cha
 - `Containers.gs` : configuration multi-avatar des conteneurs et formules de quantité ;
 - `Imports.gs` : imports MU et inventaires ;
 - `OrderHistory.gs` : modèle, capture et miroir de l'historique des demandes ;
+- `OrderEditing.gs` : éditions différentielles des entêtes/lignes, conflits et actions Sheets ;
 - `PurchaseOrders.gs` : demandes de secours et Discord ;
 - `SyncD1.gs` : configuration, installation et déclencheurs ;
 - `SyncEngine.gs`, `SyncOrders.gs`, `SyncSheets.gs`, `SyncTransport.gs` : orchestration, demandes, feuilles et transport D1.
@@ -19,7 +20,9 @@ Les secrets `FRJ_D1_SYNC_TOKEN`, `FRJ_DISCORD_ORDER_WEBHOOK_URL` et les options 
 
 ## Historique des demandes
 
-La feuille `COMMANDES_HISTORIQUE` est créée de façon idempotente lors de l'installation de la synchronisation. Chaque événement possède une clé stable commune à GAS et D1. Une création ou annulation reçue par le secours GAS, ainsi qu'un changement manuel de la colonne `STATUT` dans `COMMANDES_APP`, ajoute une ligne non synchronisée. Le prochain envoi la réplique dans D1 ; inversement, le curseur des commandes rapatrie les événements D1 nouveaux ou modifiés.
+La feuille `COMMANDES_HISTORIQUE` est créée de façon idempotente lors de l'installation de la synchronisation. Chaque événement possède une clé stable commune à GAS et D1. Une création ou annulation reçue par le secours GAS ajoute une ligne non synchronisée, ensuite répliquée dans D1. Depuis le 12/09/2026, les éditions manuelles des entêtes/statuts de COMMANDES_APP et des articles de COMMANDES_LIGNES passent par /sync/order-edit : le serveur valide et applique la demande atomiquement avec son événement sheet-order-edited, puis le miroir rapatrie son historique.
+
+Le projet est autonome : les commandes ne reposent pas sur un menu de script lié. La colonne ACTION_EDITION de COMMANDES_APP sert à synchroniser, ajouter un article et résoudre explicitement un conflit. Le poll traite au maximum dix éditions par passage. Le JSON miroir reste la base de comparaison ; EDITION_JSON conserve l'envoi idempotent en attente, EDITION_ERREUR son erreur, D1_CONFLIT_JSON la version distante éventuelle. Le guide complet et le retour arrière figurent dans docs/PANIER.md. Aucune modification du contrat des inventaires.
 
 Pour une ligne d'historique déjà créée, seule la colonne `COMMENTAIRE` est destinée à être modifiée manuellement. Sa date de modification départage deux changements concurrents : la version la plus récente est conservée puis renvoyée à l'autre côté. Les colonnes `SYNCED_D1_AT` et `SYNC_ERROR` indiquent respectivement la dernière convergence et l'éventuel échec à retenter.
 

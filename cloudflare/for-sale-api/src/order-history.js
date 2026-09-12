@@ -13,7 +13,7 @@ const STATUS_LABELS = Object.freeze({
 const CLIENT_ACTIONS = new Set(["submitted", "proposal-accepted", "client-cancelled"]);
 const ADMIN_ACTIONS = new Set([
   "admin-created", "status-changed", "proposal-changed", "proposal-line-changed", "proposal-line-added",
-  "proposal-line-removed"
+  "proposal-line-removed", "sheet-order-edited", "buyer-avatar-corrected"
 ]);
 const HIDDEN_ACTIONS = new Set(["history-comment-updated", "pricing-confirmed-backfill", "discount-refreshed"]);
 const SYNCED_ACTIONS = new Set([
@@ -26,7 +26,7 @@ const SYNCED_ACTIONS = new Set([
   "proposal-line-removed",
   "status-changed",
   "proposal-accepted",
-  "client-cancelled"
+  "client-cancelled", "sheet-order-edited", "buyer-avatar-corrected"
 ]);
 const ORDER_STATUSES = new Set([
   "submitted", "viewed", "preparing", "ready", "completed", "cancelled", "expired"
@@ -44,6 +44,8 @@ export function isVisibleOrderHistoryAction(action) {
 }
 
 export function automaticOrderHistoryComment(action, details = {}) {
+  if (action === "sheet-order-edited") return "Demande modifiée depuis Google Sheets.";
+  if (action === "buyer-avatar-corrected") return "Nom d'avatar corrigé.";
   if (action === "submitted") return "Demande transmise par le client.";
   if (action === "gas-fallback-synchronized") return "Demande reçue depuis le secours GAS.";
   if (action === "admin-created") return "Demande directe créée par l’administrateur.";
@@ -119,7 +121,7 @@ export function normalizeSyncedOrderHistoryEvent(value) {
   const orderId = String(source.orderId || "").trim().toLowerCase();
   const action = String(source.action || "").trim();
   const actor = String(source.actor || "").trim();
-  if (!/^(?:d1-\d+|gas-[a-f0-9-]{36}|[a-f0-9-]{36})$/i.test(eventKey)) {
+  if (!/^(?:d1-\d+|(?:gas|sheet)-[a-f0-9-]{36}|avatar-public-20260912-[a-f0-9-]{36}|[a-f0-9-]{36})$/i.test(eventKey)) {
     throw new TypeError("Clé d’événement invalide");
   }
   if (!/^[a-f0-9-]{36}$/i.test(orderId)) throw new TypeError("Identifiant de demande invalide");

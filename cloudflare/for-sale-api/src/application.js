@@ -33,6 +33,11 @@ import {
   validateOrderStatus
 } from "./orders.js";
 import { sendOrUpdateDiscordOrder } from "./discord.js";
+import { applySheetOrder, readSheetOrder } from "./order-sheet-sync.js";
+
+function sheetOrderHelpers() {
+  return { mapAdminOrder, mapOrderItem, readAdminOrderCatalog, deriveBaseMarkup, synchronizeDiscordOrder };
+}
 import { diffContainerConfig, mapContainerConfigRow, normalizeContainerConfigPayload } from "./containers.js";
 import { businessDateInParis, computeDiscountedMarkup } from "./discounts.js";
 import {
@@ -448,6 +453,9 @@ export async function handlePost(request, url, env) {
 }
 
 export async function handleSyncGet(url, env) {
+  if (url.pathname === "/sync/order-edit") {
+    return json({ snapshot: (await readSheetOrder(env, url.searchParams.get("id"), sheetOrderHelpers())).snapshot });
+  }
   if (url.pathname === "/sync/orders") {
     return json(await readOrdersForGasMirror(env, url));
   }
@@ -527,6 +535,10 @@ export async function handleSyncPost(request, url, env) {
     return json(await importGasFallbackOrder(env, payload));
   }
 
+  if (url.pathname === "/sync/order-edit") {
+    if (!isCartEnabled(env)) throw new ApiError(503, "Suivi des demandes désactivé");
+    return json(await applySheetOrder(env, payload, sheetOrderHelpers()));
+  }
   if (url.pathname === "/sync/order-history") {
     if (!isCartEnabled(env)) throw new ApiError(503, "Suivi des demandes désactivé");
     return json(await importGasOrderHistory(env, payload));
@@ -2663,13 +2675,14 @@ function publicDiscordResult(result) {
   };
 }
 
-async function readAdminOrderCatalog(env) {
+async function readAdminOrderCatalog(env, requestedItems = null) {
   const businessDate = businessDateInParis();
   const result = await env.DB.prepare(`
     WITH stock AS (
       SELECT item_name, SUM(quantity) AS available_stock
       FROM saleable_inventory
       WHERE avatar_id = 'enzo'
+        ${requestedItems ? "AND item_name COLLATE NOCASE IN (SELECT value FROM json_each(?))" : ""}
       GROUP BY item_name COLLATE NOCASE
     )
     SELECT
@@ -2697,7 +2710,7 @@ async function readAdminOrderCatalog(env) {
       AND stock.available_stock > 0
       AND c.unit_price_ped IS NOT NULL
     ORDER BY l.storage, l.aisle, l.item_name COLLATE NOCASE
-  `).bind(businessDate, businessDate).all();
+  `).bind(...(requestedItems ? [JSON.stringify([...new Set(requestedItems.map(item => item.itemName))])] : []), businessDate, businessDate).all();
   return {
     generatedAt: new Date().toISOString(),
     items: result.results.map((row) => ({
@@ -3171,6 +3184,8 @@ async function readOrdersForGasMirror(env, url) {
              buyer_avatar, buyer_contact, buyer_comment, language, frj_member, source_backend,
              total_tt_ped, total_sale_ped, pricing_status, client_created_at, created_at, updated_at,
              discord_message_id
+      , (SELECT COALESCE(MAX(e.id),0) FROM purchase_order_events e
+         WHERE e.order_id = purchase_orders.id AND e.action NOT LIKE 'discord-%') AS edit_revision
       FROM purchase_orders
       WHERE id IN (SELECT CAST(value AS TEXT) FROM json_each(?))
     `).bind(idsJson),
@@ -3210,6 +3225,7 @@ async function readOrdersForGasMirror(env, url) {
   });
   const orders = ordersResult.results.map((row) => ({
     ...mapAdminOrder(row),
+    editRevision: Number(row.edit_revision || 0),
     accessTokenHash: row.access_token_hash,
     items: itemsByOrder[row.id] || [],
     historyEvents: historyByOrder[row.id] || []

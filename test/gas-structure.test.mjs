@@ -10,6 +10,7 @@ const expectedFiles = [
   "Containers.gs",
   "Imports.gs",
   "OrderHistory.gs",
+  "OrderEditing.gs",
   "PurchaseOrders.gs",
   "SyncD1.gs",
   "SyncEngine.gs",

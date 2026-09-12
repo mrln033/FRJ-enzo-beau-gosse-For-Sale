@@ -298,7 +298,8 @@ function getOrCreatePurchaseOrderSheet_(ss) {
     "ORDER_ID", "REFERENCE", "AVATAR_ACHETEUR", "CONTACT", "COMMENTAIRE", "LANGUE",
     "MEMBRE_FRJ", "STATUT", "TOTAL_TT_PED", "TOTAL_VENTE_PED", "PRIX_STATUT",
     "DATE_CLIENT", "DATE_RECEPTION", "SYNC_PAYLOAD_JSON", "SYNCED_D1_AT", "SYNC_ERROR",
-    "DISCORD_MESSAGE_ID", "DISCORD_ERROR", "APPROVAL_REQUIRED", "PROPOSAL_VERSION"
+    "DISCORD_MESSAGE_ID", "DISCORD_ERROR", "APPROVAL_REQUIRED", "PROPOSAL_VERSION",
+    "EDITION_JSON", "EDITION_ERREUR", "D1_CONFLIT_JSON", "ACTION_EDITION"
   ];
   if (sheet.getMaxColumns() < headers.length) {
     sheet.insertColumnsAfter(sheet.getMaxColumns(), headers.length - sheet.getMaxColumns());
@@ -306,13 +307,22 @@ function getOrCreatePurchaseOrderSheet_(ss) {
   var currentHeaders = sheet.getLastRow() > 0
     ? sheet.getRange(1, 1, 1, headers.length).getDisplayValues()[0]
     : [];
+  for (var technicalColumn = 20; technicalColumn < headers.length; technicalColumn++) {
+    if (currentHeaders[technicalColumn] && currentHeaders[technicalColumn] !== headers[technicalColumn]) {
+      throw new Error("COMMANDES_APP : colonne " + (technicalColumn+1) + " déjà utilisée ; extension interrompue.");
+    }
+    if (!currentHeaders[technicalColumn] && sheet.getLastRow()>1
+      && sheet.getRange(2,technicalColumn+1,sheet.getLastRow()-1,1).getValues().some(function(value) { return value[0] !== ""; })) {
+      throw new Error("COMMANDES_APP : données présentes dans une colonne sans en-tête ; extension interrompue.");
+    }
+  }
   if (headers.some(function(header, index) { return currentHeaders[index] !== header; })) {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   }
   return sheet;
 }
 
-function upsertPurchaseOrderMirror_(snapshot) {
+function upsertPurchaseOrderMirror_(snapshot, force) {
   var order = snapshot && snapshot.order ? snapshot.order : snapshot;
   var items = snapshot && Array.isArray(snapshot.items) ? snapshot.items : (Array.isArray(order && order.items) ? order.items : []);
   var orderId = String(order && order.id || "").trim().toLowerCase();
@@ -328,6 +338,9 @@ function upsertPurchaseOrderMirror_(snapshot) {
     : [];
   var existingIndex = values.findIndex(function(row) { return String(row[indexes.ORDER_ID] || "").trim().toLowerCase() === orderId; });
   var row = existingIndex >= 0 ? values[existingIndex].slice() : new Array(headers.length).fill("");
+  if (!force && existingIndex >= 0 && typeof frjPreserveLocalOrderEdit_ === "function"
+    && PropertiesService.getScriptProperties().getProperty("FRJ_ORDER_EDITING_VERSION")
+    && frjPreserveLocalOrderEdit_(row,indexes,Object.assign({},order,{items:items}),sheet,existingIndex+2)) return false;
   var set = function(name, value) { if (indexes[name] !== undefined) row[indexes[name]] = value; };
 
   set("ORDER_ID", orderId);
@@ -361,7 +374,10 @@ function upsertPurchaseOrderMirror_(snapshot) {
       clientCreatedAt: order.clientCreatedAt || null,
       discordMessageId: order.discordMessageId || null,
       approvalRequired: order.approvalRequired === true,
-      proposalVersion: Number(order.proposalVersion || 0)
+      proposalVersion: Number(order.proposalVersion || 0),
+      editRevision: order.editRevision,
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt
     },
     items: items
   }));
@@ -370,9 +386,14 @@ function upsertPurchaseOrderMirror_(snapshot) {
   set("DISCORD_MESSAGE_ID", order.discordMessageId || "");
   set("APPROVAL_REQUIRED", order.approvalRequired === true ? "TRUE" : "FALSE");
   set("PROPOSAL_VERSION", Number(order.proposalVersion || 0));
+  set("EDITION_JSON", "");
+  set("EDITION_ERREUR", "");
+  set("D1_CONFLIT_JSON", "");
+  set("ACTION_EDITION", "");
 
   var targetRow = existingIndex >= 0 ? existingIndex + 2 : sheet.getLastRow() + 1;
   sheet.getRange(targetRow, 1, 1, headers.length).setValues([row]);
+  if (typeof frjWriteOrderLines_ === "function") frjWriteOrderLines_(Object.assign({},order,{items:items}));
   return targetRow;
 }
 

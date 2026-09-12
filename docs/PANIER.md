@@ -25,6 +25,34 @@ D1 utilise exclusivement :
 
 GAS utilise la feuille `COMMANDES_APP` pour le miroir des demandes et `COMMANDES_HISTORIQUE` pour leur chronologie bidirectionnelle. Les clés d'événement évitent les doublons entre GAS et D1 ; les colonnes de synchronisation conservent les erreurs à retenter. `DISCORD_MESSAGE_ID` et `DISCORD_ERROR` assurent la reprise des notifications. Aucun schéma d'inventaire, de catalogue ou de MU n'est modifié.
 
+## Modification des demandes depuis Google Sheets — 12/09/2026
+
+Les demandes existantes peuvent être corrigées dans le classeur applicatif, sans toucher au classeur des inventaires :
+
+- COMMANDES_APP, colonnes C à H : avatar, contact, commentaire, langue FR/EN, profil MEMBRE_FRJ (TRUE/FALSE), statut.
+- COMMANDES_LIGNES : article, catégorie, rayon, quantité, MU et retrait d'une ligne. MU_TYPE vaut percent, ped, none ou auto. MU_SAISI est la valeur finale appliquée au client : 120 pour 120 %, ou 1,25 pour +1,25 PED. Avec auto, le serveur utilise le MU catalogue actuel et applique le profil FRJ et la campagne ; la valeur saisie est ignorée.
+- COMMANDES_HISTORIQUE : le commentaire reste modifiable.
+
+L'onglet COMMANDES_LIGNES est ajouté automatiquement au premier poll après publication. La colonne ACTION_EDITION (X) de COMMANDES_APP propose SYNCHRONISER, AJOUTER ARTICLE, RECHARGER D1 (ABANDON LOCAL) ou REAPPLIQUER SHEETS SUR D1. Choisir une action sur la ligne de la demande ; elle est traitée par le déclencheur d'édition, ou au prochain poll si ce déclencheur a été manqué. Compléter les trois champs Article/Catégorie/Rayon d'une nouvelle ligne avant synchronisation. Cocher RETIRER pour supprimer un article ; une demande doit conserver au moins un article.
+
+Les identifiants, références, dates techniques, JSON de synchronisation, TT unitaires et totaux ne sont pas des champs de saisie métier. Ne pas modifier les colonnes grisées/techniques ni supprimer la ligne d'une demande entière. Les totaux sont recalculés côté serveur. Le profil, les quantités et les prix d'une demande verrouillée ne sont pas modifiables : la rouvrir dans l'application avant de les corriger. Un changement des conditions commerciales crée une nouvelle version à valider par le client. Enregistrer séparément le changement de statut qui confirme les prix. Une correction d'avatar/contact ne change ni prix, ni version de proposition.
+
+### Synchronisation et conflits
+
+Le poll existant traite au plus dix demandes modifiées toutes les cinq minutes. Les changements de l'interface reviennent par le miroir D1 vers GAS. La comparaison locale ne contacte pas D1 si aucune édition n'est détectée ; elle détecte aussi les collages et changements de cellules effectués hors onEdit.
+
+EDITION_JSON conserve l'envoi en attente, EDITION_ERREUR explique un rejet et D1_CONFLIT_JSON conserve la version distante en cas de conflit. Une saisie locale en attente n'est pas écrasée par le miroir. Si les deux côtés ont changé, aucune priorité silencieuse : choisir dans ACTION_EDITION soit RECHARGER D1 (ABANDON LOCAL), soit REAPPLIQUER SHEETS SUR D1 (réapplication explicite, toujours soumise aux règles métier).
+
+Chaque opération possède un identifiant stable et un reçu atomique dans l'historique : une reprise après panne réseau n'applique pas deux fois les prix ou la version. Les confirmations restent possibles après vente du stock et conservent le TT enregistré, comme dans l'Admin ; seules les remises encore applicables sont actualisées avant gel. Discord est actualisé après acceptation, sans bloquer la demande en cas de panne.
+
+### Coût et contrôle
+
+Aucune migration D1, aucun scan périodique complet supplémentaire des demandes dans D1. Une relecture initiale de l'historique fournit les révisions aux anciens miroirs. Les contrôles utilisent les index existants ; les lectures catalogue/stock lors d'un changement de prix ciblent les noms d'articles concernés. Le contrôle de révision mesuré sur une demande réelle a lu 2 lignes et écrit 0 ligne ; le plan du stock utilise idx_inventory_current_avatar_item.
+
+Les tests SQLite comptent 2 changements métier pour une correction d'entête (demande + événement), et 3 pour une seule ligne modifiée (demande + événement + ligne). Ce ne sont pas des devis de facturation D1 : les écritures d'index, les lectures de contrôle et le suivi Discord s'ajoutent. Un envoi strictement inchangé et une reprise déjà appliquée ne produisent aucune écriture métier supplémentaire.
+
+Retour arrière : conserver les saisies encore en attente avant toute restauration, puis annuler uniquement le commit de cette évolution. Restaurer le Worker 35239112-3a59-4656-9eca-05438a36ce59 et les sources GAS de référence 3b3997e (version Web App 38). Restaurer aussi les sources HEAD Apps Script, car les triggers les exécutent indépendamment de la version Web App. Retirer la propriété FRJ_ORDER_EDITING_VERSION en cas de retour durable. Ne supprimer ni l'onglet ni les demandes modifiées : le retour du code n'annule pas les données déjà acceptées.
+
 ## Désactivation immédiate et réversible
 
 1. Interface publique : passer `cart` à `false` dans `js/features.js`, puis republier GitHub Pages. Les paniers déjà présents sur les machines restent conservés localement.

@@ -144,6 +144,9 @@ function frjSpreadsheetChangedTrigger(e) {
   try { sourceId = e && e.source ? e.source.getId() : ""; } catch (ignored) {}
   var purchaseOrderChanged = frjCapturePurchaseOrderEdit_(e);
   if (purchaseOrderChanged) frjPushPendingPurchaseOrderHistory_();
+  if (e && e.range && ["COMMANDES_APP","COMMANDES_LIGNES","COMMANDES_HISTORIQUE"].indexOf(e.range.getSheet().getName()) !== -1) {
+    return "Edition de demande capturée ; envoi par le poll des demandes.";
+  }
   var outbox = frjCaptureGasOutbox_();
   frjPublishGasObservations_(outbox);
   return frjRequestSynchronization_("modification-google-sheet", sourceId);
@@ -213,6 +216,7 @@ function frjPromotionTomorrowFinalCheckTrigger() {
 
 function frjD1SignalPollTrigger() {
   frjEnsureSchedulerVersion_();
+  frjEnsureOrderEditing_();
   var properties = PropertiesService.getScriptProperties();
   // Le poll régulier applique aussi une préparation locale devenue nécessaire
   // après un déploiement, même lorsqu'aucun dataset n'attend de synchronisation.
@@ -241,6 +245,8 @@ function frjD1SignalPollTrigger() {
     if (ordersPushed) scheduled.push("COMMANDES:" + ordersPushed);
     var historyPushed = frjPushPendingPurchaseOrderHistory_();
     if (historyPushed) scheduled.push("HISTORIQUE-COMMANDES:" + historyPushed);
+    var editsPushed = frjSyncEditableOrders_();
+    if (editsPushed) scheduled.push("EDITIONS-COMMANDES:" + editsPushed);
     var ordersPulled = frjPullPurchaseOrdersFromD1_();
     if (ordersPulled) scheduled.push("COMMANDES-D1:" + ordersPulled);
     properties.deleteProperty("FRJ_D1_POLL_LAST_ERROR");
