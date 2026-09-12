@@ -38,7 +38,7 @@
         </label>
         <label>
           Profil de joueur
-          <select id="newOrderProfile" name="profile">
+          <select id="newOrderProfile" name="profile" required>
             <option value="public">Public</option>
             <option value="frj">Membre FRJ</option>
           </select>
@@ -47,7 +47,7 @@
           <input type="text" id="newOrderContact" name="buyerContact" maxlength="160">
         </label>
         <p><strong>Origine :</strong> Demande directe</p>
-        <label><input type="checkbox" id="newOrderAdminQuote"> Créer un Devis Admin (modèle privé, hors progression)</label>
+        <label class="admin-quote-choice"><input type="checkbox" id="newOrderAdminQuote"><span>Créer un Devis Admin (modèle privé, hors progression)</span></label>
       </div>
       <div id="newOrderLines" class="direct-order-lines"></div>
       <div class="new-order-toolbar">

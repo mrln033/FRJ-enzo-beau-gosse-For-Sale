@@ -1,5 +1,7 @@
 # FRJ For Sale
 
+T-020 : demandes Terminées définitivement en lecture seule, conversion Devis Admin interdite depuis À préparer / Prête / Terminée. Avatar facultatif pour un modèle (Public ou Membre Soc selon profil obligatoire). Ces gardes couvrent aussi les éditions Sheets ; GAS reste en version 44. Voir les règles, tests et le retour ciblé dans [Devis Admin](docs/DEVIS-ADMIN.md).
+
 Catalogue bilingue d'articles, panier et suivi de demandes d'achat pour **enzo beau gosse**.
 
 Le frontend statique est publié par GitHub Pages. Il peut lire les données depuis Google Apps Script (GAS) ou Cloudflare D1 et possède des mécanismes de repli documentés. Les deux backends restent des API indépendantes du frontend.

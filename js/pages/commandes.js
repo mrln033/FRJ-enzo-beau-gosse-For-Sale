@@ -202,13 +202,14 @@
       option.value = value;
       option.textContent = ui.statusLabel(value, "FR", "admin");
       option.selected = order.status === value;
-      option.disabled = value === "awaiting_approval";
+      option.disabled = value === "awaiting_approval" ||
+        (value === "admin_quote" && ["preparing", "ready", "completed"].includes(order.status));
       select.appendChild(option);
     });
     select.addEventListener("change", () => updateStatus(order.id, select));
     const headerActions = document.createElement("div");
     headerActions.className = "order-header-actions";
-    select.disabled = order.status === "admin_quote";
+    select.disabled = order.status === "admin_quote" || order.status === "completed";
     headerActions.append(select);
     if (order.status !== "admin_quote") headerActions.append(createTrackingControl(order));
     if (order.status === "admin_quote") {
@@ -676,6 +677,7 @@
       document.getElementById("newOrderAvatar").value = source.buyerAvatar;
       document.getElementById("newOrderProfile").value = source.frjMember ? "frj" : "public";
       document.getElementById("newOrderContact").value = source.buyerContact || "";
+      updateQuoteAvatarRequirement();
       source.items.forEach(item => addNewOrderLine(item));
       document.getElementById("newOrderPanel").hidden = false;
       document.getElementById("newOrderToggle").textContent = "Masquer le formulaire";
@@ -702,8 +704,11 @@
       if (!panel.hidden && !newOrderEditors.length) addNewOrderLine();
     });
     document.getElementById("newOrderAddLine").addEventListener("click", addNewOrderLine);
+    document.getElementById("newOrderAdminQuote")?.addEventListener("change",updateQuoteAvatarRequirement);
+    updateQuoteAvatarRequirement();
     document.getElementById("newOrderProfile").addEventListener("change", (event) => {
       const frjMember = event.target.value === "frj";
+      updateQuoteAvatarRequirement();
       newOrderEditors.forEach((editor) => editor.setProfile(frjMember));
       updateNewOrderForm();
     });
@@ -714,6 +719,16 @@
       toggle.textContent = "Ajouter une nouvelle demande";
     });
     form.addEventListener("submit", submitNewOrder);
+  }
+
+  function updateQuoteAvatarRequirement() {
+    const avatar = document.getElementById("newOrderAvatar");
+    if (!avatar) return;
+    const quote = !duplicateSourceId && document.getElementById("newOrderAdminQuote")?.checked === true;
+    avatar.required = !quote;
+    avatar.placeholder = quote
+      ? (document.getElementById("newOrderProfile").value === "frj" ? "Membre Soc si laissé vide" : "Public si laissé vide")
+      : "";
   }
 
   function addNewOrderLine(source = null) {
@@ -787,6 +802,7 @@
     if (document.getElementById("newOrderAdminQuote")) document.getElementById("newOrderAdminQuote").disabled = false;
     newOrderEditors = [];
     duplicateSourceId = null;
+    updateQuoteAvatarRequirement();
     document.getElementById("newOrderLines")?.replaceChildren();
     const feedback = document.getElementById("newOrderFeedback");
     if (feedback) {
@@ -1105,6 +1121,12 @@
     textarea.maxLength = 500;
     textarea.value = historyEvent.comment || "";
     textarea.setAttribute("aria-label", `Commentaire historique du ${ui.formatDate(historyEvent.createdAt)}`);
+    if (order.status === "completed") {
+      textarea.readOnly = true;
+      editor.append(textarea);
+      item.append(meta,editor);
+      return item;
+    }
     const controls = document.createElement("div");
     controls.className = "order-history-controls";
     const feedback = document.createElement("span");

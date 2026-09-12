@@ -1,9 +1,28 @@
-# Devis Admin — T-019
+# Devis Admin — T-019 / T-020
+
+## Compléments T-020 : clôture et identité
+
+- **Terminée** signifie livrée et payée : statut, coordonnées, profil, articles, prix et commentaires d'historique sont définitivement en lecture seule. Impossible de rouvrir ou de convertir cette demande, y compris par l'API ou l'édition Sheets.
+- **À préparer** et **Prête** interdisent également la conversion directe en Devis Admin. Les autres transitions existantes sont conservées.
+- La case Devis Admin est alignée devant son texte. Le profil reste obligatoire ; l'avatar devient facultatif pour un modèle seulement. Si vide à l'enregistrement : **Public** pour le profil public, **Membre Soc** pour le profil FRJ. Un avatar personnalisé est conservé. Une duplication normale exige toujours l'avatar.
+- Sheets reste un miroir éditable physiquement : une saisie interdite est refusée par D1, ne modifie pas la demande et doit être abandonnée/restaurée depuis la version D1 via le mécanisme d'édition existant. Aucun changement du format des inventaires.
+- Migration additive **0025_completed_order_lock.sql** : huit gardes SQL, aucune réécriture de données. Les confirmations de prix sont effectuées avant le verrouillage terminal dans la même transaction. Les accusés Discord et de synchronisation restent permis ; l'historique métier déjà enregistré ne peut pas être réécrit.
+- Aucun nouveau déclencheur ou audit complet. GAS 44 reste inchangé. Tests locaux de clôture et de refus ; ne pas terminer une demande réelle uniquement pour tester.
+
+### Publication T-020 du 12/09/2026
+
+250 tests réussis. Worker **6b8fdab9-13ea-48a8-a873-df1d89d2283a** publié avant application de 0025 pour préserver les clôtures pendant le déploiement. Les huit gardes sont présentes en production ; contrôle en lecture seule : 35 demandes, dont 21 Terminées. Sauvegarde privée **save/20260912-before-completed-lock.sql**, 12 937 891 octets, exclue de Git. Frontend publié par le commit T-020 ; validation utilisateur attendue.
+
+### Retour ciblé de T-020
+
+Référence préalable : Git **d1feec7**, Worker **1501b9a8-f3bd-4301-b67d-8731f2f06977**, GAS **44** inchangé. Sauvegarder D1 avant publication et conserver les achats ultérieurs.
+En cas de non-validation, sous pause des éditions : retirer uniquement les huit déclencheurs de 0025 (purchase_advanced_quote_conversion, purchase_completed_header_update, purchase_completed_header_delete, purchase_completed_item_insert, purchase_completed_item_update, purchase_completed_item_delete, purchase_completed_history_update, purchase_completed_history_delete), puis revenir au Worker de référence et révoquer le commit T-020 par un revert ciblé. Garder 0024 et les Devis Admin. Ne pas restaurer toute la base ni effacer des demandes. Consigner le retrait et prévoir une nouvelle migration pour toute réactivation des gardes, puisque 0025 restera enregistrée comme appliquée.
+
 
 ## Utilisation
 
-- Nouvelle demande : cocher **Créer un Devis Admin** avant l'enregistrement. Avatar et profil sont indépendants.
-- Demande existante : choisir **Devis Admin** dans son statut et confirmer la conversion. Son ancien lien client devient indisponible. Les prix, lignes, coordonnées et l'origine sont conservés.
+- Nouvelle demande : cocher **Créer un Devis Admin** avant l'enregistrement. Profil obligatoire, avatar facultatif selon les règles T-020 ci-dessus.
+- Demande existante hors À préparer / Prête / Terminée : choisir **Devis Admin** et confirmer la conversion. Son ancien lien client devient indisponible. Les prix, lignes, coordonnées et l'origine sont conservés.
 - Le modèle reste Devis Admin : le sélecteur de progression et le suivi client ne sont plus proposés. Les articles, quantités et MU restent éditables avec les validations existantes. Coordonnées et profil sont également éditables dans Sheets.
 - **Dupliquer ce devis** prépare une demande indépendante ; modifier avatar/contact/profil avant enregistrement. La copie commence **À valider**, même si un appel tente de la créer en Devis Admin. Le modèle et son historique ne changent pas.
 - Le stock courant plafonne les quantités proposées ; article absent, sans stock ou MU inexploitable est signalé. TT, MU, profil et promotion du moment sont relus et revérifiés à l'enregistrement. Le modèle n'est pas recalculé automatiquement lors d'un changement de promotion.

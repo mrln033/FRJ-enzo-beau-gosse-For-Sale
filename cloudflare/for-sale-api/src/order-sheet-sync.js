@@ -62,6 +62,10 @@ export async function applySheetOrder(env, payload, helpers) {
   if (current.snapshot.editRevision !== expected) {
     return { ok: false, conflict: true, error: "D1 a changé : choisissez quelle version conserver.", snapshot: current.snapshot };
   }
+  if (current.row.status === "completed") {
+    if (JSON.stringify(payload.draft) === JSON.stringify(editableSheetDraft(current.snapshot))) return {ok:true,noChange:true,snapshot:current.snapshot};
+    throw new ApiError(409,"Demande Terminée : coordonnées, statut et articles définitivement verrouillés.");
+  }
   const source = payload.draft;
   if (!source || typeof source.frjMember !== "boolean") throw new ApiError(400, "Profil invalide");
   const draft = {
@@ -201,6 +205,8 @@ export async function applySheetOrder(env, payload, helpers) {
     statements.push(env.DB.prepare(`DELETE FROM purchase_order_items WHERE order_id=? AND line_no=? AND ${guard}`)
       .bind(id,old.line_no,...guardArgs));
   }
+  // Confirmer les lignes avant de verrouiller définitivement l’entête Terminée.
+  statements.push(statements.splice(1,1)[0]);
   const results = await env.DB.batch(statements);
   if (!Number(results[0].meta?.changes)) return { ok:false, conflict:true,
     error:"D1 a changé pendant l'enregistrement.", snapshot:(await readSheetOrder(env,id,helpers)).snapshot };

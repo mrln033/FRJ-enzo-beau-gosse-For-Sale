@@ -1977,7 +1977,7 @@ SET status = 'submitted', approval_required = CASE WHEN admin_quote = 1 THEN 0 E
       `).bind(status, confirmsPricing ? 1 : 0, existing.id)
     ];
     if (confirmsPricing) {
-      statements.push(env.DB.prepare(`
+      statements.unshift(env.DB.prepare(`
         UPDATE purchase_order_items SET price_status = 'confirmed' WHERE order_id = ?
       `).bind(existing.id));
     }
@@ -2561,6 +2561,7 @@ async function importGasOrderHistoryEvent(env, event) {
     const storedDate = row.comment_updated_at ? normalizeSyncTimestamp(row.comment_updated_at) : "";
     const commentChanged = event.comment !== row.comment;
     if (incomingDate && incomingDate > storedDate && commentChanged) {
+      if (row.purchase_order_status === "completed") throw new ApiError(409,"L’historique d’une demande Terminée est en lecture seule.");
       await env.DB.batch([
         env.DB.prepare(`
           UPDATE purchase_order_events
@@ -2588,6 +2589,7 @@ async function importGasOrderHistoryEvent(env, event) {
     && (!orderUpdatedAt || event.createdAt > orderUpdatedAt)
   );
   if (shouldUpdateOrder) {
+    if (row.purchase_order_status === "completed") throw new ApiError(409,"Demande Terminée : statut définitivement verrouillé.");
     const confirmsPricing = confirmsOrderPricing(event.newStatus);
     statements.push(env.DB.prepare(`
       UPDATE purchase_orders
@@ -2597,7 +2599,7 @@ async function importGasOrderHistoryEvent(env, event) {
       WHERE id = ?
     `).bind(event.newStatus, confirmsPricing ? 1 : 0, event.createdAt, event.orderId));
     if (confirmsPricing) {
-      statements.push(env.DB.prepare(`
+      statements.unshift(env.DB.prepare(`
         UPDATE purchase_order_items SET price_status = 'confirmed' WHERE order_id = ?
       `).bind(event.orderId));
     }
@@ -3134,6 +3136,8 @@ async function readOrderHistory(env, orderId) {
 }
 
 async function updateOrderHistoryComment(env, orderId, eventId, comment) {
+  const order = await env.DB.prepare("SELECT status FROM purchase_orders WHERE id=?").bind(orderId).first();
+  if (order?.status === "completed") throw new ApiError(409,"L’historique d’une demande Terminée est en lecture seule.");
   const existing = await env.DB.prepare(`
     SELECT id, order_id, event_key, action, actor, comment, details,
            created_at, comment_updated_at

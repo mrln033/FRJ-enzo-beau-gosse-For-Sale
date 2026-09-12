@@ -1,5 +1,7 @@
 # Backend Google Apps Script
 
+T-020 : demandes Terminées définitivement en lecture seule, conversion Devis Admin interdite depuis À préparer / Prête / Terminée. Avatar facultatif pour un modèle (Public ou Membre Soc selon profil obligatoire). Ces gardes couvrent aussi les éditions Sheets ; GAS reste en version 44. Voir les règles, tests et le retour ciblé dans [Devis Admin](../docs/DEVIS-ADMIN.md).
+
 Ce dossier contient la totalité du projet Apps Script autonome. Apps Script charge tous les fichiers `.gs` dans un espace global commun ; leur séparation sert donc à clarifier les responsabilités, sans changer les noms des fonctions publiques.
 
 ## Points d'entrée et modules

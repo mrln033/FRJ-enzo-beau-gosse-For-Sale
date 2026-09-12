@@ -34,7 +34,9 @@ T-017 terminée : liens courts des titres Discord publiés et anciens messages a
 -------------------------------
 DEMANDES  => CE QUI EST A FAIRE
 
->>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-020 <<<
+>>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-021 <<<
+
+Aucune nouvelle demande active ; T-020 réalisée ci-dessous, validation utilisateur en production attendue.
 
 
 
@@ -45,6 +47,12 @@ d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> a
 
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
+
+12/09/2026 — T-020 [CORRECTION] [RÉALISÉE — VALIDATION PRODUCTION ATTENDUE] — Compléments Devis Admin et demandes Terminées.
+Demande conversation : Terminée signifie livrée/payée et doit être définitivement non modifiable. Conversion directe Devis Admin également interdite depuis À préparer et Prête. Case à cocher devant le texte ; avatar facultatif pour un modèle, avec Public ou Membre Soc par défaut selon profil obligatoire ; avatar personnalisé conservé.
+Réalisation : gardes interface, API, édition Sheets et D1 ; historique terminal en lecture seule ; confirmations de prix avant verrouillage dans une transaction. Migration 0025 additive (huit triggers), aucun inventaire modifié, aucun nouveau déclencheur. Les accusés techniques Discord/synchronisation restent autorisés.
+Contrôles : 250 tests réussis ; Worker 6b8fdab9-13ea-48a8-a873-df1d89d2283a publié, migration 0025 appliquée et huit gardes relues. D1 : 35 demandes conservées, dont 21 Terminées. Aucune demande réelle clôturée ou éditée pour tester. GAS 44 inchangé. Interface livrée par le commit de ce lot via GitHub Pages.
+Sauvegarde privée save/20260912-before-completed-lock.sql (12 937 891 octets), exclue de Git. Retour ciblé : Git d1feec7 / Worker 1501b9a8-f3bd-4301-b67d-8731f2f06977, retrait uniquement des huit gardes de 0025 sous pause des éditions ; conserver 0024 et toutes les données ultérieures. Procédure complète dans docs/DEVIS-ADMIN.md. Guides racine, PANIER, GAS et Worker actualisés.
 
 12/09/2026 — T-019 [ÉVOLUTION] [RÉALISÉE — VALIDATION PRODUCTION ATTENDUE] — Devis Admin.
 Demande d'origine (conversation) : « J'aimerais ajouter un statut spécial 'Devis Admin', qui tiendrait lieu de déclencheur pour ce bouton [Dupliquer], indépendamment du nom d'avatar 'ciblé' comme indiqué dans une demande précédente. Ce statu 'Devis Admin' ne suivrait pas la progression de statut comme les demandes 'normales'. » Accord : mise en œuvre, documentation, tests/validation en production et retour en cas de non-validation.

@@ -1,5 +1,7 @@
 # FRJ For Sale API — Cloudflare Worker + D1
 
+T-020 : demandes Terminées définitivement en lecture seule, conversion Devis Admin interdite depuis À préparer / Prête / Terminée. Avatar facultatif pour un modèle (Public ou Membre Soc selon profil obligatoire). Ces gardes couvrent aussi les éditions Sheets ; GAS reste en version 44. Voir les règles, tests et le retour ciblé dans [Devis Admin](../../docs/DEVIS-ADMIN.md).
+
 Ce projet est volontairement séparé de `../worker.js`, qui gère Discord pour une autre application.
 
 ## Organisation du code

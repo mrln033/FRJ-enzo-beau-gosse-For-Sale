@@ -138,6 +138,7 @@ function setupDatabase() {
   applyMigration(database, "0021_purchase_order_discounts.sql");
   applyMigration(database, "0023_mutable_order_discounts.sql");
   applyMigration(database, "0024_admin_quotes.sql");
+  applyMigration(database, "0025_completed_order_lock.sql");
   database.exec(`
     INSERT INTO avatars VALUES ('enzo', 'Enzo', 'Inventaire Enzo');
     INSERT INTO catalog_items (name, unit_price_ped) VALUES ('Item A', 10), ('Item B', 5), ('Sans stock', 2);
@@ -180,6 +181,65 @@ async function sheetFixture() {
   return {db,env,id,initial,get,operation,send,items,writes};
 }
 
+
+test("Devis Admin : avatar facultatif uniquement avec profil explicite", () => {
+  for (const [frjMember, avatar] of [[false,"Public"],[true,"Membre Soc"]]) {
+    const draft = { adminQuote:true,frjMember,items:[lineA] };
+    assert.equal(normalizeAdminOrderDraft(draft).buyerAvatar,avatar);
+    assert.equal(normalizeAdminOrderDraft({...draft,buyerAvatar:"Mon Avatar"}).buyerAvatar,"Mon Avatar");
+    assert.throws(()=>normalizeAdminOrderDraft({...draft,frjMember:undefined}),/profil/i);
+    assert.throws(()=>normalizeAdminOrderDraft({...draft,adminQuote:false}),/avatar/i);
+    assert.throws(()=>normalizeAdminOrderDraft({...draft,duplicateSourceId:crypto.randomUUID()}),/avatar/i);
+  }
+});
+
+test("Statuts avancés : conversion Devis Admin refusée par API, Sheets et SQL", async () => {
+  for (const status of ["preparing","ready","completed"]) {
+    const f = await sheetFixture();
+    const url = new URL("https://api.example/admin/orders/"+f.id+"/status");
+    const post = next => handleAdminPost(new Request(url,{method:"POST",body:JSON.stringify({status:next})}),url,f.env);
+    await post(status);
+    assert.equal((await f.get()).status,status);
+    assert.ok(f.items().every(item=>item.price_status==="confirmed"));
+    await assert.rejects(()=>post("admin_quote"),e=>e.status===409);
+    const snapshot=await f.get(), op=f.operation();
+    op.baseRevision=snapshot.editRevision;
+    op.draft=editableSheetDraft(snapshot);
+    op.draft.status="admin_quote";
+    await assert.rejects(()=>f.send(op),e=>e.status===409);
+    assert.throws(()=>f.db.prepare("UPDATE purchase_orders SET admin_quote=1,status='submitted',approval_required=0 WHERE id=?").run(f.id),/conversion|verrouille/i);
+    assert.equal((await f.get()).status,status);
+  }
+});
+
+test("Terminée : clôture Sheets, idempotence et verrouillage définitif sans bloquer les accusés techniques", async () => {
+  const f=await sheetFixture(), close=f.operation();
+  close.draft.status="completed";
+  assert.equal((await f.send(close)).ok,true);
+  assert.equal((await f.send(close)).duplicate,true);
+  const snapshot=await f.get();
+  assert.equal(snapshot.status,"completed");
+  assert.ok(f.items().every(item=>item.price_status==="confirmed"));
+  const unchanged={...f.operation(),baseRevision:snapshot.editRevision,draft:editableSheetDraft(snapshot)};
+  assert.equal((await f.send(unchanged)).noChange,true);
+  for (const field of ["buyerAvatar","buyerContact","buyerComment"]) {
+    await assert.rejects(()=>f.send({...unchanged,operationId:"sheet-"+crypto.randomUUID(),draft:{...unchanged.draft,[field]:"Modification"}}),e=>e.status===409);
+  }
+  const url=new URL("https://api.example/admin/orders/"+f.id+"/status");
+  for (const status of ["submitted","viewed","preparing","ready","cancelled","expired","admin_quote"]) {
+    await assert.rejects(()=>handleAdminPost(new Request(url,{method:"POST",body:JSON.stringify({status})}),url,f.env),e=>e.status===409);
+  }
+  for (const sql of [
+    "UPDATE purchase_orders SET buyer_avatar='Autre' WHERE id=?",
+    "DELETE FROM purchase_orders WHERE id=?",
+    "UPDATE purchase_order_items SET quantity=99 WHERE order_id=?",
+    "DELETE FROM purchase_order_items WHERE order_id=?",
+    "UPDATE purchase_order_events SET comment='Autre' WHERE order_id=?",
+    "DELETE FROM purchase_order_events WHERE order_id=?"
+  ]) assert.throws(()=>f.db.prepare(sql).run(f.id),/Terminee/);
+  assert.doesNotThrow(()=>f.db.prepare("UPDATE purchase_orders SET discord_message_id='technical-receipt' WHERE id=?").run(f.id));
+  assert.deepEqual(editableSheetDraft(await f.get()),editableSheetDraft(snapshot));
+});
 
 test("Devis Admin : conversion explicite, privé, hors progression et modèle éditable",async()=>{
   const f=await sheetFixture();

@@ -6,11 +6,13 @@ const CLIENT_CANCELLABLE_STATUSES = new Set(["submitted", "viewed"]);
 const PRICE_CONFIRMING_ORDER_STATUSES = new Set(["preparing", "ready", "completed"]);
 
 export function canReviseOrder(status, approvalRequired = false) {
+  if (status === "completed") return false;
   return approvalRequired === true || Number(approvalRequired || 0) === 1
     || EDITABLE_ORDER_STATUSES.has(String(status || "").trim().toLowerCase());
 }
 
 export function canClientCancelOrder(status, approvalRequired = false) {
+  if (status === "completed") return false;
   return approvalRequired === true || Number(approvalRequired || 0) === 1
     || CLIENT_CANCELLABLE_STATUSES.has(String(status || "").trim().toLowerCase());
 }
@@ -77,7 +79,9 @@ export function normalizeAdminOrderDraft(payload) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new Error("Demande directe invalide");
   }
-  const buyerAvatar = cleanText(payload.buyerAvatar, 80);
+  const adminQuote = payload.adminQuote === true && !payload.duplicateSourceId;
+  if (adminQuote && typeof payload.frjMember !== "boolean") throw new Error("Le profil du Devis Admin est obligatoire");
+  const buyerAvatar = cleanText(payload.buyerAvatar, 80) || (adminQuote ? payload.frjMember ? "Membre Soc" : "Public" : "");
   if (!buyerAvatar) throw new Error("L'avatar en jeu est obligatoire");
   const sourceItems = Array.isArray(payload.items) ? payload.items : [];
   if (sourceItems.length < 1 || sourceItems.length > 10) {
