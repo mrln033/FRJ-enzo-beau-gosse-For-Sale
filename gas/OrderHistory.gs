@@ -101,6 +101,9 @@ function upsertPurchaseOrderHistoryMirror_(events, force) {
     var key = String(event.eventKey || "").trim().toLowerCase();
     var targetRow = rowsByKey[key];
     if (targetRow) {
+      if (!values[targetRow-2][indexes.ORDER_ID] && event.orderId) {
+        sheet.getRange(targetRow,indexes.ORDER_ID+1).setValue(event.orderId);
+      }
       if (!force && !values[targetRow-2][indexes.SYNCED_D1_AT]) return;
       sheet.getRange(targetRow, 1, 1, headers.length).setValues([row]);
     }
@@ -139,7 +142,7 @@ function purchaseMarkHistorySyncResult_(pending, results) {
     var result = resultsByKey[entry.event.eventKey];
     if (result && result.ok && result.event
       && String(pending.sheet.getRange(entry.rowNumber,pending.indexes.COMMENTAIRE+1).getValue() || "") === entry.event.comment) {
-      canonicalEvents.push(result.event);
+      canonicalEvents.push(Object.assign({},result.event,{orderId:entry.event.orderId}));
       return;
     }
     var message = result && result.error ? result.error : "Réponse D1 absente";

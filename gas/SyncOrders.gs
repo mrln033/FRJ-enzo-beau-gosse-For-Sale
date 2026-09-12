@@ -54,6 +54,11 @@ function frjPushPendingPurchaseOrderHistory_() {
 function frjPullPurchaseOrdersFromD1_() {
   var properties = PropertiesService.getScriptProperties();
   var cursorKey = "FRJ_D1_ORDERS_EVENT_CURSOR";
+  // Rattrapage unique des événements historiques dont ORDER_ID était omis par le DTO.
+  if (properties.getProperty("FRJ_HISTORY_ORDER_IDS_VERSION") !== "1") {
+    properties.setProperty(cursorKey,"0");
+    properties.setProperty("FRJ_HISTORY_ORDER_IDS_VERSION","1");
+  }
   var cursor = Number(properties.getProperty(cursorKey) || 0);
   if (!isFinite(cursor) || cursor < 0) cursor = 0;
   var pulled = 0;
@@ -63,6 +68,9 @@ function frjPullPurchaseOrdersFromD1_() {
     var orders = response && Array.isArray(response.orders) ? response.orders : [];
     orders.forEach(function(order) {
       upsertPurchaseOrderMirror_(order);
+      order.historyEvents = (order.historyEvents || []).map(function(event) {
+        return Object.assign({},event,{orderId:order.id});
+      });
       upsertPurchaseOrderHistoryMirror_(order.historyEvents || []);
       pulled++;
     });

@@ -12,6 +12,19 @@ const snapshot={id:"11111111-1111-4111-8111-111111111111",publicReference:"FRJ-2
   editRevision:4,totalTtPed:10,totalSalePed:12,pricingStatus:"estimated",proposalVersion:0,
   items:[{lineNo:1,itemName:"Article",storage:"ARMORS",aisle:"PARTS",quantity:1,
     markupKind:"percent",markupValue:1.2,unitTtPed:10,lineTtPed:10,lineSalePed:12}]};
+test("GAS : le miroir conserve pourcentages, zéros et texte sans exécuter de formule",()=>{
+  const context=vm.createContext({});
+  vm.runInContext(fs.readFileSync(new URL("../gas/PurchaseOrders.gs",import.meta.url),"utf8"),context);
+  let formatted=false, written;
+  const sheet={getMaxRows:()=>100,getRange:(row,col,rows,cols)=>({
+    setNumberFormat(format){assert.equal(col,3);assert.equal(cols,4);assert.equal(format,"@");formatted=true;},
+    setValues(values){assert.ok(formatted);written=values[0];}
+  })};
+  const input=["id","ref","00123","=1+1","101%","FR"];
+  context.purchaseWriteOrderRow_(sheet,2,input);
+  assert.equal(written[2],"00123");assert.equal(written[3],"'=1+1");assert.equal(written[4],"101%");
+  assert.equal(input[3],"=1+1");
+});
 function fixture() {
   let calls=0;
   const context=vm.createContext({Utilities:{getUuid:randomUUID},
@@ -33,6 +46,29 @@ function fixture() {
   context.frjOrderSheetState_=()=>state;
   return {context,state,row,indexes,calls:()=>calls};
 }
+test("GAS : historique rattaché à sa demande et replay de réparation unique",()=>{
+  const properties=new Map(), seen=[];
+  const context=vm.createContext({
+    PropertiesService:{getScriptProperties:()=>({getProperty:k=>properties.get(k),setProperty:(k,v)=>properties.set(k,v)})},
+    frjD1Request_:path=>{seen.push(path);return {cursor:10,hasMore:false,orders:[{id:snapshot.id,historyEvents:[{eventKey:"d1-10"}]}]};},
+    upsertPurchaseOrderMirror_:()=>{},upsertPurchaseOrderHistoryMirror_:events=>assert.equal(events[0].orderId,snapshot.id)
+  });
+  vm.runInContext(fs.readFileSync(new URL("../gas/SyncOrders.gs",import.meta.url),"utf8"),context);
+  properties.set("FRJ_D1_ORDERS_EVENT_CURSOR","500");
+  context.frjPullPurchaseOrdersFromD1_();context.frjPullPurchaseOrdersFromD1_();
+  assert.deepEqual(seen,["/sync/orders?afterEventId=0","/sync/orders?afterEventId=10"]);
+});
+
+test("GAS : l'accusé d'un commentaire conserve le lien de l'événement",()=>{
+  let saved;
+  const context=vm.createContext({upsertPurchaseOrderHistoryMirror_:(events,force)=>{saved=events;assert.equal(force,true);}});
+  vm.runInContext(fs.readFileSync(new URL("../gas/OrderHistory.gs",import.meta.url),"utf8"),context);
+  context.upsertPurchaseOrderHistoryMirror_=(events,force)=>{saved=events;assert.equal(force,true);};
+  const pending={sheet:{getRange:()=>({getValue:()=>"Commentaire corrigé"})},indexes:{COMMENTAIRE:5},
+    entries:[{rowNumber:2,event:{eventKey:"event-1",orderId:snapshot.id,comment:"Commentaire corrigé"}}]};
+  assert.equal(context.purchaseMarkHistorySyncResult_(pending,[{eventKey:"event-1",ok:true,event:{eventKey:"event-1",comment:"Commentaire corrigé"}}]),1);
+  assert.equal(saved[0].orderId,snapshot.id);
+});
 
 test("Sheets GAS : aucune écriture ni requête D1 sans changement",()=>{
   const f=fixture();

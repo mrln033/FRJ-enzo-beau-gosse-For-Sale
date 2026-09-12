@@ -52,13 +52,13 @@ function processPurchaseOrderRequest(rawBody) {
       clientCreatedAt: normalized.clientCreatedAt,
       discordMessageId: null
     };
-    sheet.appendRow([
+    var orderRow = sheet.getLastRow()+1;
+    purchaseWriteOrderRow_(sheet,orderRow,[
       order.id, order.publicReference, order.buyerAvatar, order.buyerContact || "",
       order.buyerComment || "", order.language, order.frjMember ? "TRUE" : "FALSE",
       order.status, order.totalTtPed, order.totalSalePed, order.pricingStatus,
       order.clientCreatedAt || "", new Date(), "", "", "", "", "", "FALSE", 0
     ]);
-    var orderRow = sheet.getLastRow();
     var historyEvent = purchaseCreateHistoryEvent_(
       order.id,
       "gas-fallback-synchronized",
@@ -392,9 +392,21 @@ function upsertPurchaseOrderMirror_(snapshot, force) {
   set("ACTION_EDITION", "");
 
   var targetRow = existingIndex >= 0 ? existingIndex + 2 : sheet.getLastRow() + 1;
-  sheet.getRange(targetRow, 1, 1, headers.length).setValues([row]);
+  purchaseWriteOrderRow_(sheet,targetRow,row);
   if (typeof frjWriteOrderLines_ === "function") frjWriteOrderLines_(Object.assign({},order,{items:items}));
   return targetRow;
+}
+
+function purchaseWriteOrderRow_(sheet, targetRow, row) {
+  if (targetRow > sheet.getMaxRows()) sheet.insertRowsAfter(sheet.getMaxRows(),targetRow-sheet.getMaxRows());
+  // Les champs métier sont du texte : "101%" et "00123" ne sont pas des nombres.
+  sheet.getRange(targetRow,3,1,4).setNumberFormat("@");
+  var stored = row.slice();
+  for (var column=2;column<=5;column++) {
+    var value = String(stored[column] == null ? "" : stored[column]);
+    stored[column] = value.charAt(0) === "=" ? "'" + value : value;
+  }
+  sheet.getRange(targetRow,1,1,stored.length).setValues([stored]);
 }
 
 function purchasePublishDiscord_(order, items) {
