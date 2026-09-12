@@ -121,7 +121,7 @@ function processPurchaseOrderCancellation(rawBody) {
       found = { rowIndex: rowIndex, payload: syncPayload, order: order };
       break;
     }
-    if (!found) return purchaseJsonOutput_({ ok: false, error: "Demande introuvable" });
+    if (!found || found.order.status === "admin_quote") return purchaseJsonOutput_({ ok: false, error: "Demande introuvable" });
     var canCancel = found.order.approvalRequired === true
       || found.order.status === "submitted" || found.order.status === "viewed";
     if (!canCancel) {
@@ -439,10 +439,11 @@ function purchasePublishDiscord_(order, items) {
 
 function purchaseDiscordPayload_(order, items) {
   var reference = String(order.publicReference || "").trim().toUpperCase();
-  var trackingUrl = /^FRJ-\d{8}-[A-F0-9]{6}$/.test(reference)
+  var trackingUrl = order.status !== "admin_quote" && /^FRJ-\d{8}-[A-F0-9]{6}$/.test(reference)
     ? "https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/s.html#" + reference
     : "https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/commandes.html";
   var statusLabels = {
+    admin_quote: "Devis Admin",
     submitted: "Demande transmise", viewed: "Demande consultée", preparing: "Préparation en cours",
     ready: "Prête", completed: "Terminée", cancelled: "Annulée", expired: "Expirée"
   };

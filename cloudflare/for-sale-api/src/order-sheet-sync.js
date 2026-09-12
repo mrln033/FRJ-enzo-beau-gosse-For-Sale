@@ -1,4 +1,5 @@
 import { ApiError, sha256 } from "./http.js";
+import { requireQuoteTransition } from "./admin-quotes.js";
 import { canReviseOrder, confirmsOrderPricing, validateOrderStatus, orderItemKey, reviseOrderLine, priceOrderLine, formatMarkup } from "./orders.js";
 import { computeDiscountedMarkup, businessDateInParis } from "./discounts.js";
 
@@ -89,6 +90,8 @@ export async function applySheetOrder(env, payload, helpers) {
   const profileChanged = draft.frjMember !== base.frjMember;
   const termsChanged = JSON.stringify(draft.items) !== JSON.stringify(base.items) || profileChanged;
   const statusChanged = draft.status !== base.status;
+  requireQuoteTransition(current.row,draft.status);
+  const adminQuote = draft.status === "admin_quote";
   const mutable = canReviseOrder(current.row.status, current.row.approval_required);
   if (termsChanged && !mutable) throw new ApiError(409, "Prix et quantités verrouillés : rouvrir la demande depuis l'application avant modification.");
   if (termsChanged && statusChanged && draft.status !== "awaiting_approval") {
@@ -163,8 +166,8 @@ export async function applySheetOrder(env, payload, helpers) {
   const round = n => Math.round(n * 100) / 100;
   const totalTt = round(priced.reduce((n,item) => n + Number(item.line_tt_ped), 0));
   const totalSale = round(priced.reduce((n,item) => n + Number(item.line_sale_ped), 0));
-  const status = termsChanged || draft.status === "awaiting_approval" ? "submitted" : draft.status;
-  const approval = termsChanged || draft.status === "awaiting_approval" ? 1 : statusChanged ? 0 : current.row.approval_required;
+  const status = adminQuote || termsChanged || draft.status === "awaiting_approval" ? "submitted" : draft.status;
+  const approval = adminQuote ? 0 : termsChanged || draft.status === "awaiting_approval" ? 1 : statusChanged ? 0 : current.row.approval_required;
   const pricing = confirming ? "confirmed" : termsChanged
     ? priced.some(item => item.price_status === "to-confirm") ? "to-confirm" : "estimated" : current.row.pricing_status;
   // Le reçu et les écritures sont atomiques. Une révision concurrente ne peut pas être écrasée.
@@ -175,12 +178,12 @@ export async function applySheetOrder(env, payload, helpers) {
     (order_id, action, actor, event_key, comment, details)
     SELECT po.id, 'sheet-order-edited', 'gas', ?, ?, ? FROM purchase_orders po
     WHERE po.id = ? AND ${revisionSql} = ?`).bind(operationId, "Demande modifiée depuis Google Sheets.",
-      JSON.stringify({ digest, attempt, termsChanged, statusChanged, from:current.row.status, to:status }), id, expected)];
+      JSON.stringify({ digest, attempt, termsChanged, statusChanged, from:base.status, to:adminQuote ? "admin_quote" : status, previousApprovalRequired:current.row.approval_required }), id, expected)];
   statements.push(env.DB.prepare(`UPDATE purchase_orders SET buyer_avatar=?, buyer_contact=?, buyer_comment=?,
-    language=?, frj_member=?, status=?, approval_required=?, proposal_version=proposal_version+?,
+    language=?, frj_member=?, status=?, approval_required=?, admin_quote=?, proposal_version=proposal_version+?,
     total_tt_ped=?, total_sale_ped=?, pricing_status=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND ${guard}`)
     .bind(draft.buyerAvatar, draft.buyerContact || null, draft.buyerComment || null, draft.language,
-      draft.frjMember ? 1 : 0, status, approval, termsChanged ? 1 : 0, totalTt, totalSale, pricing, id, ...guardArgs));
+      draft.frjMember ? 1 : 0, status, approval, adminQuote ? 1 : 0, termsChanged ? 1 : 0, totalTt, totalSale, pricing, id, ...guardArgs));
   const columns = ["item_name","storage","aisle","quantity","stock_at_submission","unit_tt_ped","markup_kind","markup_value",
     "markup_display","unit_sale_ped","line_tt_ped","line_sale_ped","price_status","base_markup_kind","base_markup_value",
     "base_markup_profiled","discount_campaign_id","discount_kind","discount_rate"];

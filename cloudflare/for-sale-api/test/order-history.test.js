@@ -71,6 +71,7 @@ function makeD1(database) {
 
 function applyMigration(database, name) {
   database.exec(readFileSync(new URL(`../migrations/${name}`, import.meta.url), "utf8"));
+  if (name === "0009_order_proposals.sql") database.exec(readFileSync(new URL("../migrations/0024_admin_quotes.sql",import.meta.url),"utf8"));
 }
 
 function insertOrder(database) {
@@ -255,6 +256,7 @@ test("l'acceptation et l'annulation client écrivent leur événement dans le m�
   applyMigration(database, "0018_purchase_order_tracking_tokens.sql");
   applyMigration(database, "0021_purchase_order_discounts.sql");
   applyMigration(database, "0023_mutable_order_discounts.sql");
+
   insertOrder(database);
   const token = "b".repeat(72);
   const tokenHash = createHash("sha256").update(token).digest("hex");

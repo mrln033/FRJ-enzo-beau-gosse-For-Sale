@@ -20,6 +20,8 @@ Convention d'identification à compter du 31/08/2026 :
 ----------------------------------------
 POINT DE REPRISE — 12/09/2026
 
+T-019 réalisée et publiée : Devis Admin indépendant de l'avatar/origine. FRJ-20260904-D37391 convertie et synchronisée, autres demandes inchangées. Tests utilisateur en production attendus. Retour arrière ciblé dans docs/DEVIS-ADMIN.md. Prochain identifiant : T-020 (remplace le repère T-019 des étapes précédentes).
+
 Ordre recommandé déjà réalisé et validé : d.1 -> d.2 -> d.3 -> d.7 -> d.8 -> d.6 -> d.10 -> d.11 -> d.5 -> d.13 -> d.12.
 Les demandes d.13, d.12 et d.9 sont terminées. D.9 fournit les promotions quotidiennes et les soldes communs à GAS et D1.
 
@@ -32,7 +34,9 @@ T-017 terminée : liens courts des titres Discord publiés et anciens messages a
 -------------------------------
 DEMANDES  => CE QUI EST A FAIRE
 
->>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-019 <<<
+>>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-020 <<<
+
+
 
 	
 
@@ -41,6 +45,13 @@ d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> a
 
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
+
+12/09/2026 — T-019 [ÉVOLUTION] [RÉALISÉE — VALIDATION PRODUCTION ATTENDUE] — Devis Admin.
+Demande d'origine (conversation) : « J'aimerais ajouter un statut spécial 'Devis Admin', qui tiendrait lieu de déclencheur pour ce bouton [Dupliquer], indépendamment du nom d'avatar 'ciblé' comme indiqué dans une demande précédente. Ce statu 'Devis Admin' ne suivrait pas la progression de statut comme les demandes 'normales'. » Accord : mise en œuvre, documentation, tests/validation en production et retour en cas de non-validation.
+Réalisation : création par case dédiée ou conversion explicite d'une demande existante ; aucune reconnaissance automatique par avatar/origine. Modèle privé, hors progression et sans approbation client ; modifications d'articles/MU possibles sans sortie de cet état. Filtre/compteur séparés. Dupliquer prépare une copie normale À valider, avec nouvelles coordonnées/profil et contrôles actuels de stock, TT, MU et promotions. Le modèle est exclu des recalculs automatiques de campagnes. Les anciens liens publics et actions client sont refusés pour les modèles ; Discord affiche Devis Admin et pointe vers la console sans entrée Admin codée en dur.
+Migration D1 additive 0024 (indicateur admin_quote et gardes SQL), aucune reconstruction de table ni modification d'inventaire. Statut métier synchronisé dans les deux sens via l'édition existante ; validation STATUT initialisée une fois par FRJ_ADMIN_QUOTES_VERSION. Pas de nouveau déclencheur ni scan récurrent complet.
+Contrôles : 247 tests réussis, déploiement à blanc valide ; Worker 1501b9a8-f3bd-4301-b67d-8731f2f06977 et GAS 44 publiés, sources GAS relues identiques. FRJ-20260904-D37391 convertie via H29 puis retour du miroir confirmé (révision 477), aucune édition/conflit restant. Articles, profil et totaux inchangés : TT 210 PED, vente 231 PED. D1 relu : 35 demandes, un seul Devis Admin. Suivi public du modèle 404, demande témoin normale 200 ; Discord relu : Devis Admin et URL de console correcte. Les autres anciens modèles Public/Soc restent à convertir explicitement par l'Admin.
+Sauvegarde privée save/20260912-before-admin-quotes.sql exclue de Git. Retour ciblé : Git f8485d7, Worker 24930711-fdab-411f-99c9-38cd62840fb0, GAS 43 + HEAD ; procédure conservant achats/modifications postérieurs dans docs/DEVIS-ADMIN.md. Documentation PANIER et guides racine/GAS/Worker actualisés. Aucun achat factice créé en production pour ce lot.
 
 12/09/2026 — Contrôle direct de l'édition Sheets/D1 après reconnexion Google [TERMINÉ — PUBLIÉ].
 Autorisation utilisateur : faire les contrôles et corrections nécessaires sans attendre de relance.

@@ -12,6 +12,10 @@ Ce projet est volontairement séparé de `../worker.js`, qui gère Discord pour 
 
 Le point d'entrée déclaré dans `wrangler.jsonc` et tous les contrats HTTP restent inchangés.
 
+## Devis Admin (T-019)
+
+Appliquer `0024_admin_quotes.sql` avant le Worker T-019 : colonne additive `admin_quote` et gardes SQL, sans reconstruction de table. L'état exposé `admin_quote` prime sur le statut commercial interne et interdit le suivi public. `src/admin-quotes.js` porte les règles communes ; les copies restent des demandes normales. Guide et retour arrière : [DEVIS-ADMIN.md](../../docs/DEVIS-ADMIN.md).
+
 ## État actuel
 
 - Worker déployé : <https://frj-for-sale-api.merlin-merzhin-lesage.workers.dev>

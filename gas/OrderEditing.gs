@@ -36,7 +36,7 @@ function frjOrderDraft_(row, indexes, lines) {
     buyerComment: String(value("COMMENTAIRE") || "").trim(),
     language: String(value("LANGUE") || "FR").trim().toUpperCase(),
     frjMember: frjOrderBoolean_(value("MEMBRE_FRJ")),
-    status: String(value("STATUT") || "").trim().toLowerCase(),
+    status: String(value("STATUT") || "").trim().toLowerCase().replace(/^devis admin$/, "admin_quote"),
     items: lines.filter(function(line) { return !frjOrderBoolean_(line[8]); }).map(function(line) {
       var kind = String(line[6] || "none").trim().toLowerCase();
       if (kind === "%") kind = "percent";
@@ -67,11 +67,22 @@ function frjOrderSheetState_() {
     linesSheet:linesSheet, lines:lines };
 }
 function frjEnsureOrderEditing_(alreadyLocked) {
+  frjEnsureAdminQuoteStatus_();
   if (PropertiesService.getScriptProperties().getProperty("FRJ_ORDER_EDITING_VERSION") === "20260912-2") return;
   if (alreadyLocked) return frjInitializeOrderEditing_();
   var lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try { return frjInitializeOrderEditing_(); } finally { lock.releaseLock(); }
+}
+function frjEnsureAdminQuoteStatus_() {
+  var properties = PropertiesService.getScriptProperties();
+  if (properties.getProperty("FRJ_ADMIN_QUOTES_VERSION") === "1") return;
+  var orders = getOrCreatePurchaseOrderSheet_(frjOrderBook_());
+  orders.getRange("H2:H").setDataValidation(SpreadsheetApp.newDataValidation()
+    .requireValueInList(["admin_quote","awaiting_approval","submitted","viewed","preparing","ready","completed","cancelled","expired"],true)
+    .setAllowInvalid(false).build());
+  orders.getRange("H1").setNote("admin_quote = Devis Admin : modèle privé hors progression. Dupliquer depuis la console pour créer une demande client. Conversion à enregistrer séparément des prix.");
+  properties.setProperty("FRJ_ADMIN_QUOTES_VERSION","1");
 }
 function frjInitializeOrderEditing_() {
   var properties = PropertiesService.getScriptProperties();

@@ -3,6 +3,7 @@ const ADMIN_ORDERS_URL = "https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale
 const SHORT_TRACKING_URL = "https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/s.html";
 
 const STATUS_LABELS = {
+  admin_quote: "Devis Admin",
   submitted: "Demande transmise",
   awaiting_approval: "À valider par le client",
   viewed: "Demande consultée",
@@ -14,6 +15,7 @@ const STATUS_LABELS = {
 };
 
 const STATUS_COLORS = {
+  admin_quote: 0x64748B,
   submitted: 0xC89222,
   awaiting_approval: 0x8B5CF6,
   viewed: 0x3578C4,
@@ -26,7 +28,7 @@ const STATUS_COLORS = {
 
 export function buildDiscordOrderPayload(order, items) {
   const reference = String(order?.publicReference || "").trim().toUpperCase();
-  const trackingUrl = /^FRJ-\d{8}-[A-F0-9]{6}$/.test(reference)
+  const trackingUrl = order?.status !== "admin_quote" && /^FRJ-\d{8}-[A-F0-9]{6}$/.test(reference)
     ? `${SHORT_TRACKING_URL}#${reference}` : ADMIN_ORDERS_URL;
   const status = String(order?.status || "submitted").toLowerCase();
   const memberLabel = order?.frjMember ? "MU FRJ" : "MU";

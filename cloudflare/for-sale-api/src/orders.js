@@ -1,5 +1,5 @@
 const ORDER_STATUSES = new Set([
-  "submitted", "viewed", "preparing", "ready", "completed", "cancelled", "expired"
+  "submitted", "viewed", "preparing", "ready", "completed", "cancelled", "expired", "admin_quote"
 ]);
 const EDITABLE_ORDER_STATUSES = new Set(["submitted", "viewed"]);
 const CLIENT_CANCELLABLE_STATUSES = new Set(["submitted", "viewed"]);

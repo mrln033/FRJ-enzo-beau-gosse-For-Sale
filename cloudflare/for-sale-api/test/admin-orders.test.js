@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
-import { handleAdminDelete, handleAdminGet, handleAdminPost, handleSyncGet, handleSyncPost, refreshMutableOrderDiscounts } from "../src/application.js";
+import { handlePublicOrderGet, handlePublicOrderAcceptance, handlePublicOrderCancellation, handleAdminDelete, handleAdminGet, handleAdminPost, handleSyncGet, handleSyncPost, refreshMutableOrderDiscounts } from "../src/application.js";
 import { editableSheetDraft } from "../src/order-sheet-sync.js";
 import { normalizeAdminOrderDraft, normalizeAdminOrderLine } from "../src/orders.js";
 
@@ -137,6 +137,7 @@ function setupDatabase() {
   applyMigration(database, "0018_purchase_order_tracking_tokens.sql");
   applyMigration(database, "0021_purchase_order_discounts.sql");
   applyMigration(database, "0023_mutable_order_discounts.sql");
+  applyMigration(database, "0024_admin_quotes.sql");
   database.exec(`
     INSERT INTO avatars VALUES ('enzo', 'Enzo', 'Inventaire Enzo');
     INSERT INTO catalog_items (name, unit_price_ped) VALUES ('Item A', 10), ('Item B', 5), ('Sans stock', 2);
@@ -178,6 +179,65 @@ async function sheetFixture() {
   const writes = () => Number(db.prepare("SELECT total_changes() AS n").get().n);
   return {db,env,id,initial,get,operation,send,items,writes};
 }
+
+
+test("Devis Admin : conversion explicite, privé, hors progression et modèle éditable",async()=>{
+  const f=await sheetFixture();
+  f.db.prepare("UPDATE purchase_orders SET source_backend='d1' WHERE id=?").run(f.id);
+  const post=async(path,body)=>{const url=new URL("https://api.example"+path);return (await handleAdminPost(new Request(url,{method:"POST",body:JSON.stringify(body)}),url,f.env)).json();};
+  const items=f.items();
+  const result=await post("/admin/orders/"+f.id+"/status",{status:"admin_quote"});
+  assert.equal(result.status,"admin_quote");
+  assert.deepEqual(f.items(),items);
+  assert.equal((await f.get()).status,"admin_quote");
+  const quote=f.db.prepare("SELECT * FROM purchase_orders WHERE id=?").get(f.id);
+  assert.equal(quote.approval_required,0);
+  assert.equal(quote.source_backend,"d1");
+  for(const status of ["submitted","preparing","completed","cancelled","expired"]) {
+    await assert.rejects(()=>post("/admin/orders/"+f.id+"/status",{status}),e=>e.status===409);
+  }
+  const token="a".repeat(72), hash=createHash("sha256").update(token).digest("hex");
+  f.db.prepare("UPDATE purchase_orders SET access_token_hash=? WHERE id=?").run(hash,f.id);
+  const alias="b".repeat(72);
+  f.db.prepare("INSERT INTO purchase_order_tracking_tokens(token_hash,order_id) VALUES (?,?)").run(createHash("sha256").update(alias).digest("hex"),f.id);
+  for(const identifier of [quote.public_reference,token,alias]) {
+    const base="https://api.example/orders/status/"+identifier;
+    await assert.rejects(()=>handlePublicOrderGet(new URL(base),f.env),e=>e.status===404);
+    await assert.rejects(()=>handlePublicOrderCancellation(new URL(base+"/cancel"),f.env),e=>e.status===404);
+    await assert.rejects(()=>handlePublicOrderAcceptance(new Request(base+"/accept",{method:"POST",body:JSON.stringify({proposalVersion:1})}),new URL(base+"/accept"),f.env),e=>e.status===404);
+  }
+  await assert.rejects(()=>post("/admin/orders/"+f.id+"/tracking-link",{}),e=>e.status===404);
+  await post("/admin/orders/"+f.id+"/proposal",{items:[{lineNo:1,quantity:1,markupKind:"percent",markupAmount:115}]});
+  await post("/admin/orders/"+f.id+"/items/1",{quantity:2,markupKind:"percent",markupAmount:116});
+  await handleAdminDelete(new URL("https://api.example/admin/orders/"+f.id+"/items/2"),f.env);
+  await post("/admin/orders/"+f.id+"/items",lineB);
+  assert.equal((await f.get()).status,"admin_quote");
+  assert.equal((await f.get()).approvalRequired,false);
+  const before=f.items(); await refreshMutableOrderDiscounts(f.env);
+  assert.deepEqual(f.items(),before);
+  const report=await (await handleAdminGet(new URL("https://api.example/admin/orders"),f.env)).json();
+  assert.equal(report.orders[0].status,"admin_quote");
+  const preview=await (await handleAdminGet(new URL("https://api.example/admin/orders/"+f.id+"/duplicate-preview"),f.env)).json();
+  assert.equal(preview.source.status,"admin_quote");
+  assert.throws(()=>f.db.prepare("UPDATE purchase_orders SET status='ready' WHERE id=?").run(f.id),/Devis Admin/);
+});
+
+test("Devis Admin : Sheets convertit, conserve le modèle et le miroir le restitue",async()=>{
+  const f=await sheetFixture(), edit=f.operation();
+  edit.draft.status="admin_quote";
+  const converted=await f.send(edit);
+  assert.equal(converted.snapshot.status,"admin_quote");
+  assert.equal((await f.send(edit)).duplicate,true);
+  const next={...f.operation(),baseRevision:converted.snapshot.editRevision,draft:editableSheetDraft(converted.snapshot)};
+  next.draft.buyerAvatar="Avatar quelconque"; next.draft.items[0].quantity=1;
+  const updated=await f.send(next);
+  assert.equal(updated.snapshot.status,"admin_quote"); assert.equal(updated.snapshot.approvalRequired,false);
+  const normal={...f.operation(),baseRevision:updated.snapshot.editRevision,draft:editableSheetDraft(updated.snapshot)};
+  normal.draft.status="submitted";
+  await assert.rejects(()=>f.send(normal),e=>e.status===409);
+  const mirror=await (await handleSyncGet(new URL("https://api.example/sync/orders?afterEventId=0"),f.env)).json();
+  assert.equal(mirror.orders.find(o=>o.id===f.id).status,"admin_quote");
+});
 
 test("Sheets : entête seule, aucune écriture de ligne ; reprises et absence de changement sans écriture",async () => {
   const f=await sheetFixture(), before=f.items(), noop=f.operation(), zero=f.writes();
@@ -295,8 +355,7 @@ test("T-018 copie indépendante, contact et contrôle du catalogue sans écritur
   const create = async payload => (await handleAdminPost(new Request(url, {
     method: "POST", body: JSON.stringify(payload)
   }), url, env)).json();
-  const model = await create({ buyerAvatar: " Soc ", frjMember: true, items: [lineA] });
-  database.prepare("UPDATE purchase_orders SET status = 'completed', approval_required = 0 WHERE id = ?").run(model.order.id);
+  const model = await create({ buyerAvatar: "Autre avatar", adminQuote: true, frjMember: true, items: [lineA] });
   const before = database.prepare("SELECT * FROM purchase_orders WHERE id = ?").get(model.order.id);
   const oldItems = database.prepare("SELECT * FROM purchase_order_items WHERE order_id = ?").all(model.order.id);
   const previewUrl = new URL(`https://api.example/admin/orders/${model.order.id}/duplicate-preview`);
@@ -305,7 +364,10 @@ test("T-018 copie indépendante, contact et contrôle du catalogue sans écritur
   assert.equal(preview.source.accessTokenHash, undefined);
   assert.deepEqual(database.prepare("SELECT * FROM purchase_orders WHERE id = ?").get(model.order.id), before);
   const snapshot = preview.catalog.items.find(item => item.itemName === lineA.itemName);
-  const payload = { buyerAvatar: "Client", buyerContact: " Discord : client ", frjMember: false,
+  assert.equal(model.order.status,"admin_quote");
+  assert.equal(model.trackingPath,undefined);
+  assert.equal(model.accessToken,undefined);
+  const payload = { buyerAvatar: "Client", buyerContact: " Discord : client ", frjMember: false, adminQuote:true,
     duplicateSourceId: model.order.id, items: [{ ...lineA, markupAmount: 120, catalogSnapshot: snapshot }] };
   const result = await create(payload);
   assert.notEqual(result.order.id, model.order.id);

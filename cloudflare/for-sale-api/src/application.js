@@ -34,6 +34,7 @@ import {
 } from "./orders.js";
 import { sendOrUpdateDiscordOrder } from "./discord.js";
 import { applySheetOrder, readSheetOrder } from "./order-sheet-sync.js";
+import { isAdminQuote, requireQuoteTransition } from "./admin-quotes.js";
 
 function sheetOrderHelpers() {
   return { mapAdminOrder, mapOrderItem, readAdminOrderCatalog, deriveBaseMarkup, synchronizeDiscordOrder };
@@ -197,8 +198,7 @@ export async function handleAdminGet(url, env) {
   const duplicatePreview = url.pathname.match(/^\/admin\/orders\/([a-f0-9-]{36})\/duplicate-preview$/i);
   if (duplicatePreview) {
     const source = await env.DB.prepare("SELECT * FROM purchase_orders WHERE id = ?").bind(duplicatePreview[1]).first();
-    if (!source || source.source_backend !== "d1-admin"
-      || !["public", "soc", "membre frj"].includes(String(source.buyer_avatar).trim().toLowerCase())) {
+    if (!source || !isAdminQuote(source)) {
       throw new ApiError(400, "Cette demande n'est pas un devis duplicable.");
     }
     const items = await env.DB.prepare("SELECT * FROM purchase_order_items WHERE order_id = ? ORDER BY line_no")
@@ -1665,7 +1665,7 @@ function mapSyncState(row) {
 async function updateOrderProposal(env, orderId, requestedItems) {
   const [orderResult, itemsResult] = await env.DB.batch([
     env.DB.prepare(`
-      SELECT id, status, approval_required, proposal_version, frj_member
+      SELECT id, status, approval_required, proposal_version, frj_member, admin_quote
       FROM purchase_orders WHERE id = ?
     `).bind(orderId),
     env.DB.prepare(`
@@ -1725,7 +1725,7 @@ async function updateOrderProposal(env, orderId, requestedItems) {
     return {
       ok: true,
       noChange: true,
-      status: Number(order.approval_required || 0) === 1 ? "awaiting_approval" : order.status,
+      status: mapAdminOrder(order).status,
       proposalVersion: Number(order.proposal_version || 0)
     };
   }
@@ -1745,7 +1745,7 @@ async function updateOrderProposal(env, orderId, requestedItems) {
   statements.push(
     env.DB.prepare(`
       UPDATE purchase_orders
-      SET status = 'submitted', approval_required = 1,
+SET status = 'submitted', approval_required = CASE WHEN admin_quote = 1 THEN 0 ELSE 1 END,
           proposal_version = proposal_version + 1,
           total_tt_ped = (SELECT ROUND(COALESCE(SUM(line_tt_ped), 0), 2) FROM purchase_order_items WHERE order_id = ?),
           total_sale_ped = (SELECT ROUND(COALESCE(SUM(line_sale_ped), 0), 2) FROM purchase_order_items WHERE order_id = ?),
@@ -1765,7 +1765,7 @@ async function updateOrderProposal(env, orderId, requestedItems) {
   return {
     ok: true,
     noChange: false,
-    status: "awaiting_approval",
+    status: isAdminQuote(order) ? "admin_quote" : "awaiting_approval",
     proposalVersion: nextVersion,
     changedLines: changed.length,
     discord: publicDiscordResult(discord)
@@ -1828,7 +1828,7 @@ export async function handleAdminPost(request, url, env) {
   if (orderTrackingLinkMatch) {
     if (!isCartEnabled(env)) throw new ApiError(503, "Suivi de panier désactivé");
     const orderId = orderTrackingLinkMatch[1].toLowerCase();
-    const existing = await env.DB.prepare(`SELECT id, public_reference FROM purchase_orders WHERE id = ?`)
+    const existing = await env.DB.prepare(`SELECT id, public_reference FROM purchase_orders WHERE id = ? AND admin_quote = 0`)
       .bind(orderId).first();
     if (!existing) throw new ApiError(404, "Demande introuvable");
     const response = json({
@@ -1882,7 +1882,7 @@ export async function handleAdminPost(request, url, env) {
     const existing = await env.DB.prepare(`
       SELECT oi.order_id, oi.line_no, oi.item_name, oi.storage, oi.aisle, oi.unit_tt_ped,
              oi.quantity, oi.markup_kind, oi.markup_value, oi.discount_rate,
-             po.status, po.approval_required, po.frj_member
+             po.status, po.approval_required, po.frj_member, po.admin_quote
       FROM purchase_order_items oi
       JOIN purchase_orders po ON po.id = oi.order_id
       WHERE oi.order_id = ? AND oi.line_no = ?
@@ -1922,7 +1922,7 @@ export async function handleAdminPost(request, url, env) {
       ),
       env.DB.prepare(`
         UPDATE purchase_orders
-        SET status = 'submitted', approval_required = 1,
+SET status = 'submitted', approval_required = CASE WHEN admin_quote = 1 THEN 0 ELSE 1 END,
             proposal_version = proposal_version + 1,
             total_tt_ped = (SELECT ROUND(COALESCE(SUM(line_tt_ped), 0), 2) FROM purchase_order_items WHERE order_id = ?),
             total_sale_ped = (SELECT ROUND(COALESCE(SUM(line_sale_ped), 0), 2) FROM purchase_order_items WHERE order_id = ?),
@@ -1939,7 +1939,7 @@ export async function handleAdminPost(request, url, env) {
       })
     ]);
     const discord = await synchronizeDiscordOrder(env, orderId);
-    return json({ ok: true, status: "awaiting_approval", discord: publicDiscordResult(discord) });
+    return json({ ok: true, status: isAdminQuote(existing) ? "admin_quote" : "awaiting_approval", discord: publicDiscordResult(discord) });
   }
 
   const orderStatusMatch = url.pathname.match(/^\/admin\/orders\/([a-f0-9-]{36})\/status$/i);
@@ -1947,9 +1947,19 @@ export async function handleAdminPost(request, url, env) {
     const body = await readTextBody(request, 20_000);
     const payload = parseJsonBody(body);
     const status = parseOrderValue(() => validateOrderStatus(payload.status));
-    const existing = await env.DB.prepare(`SELECT id, status, approval_required FROM purchase_orders WHERE id = ?`)
+    const existing = await env.DB.prepare(`SELECT id, status, approval_required, admin_quote FROM purchase_orders WHERE id = ?`)
       .bind(orderStatusMatch[1].toLowerCase()).first();
     if (!existing) throw new ApiError(404, "Demande introuvable");
+    requireQuoteTransition(existing, status);
+    if (status === "admin_quote") {
+      if (isAdminQuote(existing)) return json({ok:true,noChange:true,status});
+      await env.DB.batch([
+        env.DB.prepare("UPDATE purchase_orders SET admin_quote=1,status='submitted',approval_required=0,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(existing.id),
+        prepareOrderHistoryEvent(env,{orderId:existing.id,action:"status-changed",details:{from:existing.status,to:status,previousApprovalRequired:Number(existing.approval_required)}})
+      ]);
+      const discord = await synchronizeDiscordOrder(env,existing.id);
+      return json({ok:true,status,discord:publicDiscordResult(discord)});
+    }
     if (existing.status === status && Number(existing.approval_required || 0) === 0) {
       return json({ ok: true, noChange: true, status });
     }
@@ -2109,7 +2119,7 @@ export async function handleAdminDelete(url, env) {
   const orderId = orderItemMatch[1].toLowerCase();
   const lineNo = Number(orderItemMatch[2]);
   const existing = await env.DB.prepare(`
-    SELECT oi.item_name, po.status, po.approval_required, po.proposal_version,
+    SELECT oi.item_name, po.status, po.approval_required, po.proposal_version, po.admin_quote,
            (SELECT COUNT(*) FROM purchase_order_items WHERE order_id = ?) AS item_count
     FROM purchase_order_items oi
     JOIN purchase_orders po ON po.id = oi.order_id
@@ -2130,7 +2140,7 @@ export async function handleAdminDelete(url, env) {
     `).bind(orderId, lineNo),
     env.DB.prepare(`
       UPDATE purchase_orders
-      SET status = 'submitted', approval_required = 1,
+SET status = 'submitted', approval_required = CASE WHEN admin_quote = 1 THEN 0 ELSE 1 END,
           proposal_version = proposal_version + 1,
           total_tt_ped = (
             SELECT ROUND(COALESCE(SUM(line_tt_ped), 0), 2)
@@ -2160,7 +2170,7 @@ export async function handleAdminDelete(url, env) {
   const discord = await synchronizeDiscordOrder(env, orderId);
   return json({
     ok: true,
-    status: "awaiting_approval",
+    status: isAdminQuote(existing) ? "admin_quote" : "awaiting_approval",
     proposalVersion: nextVersion,
     removedLineNo: lineNo,
     discord: publicDiscordResult(discord)
@@ -2175,11 +2185,12 @@ export async function handlePublicOrderGet(url, env) {
   if (!orderId) throw new ApiError(404, "Demande introuvable");
   await refreshMutableOrderDiscounts(env, orderId);
   const order = await env.DB.prepare(`
-    SELECT id, public_reference, status, approval_required, proposal_version, buyer_avatar, language, frj_member,
+    SELECT id, public_reference, status, approval_required, proposal_version, buyer_avatar, language, frj_member, admin_quote,
            total_tt_ped, total_sale_ped, pricing_status, created_at, updated_at
     FROM purchase_orders
     WHERE id = ?
   `).bind(orderId).first();
+  if (!order || isAdminQuote(order)) throw new ApiError(404,"Demande introuvable");
   const items = await env.DB.prepare(`
     SELECT line_no, item_name, storage, aisle, quantity, stock_at_submission,
            unit_tt_ped, markup_kind, markup_value, markup_display, unit_sale_ped,
@@ -2216,7 +2227,7 @@ export async function handlePublicOrderAcceptance(request, url, env) {
     env.DB.prepare(`
       UPDATE purchase_orders
       SET status = 'submitted', approval_required = 0, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ? AND approval_required = 1 AND proposal_version = ?
+      WHERE id = ? AND admin_quote = 0 AND approval_required = 1 AND proposal_version = ?
     `).bind(order.id, proposalVersion),
     env.DB.prepare(`
       INSERT INTO purchase_order_events (order_id, event_key, action, actor, comment, details)
@@ -2254,7 +2265,7 @@ export async function handlePublicOrderCancellation(url, env) {
     env.DB.prepare(`
       UPDATE purchase_orders
       SET status = 'cancelled', approval_required = 0, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ? AND (approval_required = 1 OR status IN ('submitted', 'viewed'))
+      WHERE id = ? AND admin_quote = 0 AND (approval_required = 1 OR status IN ('submitted', 'viewed'))
     `).bind(order.id),
     env.DB.prepare(`
       INSERT INTO purchase_order_events (order_id, event_key, action, actor, comment, details)
@@ -2283,13 +2294,14 @@ export async function handlePublicOrderPost(request, env) {
   const submission = parseOrderValue(() => normalizeOrderSubmission(rawPayload));
   const accessTokenHash = await sha256(submission.accessToken);
   const duplicate = await env.DB.prepare(`
-    SELECT id, public_reference, access_token_hash, status, approval_required, proposal_version,
+    SELECT id, public_reference, access_token_hash, status, approval_required, proposal_version, admin_quote,
            total_tt_ped, total_sale_ped,
            pricing_status, created_at, updated_at, buyer_avatar, language, frj_member,
            discord_message_id
     FROM purchase_orders WHERE id = ? OR public_reference = ?
   `).bind(submission.id, submission.publicReference).first();
   if (duplicate) {
+    if (isAdminQuote(duplicate)) throw new ApiError(404,"Demande introuvable");
     if (!(await timingSafeEqual(String(duplicate.access_token_hash), accessTokenHash))) {
       throw new ApiError(409, "Référence de demande déjà utilisée");
     }
@@ -2414,8 +2426,8 @@ async function storePurchaseOrder(env, order, items, eventAction, syncedEvent = 
         id, public_reference, access_token_hash, status, buyer_avatar, buyer_contact,
         buyer_comment, language, frj_member, source_backend, total_tt_ped,
         total_sale_ped, pricing_status, submitter_hash, client_created_at,
-        discord_message_id, approval_required, proposal_version
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        discord_message_id, approval_required, proposal_version, admin_quote
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       order.id, order.publicReference, order.accessTokenHash, order.status || "submitted",
       order.buyerAvatar, order.buyerContact || null, order.buyerComment || null,
@@ -2423,7 +2435,7 @@ async function storePurchaseOrder(env, order, items, eventAction, syncedEvent = 
       Number(order.totalTtPed || 0), Number(order.totalSalePed || 0),
       order.pricingStatus || "estimated", order.submitterHash || null, order.clientCreatedAt || null,
       order.discordMessageId || null, order.approvalRequired ? 1 : 0,
-      Number(order.proposalVersion || 0)
+      Number(order.proposalVersion || 0), order.adminQuote ? 1 : 0
     ),
     ...items.map((item, index) => env.DB.prepare(`
       INSERT INTO purchase_order_items (
@@ -2615,7 +2627,7 @@ async function synchronizeDiscordOrder(env, orderId) {
 
   const [orderResult, itemsResult] = await env.DB.batch([
     env.DB.prepare(`
-      SELECT id, public_reference, status, approval_required, proposal_version,
+SELECT id, public_reference, status, approval_required, proposal_version, admin_quote,
              buyer_avatar, buyer_contact, buyer_comment,
              language, frj_member, source_backend, total_tt_ped, total_sale_ped,
              pricing_status, created_at, updated_at, discord_message_id
@@ -2735,13 +2747,13 @@ async function readAdminOrderCatalog(env, requestedItems = null) {
 async function createAdminOrder(env, payload) {
   if (!isCartEnabled(env)) throw new ApiError(503, "Transmission des paniers désactivée");
   const draft = parseOrderValue(() => normalizeAdminOrderDraft(payload));
+  const adminQuote = payload.adminQuote === true && !payload.duplicateSourceId;
   const catalog = await readAdminOrderCatalog(env);
   if (payload.duplicateSourceId) {
     const source = await env.DB.prepare(
-      "SELECT buyer_avatar, source_backend FROM purchase_orders WHERE id = ?"
+"SELECT admin_quote FROM purchase_orders WHERE id = ?"
     ).bind(String(payload.duplicateSourceId)).first();
-    if (!source || source.source_backend !== "d1-admin"
-      || !["public", "soc", "membre frj"].includes(String(source.buyer_avatar).trim().toLowerCase())) {
+    if (!source || !isAdminQuote(source)) {
       throw new ApiError(400, "Cette demande n'est pas un devis duplicable.");
     }
     // Ne jamais enregistrer silencieusement un devis basé sur un catalogue périmé.
@@ -2766,7 +2778,8 @@ async function createAdminOrder(env, payload) {
     publicReference: identity.publicReference,
     accessTokenHash: await sha256(accessToken),
     status: "submitted",
-    approvalRequired: true,
+    approvalRequired: !adminQuote,
+    adminQuote,
     proposalVersion: 1,
     buyerAvatar: draft.buyerAvatar,
     buyerContact: draft.buyerContact,
@@ -2780,15 +2793,14 @@ async function createAdminOrder(env, payload) {
     submitterHash: null,
     clientCreatedAt: now,
     eventActor: "admin",
-    eventDetails: { sourceBackend: "d1-admin", approvalRequired: true, proposalVersion: 1 }
+    eventDetails: { sourceBackend: "d1-admin", approvalRequired: !adminQuote, proposalVersion: 1, to: adminQuote ? "admin_quote" : "submitted" }
   };
   await storePurchaseOrder(env, order, lines, "admin-created");
   const discord = await synchronizeDiscordOrder(env, order.id);
   return {
     ok: true,
     order: mapPublicOrder(order, lines),
-    accessToken,
-    trackingPath: `suivi-commande.html?ref=${encodeURIComponent(identity.publicReference)}`,
+    ...(adminQuote ? {} : {accessToken, trackingPath: `suivi-commande.html?ref=${encodeURIComponent(identity.publicReference)}`}),
     discord: publicDiscordResult(discord)
   };
 }
@@ -2798,7 +2810,7 @@ async function addAdminOrderItem(env, orderId, payload) {
   const requested = parseOrderValue(() => normalizeAdminOrderLine(payload));
   const [orderResult, itemsResult] = await env.DB.batch([
     env.DB.prepare(`
-      SELECT id, status, approval_required, proposal_version, frj_member
+      SELECT id, status, approval_required, proposal_version, frj_member, admin_quote
       FROM purchase_orders WHERE id = ?
     `).bind(orderId),
     env.DB.prepare(`
@@ -2842,7 +2854,7 @@ async function addAdminOrderItem(env, orderId, payload) {
     ),
     env.DB.prepare(`
       UPDATE purchase_orders
-      SET status = 'submitted', approval_required = 1,
+SET status = 'submitted', approval_required = CASE WHEN admin_quote = 1 THEN 0 ELSE 1 END,
           proposal_version = proposal_version + 1,
           total_tt_ped = (SELECT ROUND(COALESCE(SUM(line_tt_ped), 0), 2) FROM purchase_order_items WHERE order_id = ?),
           total_sale_ped = (SELECT ROUND(COALESCE(SUM(line_sale_ped), 0), 2) FROM purchase_order_items WHERE order_id = ?),
@@ -2862,7 +2874,7 @@ async function addAdminOrderItem(env, orderId, payload) {
   const discord = await synchronizeDiscordOrder(env, orderId);
   return {
     ok: true,
-    status: "awaiting_approval",
+    status: isAdminQuote(order) ? "admin_quote" : "awaiting_approval",
     proposalVersion: nextVersion,
     line,
     discord: publicDiscordResult(discord)
@@ -2952,7 +2964,7 @@ export async function refreshMutableOrderDiscounts(env, orderId = null) {
     LEFT JOIN discount_campaigns p
       ON p.campaign_type = 'daily_promo' AND p.enabled = 1
      AND p.starts_on = ? AND p.storage = oi.storage AND p.aisle = oi.aisle
-    WHERE (po.approval_required = 1 OR po.status IN ('submitted', 'viewed'))
+    WHERE po.admin_quote = 0 AND (po.approval_required = 1 OR po.status IN ('submitted', 'viewed'))
       ${orderFilter}
     ORDER BY oi.order_id, oi.line_no
   `);
@@ -3062,7 +3074,7 @@ async function readAdminOrders(env) {
   await refreshMutableOrderDiscounts(env);
   const [ordersResult, itemsResult] = await env.DB.batch([
     env.DB.prepare(`
-      SELECT id, public_reference, status, approval_required, proposal_version,
+SELECT id, public_reference, status, approval_required, proposal_version, admin_quote,
              buyer_avatar, buyer_contact, buyer_comment,
              language, frj_member, source_backend, total_tt_ped, total_sale_ped,
              pricing_status, client_created_at, created_at, updated_at
@@ -3180,7 +3192,7 @@ async function readOrdersForGasMirror(env, url) {
     .filter(Boolean);
   const [ordersResult, itemsResult, targetEventsResult] = await env.DB.batch([
     env.DB.prepare(`
-      SELECT id, public_reference, access_token_hash, status, approval_required, proposal_version,
+      SELECT id, public_reference, access_token_hash, status, approval_required, proposal_version, admin_quote,
              buyer_avatar, buyer_contact, buyer_comment, language, frj_member, source_backend,
              total_tt_ped, total_sale_ped, pricing_status, client_created_at, created_at, updated_at,
              discord_message_id
@@ -3246,11 +3258,13 @@ function parseOrderHistoryTargetKey(details) {
 }
 
 function mapPublicOrder(order, items) {
-  const approvalRequired = Number(order.approval_required ?? order.approvalRequired ?? 0) === 1;
+  const adminQuote = isAdminQuote(order);
+  const approvalRequired = !adminQuote && Number(order.approval_required ?? order.approvalRequired ?? 0) === 1;
   return {
     id: order.id,
     publicReference: order.public_reference || order.publicReference,
-    status: approvalRequired ? "awaiting_approval" : (order.status || "submitted"),
+    status: adminQuote ? "admin_quote" : approvalRequired ? "awaiting_approval" : (order.status || "submitted"),
+    adminQuote,
     approvalRequired,
     proposalVersion: Number(order.proposal_version ?? order.proposalVersion ?? 0),
     buyerAvatar: order.buyer_avatar || order.buyerAvatar,
@@ -3323,11 +3337,12 @@ async function resolveOrderIdByTrackingToken(env, tokenHash) {
   const row = await env.DB.prepare(`
     SELECT id
     FROM purchase_orders
-    WHERE access_token_hash = ?
+    WHERE access_token_hash = ? AND admin_quote = 0
     UNION ALL
     SELECT order_id AS id
-    FROM purchase_order_tracking_tokens
-    WHERE token_hash = ?
+    FROM purchase_order_tracking_tokens tokens
+    JOIN purchase_orders po ON po.id = tokens.order_id
+    WHERE token_hash = ? AND po.admin_quote = 0
     LIMIT 1
   `).bind(tokenHash, tokenHash).first();
   return row?.id || null;
@@ -3336,7 +3351,7 @@ async function resolveOrderIdByTrackingToken(env, tokenHash) {
 async function resolveOrderIdByPublicIdentifier(env, identifier) {
   const normalized = String(identifier || "").trim();
   if (/^FRJ-\d{8}-[A-F0-9]{6}$/i.test(normalized)) {
-    const row = await env.DB.prepare(`SELECT id FROM purchase_orders WHERE public_reference = ?`)
+    const row = await env.DB.prepare(`SELECT id FROM purchase_orders WHERE public_reference = ? AND admin_quote = 0`)
       .bind(normalized.toUpperCase()).first();
     return row?.id || null;
   }

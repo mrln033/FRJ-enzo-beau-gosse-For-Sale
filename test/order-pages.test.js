@@ -71,7 +71,7 @@ async function settle() {
 
 test("T-018 duplication : profil, remises, stock, MU absent et en-tête éditable avant création", async () => {
   const ids = ["ordersList", "ordersSummary", "ordersError", "ordersFilters", "refreshOrders",
-    "newOrderToggle", "newOrderPanel", "newOrderForm", "newOrderAvatar", "newOrderProfile", "newOrderContact",
+    "newOrderToggle", "newOrderPanel", "newOrderForm", "newOrderAvatar", "newOrderProfile", "newOrderContact", "newOrderAdminQuote",
     "newOrderLines", "newOrderAddLine", "newOrderTotal", "newOrderTotalTt", "newOrderTotalMarkup",
     "newOrderFeedback", "newOrderCancel", "newOrderSave", "newOrderResult"];
   const elements = new Map(ids.map(id => [id, new FakeElement(id)]));
@@ -85,7 +85,7 @@ test("T-018 duplication : profil, remises, stock, MU absent et en-tête éditabl
   ];
   const source = { id: "123e4567-e89b-42d3-a456-426614174000", publicReference: "FRJ-20260911-ABC123",
     buyerAvatar: " Soc ", buyerContact: "old contact", frjMember: true, sourceBackend: "d1-admin",
-    status: "completed", items: [
+    status: "admin_quote", items: [
       { ...catalog[0], quantity: 4, markupValue: 99 },
       { ...catalog[1], quantity: 1 },
       { itemName: "Missing", storage: "ARMORS", aisle: "PARTS", quantity: 1 }
@@ -108,8 +108,8 @@ test("T-018 duplication : profil, remises, stock, MU absent et en-tête éditabl
           order: { publicReference: "FRJ-20260911-DEF456" },
           trackingPath: "suivi-commande.html?ref=FRJ-20260911-DEF456"
         }) };
-        return { json: async () => ({ orders: [source, { ...source, id: "other", buyerAvatar: "Client" },
-          { ...source, id: "public-order", sourceBackend: "d1", buyerAvatar: "Public" }],
+        return { json: async () => ({ orders: [source, { ...source, id: "other", buyerAvatar: "Client", status:"submitted" },
+          { ...source, id: "public-order", sourceBackend: "d1", buyerAvatar: "Public",status:"submitted" }],
           enabled: true, generatedAt: "2026-09-11T10:00:00Z" }) };
       }
     }
@@ -200,7 +200,7 @@ test("la console Admin charge et filtre une liste vide", async () => {
   await settle();
 
   assert.equal(requests[0].path, "/admin/orders");
-  assert.equal(elements.get("ordersFilters").children.length, 9);
+  assert.equal(elements.get("ordersFilters").children.length, 10);
   assert.match(elements.get("ordersSummary").textContent, /0 demande\(s\) affichée\(s\) sur 0/);
   assert.equal(elements.get("ordersList").children[0].textContent, "Aucune demande transmise.");
   assert.equal(elements.get("ordersError").hidden, true);

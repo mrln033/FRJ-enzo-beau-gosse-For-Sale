@@ -1,6 +1,7 @@
 const COMMENT_MAX_LENGTH = 500;
 
 const STATUS_LABELS = Object.freeze({
+  admin_quote: "Devis Admin",
   submitted: "Transmise",
   viewed: "Consultée",
   preparing: "À préparer",
@@ -29,7 +30,7 @@ const SYNCED_ACTIONS = new Set([
   "client-cancelled", "sheet-order-edited", "buyer-avatar-corrected"
 ]);
 const ORDER_STATUSES = new Set([
-  "submitted", "viewed", "preparing", "ready", "completed", "cancelled", "expired"
+  "submitted", "viewed", "preparing", "ready", "completed", "cancelled", "expired", "admin_quote"
 ]);
 
 export function orderHistoryActor(action) {

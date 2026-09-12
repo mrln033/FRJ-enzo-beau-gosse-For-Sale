@@ -43,6 +43,10 @@ Le paramètre public `category` ouvre directement une catégorie du catalogue. I
 
 Le panier, la Console Admin et la page de suivi copient une adresse courte sur le domaine habituel, fondée sur la référence publique, par exemple `https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/s.html#FRJ-20260910-ABC123`. La page relais ouvre le suivi correspondant. Les anciens liens contenant un jeton restent compatibles.
 
+## Devis Admin
+
+Les modèles de devis possèdent leur statut **Devis Admin**, indépendant du nom d'avatar et de l'origine. Ils se dupliquent en demandes normales sans suivre eux-mêmes le parcours client. Voir [utilisation, synchronisation et retour arrière](docs/DEVIS-ADMIN.md).
+
 ## Vérifications locales
 
 Depuis la racine du dépôt :

@@ -29,7 +29,7 @@
   </section>
   <section id="newOrderPanel" class="new-order-panel" hidden>
     <h2>Nouvelle demande directe</h2>
-    <p class="new-order-intro">La référence et la date seront générées lors de l’enregistrement. La proposition sera placée au statut « À valider ».</p>
+    <p class="new-order-intro">La référence et la date seront générées lors de l’enregistrement. La demande sera placée « À valider », sauf si vous choisissez le modèle « Devis Admin ».</p>
     <form id="newOrderForm">
       <div class="new-order-identity">
         <label>
@@ -47,7 +47,7 @@
           <input type="text" id="newOrderContact" name="buyerContact" maxlength="160">
         </label>
         <p><strong>Origine :</strong> Demande directe</p>
-        <p><strong>Statut :</strong> À valider</p>
+        <label><input type="checkbox" id="newOrderAdminQuote"> Créer un Devis Admin (modèle privé, hors progression)</label>
       </div>
       <div id="newOrderLines" class="direct-order-lines"></div>
       <div class="new-order-toolbar">

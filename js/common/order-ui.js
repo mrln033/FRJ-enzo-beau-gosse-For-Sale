@@ -2,6 +2,7 @@
   "use strict";
 
   const statusDefinitions = Object.freeze({
+    admin_quote: Object.freeze({ admin: "Devis Admin", FR: "Devis Admin", EN: "Admin quote" }),
     awaiting_approval: Object.freeze({ admin: "À valider", FR: "À valider", EN: "Approval required" }),
     submitted: Object.freeze({ admin: "Transmise", FR: "Demande transmise", EN: "Request submitted" }),
     viewed: Object.freeze({ admin: "Vue", FR: "Demande consultée", EN: "Request viewed" }),
@@ -85,7 +86,7 @@
   }
 
   // Avant la préparation, une proposition peut encore être modifiée par l'Admin ou annulée par le client.
-  const canEditProposal = (status) => editableStatuses.has(status);
+  const canEditProposal = (status) => status === "admin_quote" || editableStatuses.has(status);
   const canCancel = (status) => editableStatuses.has(status);
   const canHide = (status) => hideableStatuses.has(status);
 

@@ -69,7 +69,11 @@ Pour désactiver uniquement Discord, supprimer le secret `DISCORD_ORDER_WEBHOOK_
 
 La suppression des trois tables D1 ou de la feuille GAS n'est pas nécessaire pour revenir en arrière. Le commit Git dédié peut aussi être annulé sans toucher aux données historiques.
 
-## T-018 — Dupliquer un devis (11/09/2026)
+## T-019 — Devis Admin (12/09/2026)
+
+Le statut Devis Admin remplace la détection par avatar et origine décrite historiquement en T-018 ci-dessous. Voir [le guide Devis Admin et retour arrière](DEVIS-ADMIN.md). Les règles de contrôle du stock, des TT, MU, profils et campagnes lors de la duplication restent celles de T-018.
+
+## T-018 — Dupliquer un devis (11/09/2026, critère remplacé par T-019)
 
 Dans la Console Admin, « Dupliquer ce devis » apparaît uniquement pour les demandes directes (sourceBackend = d1-admin) dont l'avatar, après suppression des espaces autour et normalisation de casse, est Public, Soc ou Membre FRJ. Le profil réellement enregistré dans le modèle est repris ; son nom n'est pas utilisé pour déduire le tarif.
 

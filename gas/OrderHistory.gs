@@ -262,6 +262,7 @@ function purchaseCaptureHistoryCommentEdit_(sheet, range) {
 
 function purchaseAutomaticHistoryComment_(action, details) {
   var labels = {
+    admin_quote: "Devis Admin",
     submitted: "Transmise", viewed: "Consultée", preparing: "À préparer", ready: "Prête",
     completed: "Terminée", cancelled: "Annulée", expired: "Expirée"
   };

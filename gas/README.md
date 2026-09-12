@@ -18,6 +18,10 @@ Ce dossier contient la totalité du projet Apps Script autonome. Apps Script cha
 
 Les secrets `FRJ_D1_SYNC_TOKEN`, `FRJ_DISCORD_ORDER_WEBHOOK_URL` et les options comme `FRJ_CART_ENABLED` restent dans les propriétés du script. Ils ne doivent jamais être ajoutés au dépôt.
 
+## Devis Admin (T-019)
+
+STATUT accepte `admin_quote`, synchronisé via l'édition différentielle existante. La validation de la colonne est installée une seule fois avec la propriété `FRJ_ADMIN_QUOTES_VERSION=1`. Aucun nouveau déclencheur. La conversion et le retour arrière sont décrits dans [DEVIS-ADMIN.md](../docs/DEVIS-ADMIN.md).
+
 ## Historique des demandes
 
 La feuille `COMMANDES_HISTORIQUE` est créée de façon idempotente lors de l'installation de la synchronisation. Chaque événement possède une clé stable commune à GAS et D1. Une création ou annulation reçue par le secours GAS ajoute une ligne non synchronisée, ensuite répliquée dans D1. Depuis le 12/09/2026, les éditions manuelles des entêtes/statuts de COMMANDES_APP et des articles de COMMANDES_LIGNES passent par /sync/order-edit : le serveur valide et applique la demande atomiquement avec son événement sheet-order-edited, puis le miroir rapatrie son historique.

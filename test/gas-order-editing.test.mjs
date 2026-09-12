@@ -28,7 +28,7 @@ test("GAS : le miroir conserve pourcentages, zéros et texte sans exécuter de f
 function fixture() {
   let calls=0;
   const context=vm.createContext({Utilities:{getUuid:randomUUID},
-    PropertiesService:{getScriptProperties:()=>({getProperty:()=>"20260912-2"})},
+    PropertiesService:{getScriptProperties:()=>({getProperty:key=>key==="FRJ_ADMIN_QUOTES_VERSION"?"1":"20260912-2"})},
     LockService:{getScriptLock:()=>({tryLock:()=>true,releaseLock(){}})}});
   vm.runInContext(fs.readFileSync(new URL("../gas/OrderEditing.gs",import.meta.url),"utf8"),context);
   const indexes=context.frjOrderIndexes_(headers), row=Array(headers.length).fill("");

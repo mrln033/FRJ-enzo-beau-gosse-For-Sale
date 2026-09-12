@@ -51,7 +51,12 @@
       const raw = global.localStorage.getItem(STATUS_FILTER_KEY);
       if (raw === null) return new Set(STATUS_KEYS);
       const stored = JSON.parse(raw);
-      return new Set(Array.isArray(stored) ? stored.filter((status) => STATUS_KEYS.includes(status)) : STATUS_KEYS);
+      const selected = new Set(Array.isArray(stored) ? stored.filter((status) => STATUS_KEYS.includes(status)) : STATUS_KEYS);
+      if (!global.localStorage.getItem("FRJ_ADMIN_QUOTE_FILTER_V1")) {
+        selected.add("admin_quote");
+        global.localStorage.setItem("FRJ_ADMIN_QUOTE_FILTER_V1","1");
+      }
+      return selected;
     } catch {
       return new Set(STATUS_KEYS);
     }
@@ -148,6 +153,8 @@
     summary.textContent = report.enabled === false
       ? `Fonction panier désactivée — ${displayed.length} demande(s) affichée(s) sur ${orders.length} — actualisé ${ui.formatDate(report.generatedAt)}`
       : `${displayed.length} demande(s) affichée(s) sur ${orders.length} — actualisé ${ui.formatDate(report.generatedAt)}`;
+    const quoteCount = orders.filter(order => order.status === "admin_quote").length;
+    summary.textContent += ` — ${orders.length - quoteCount} demande(s) commerciale(s), ${quoteCount} devis Admin`;
     list.replaceChildren(...displayed.map(renderOrder));
 
     if (!displayed.length && report.enabled !== false) {
@@ -201,9 +208,10 @@
     select.addEventListener("change", () => updateStatus(order.id, select));
     const headerActions = document.createElement("div");
     headerActions.className = "order-header-actions";
-    headerActions.append(select, createTrackingControl(order));
-    if (order.sourceBackend === "d1-admin"
-      && ["public", "soc", "membre frj"].includes(String(order.buyerAvatar || "").trim().toLowerCase())) {
+    select.disabled = order.status === "admin_quote";
+    headerActions.append(select);
+    if (order.status !== "admin_quote") headerActions.append(createTrackingControl(order));
+    if (order.status === "admin_quote") {
       const duplicate = document.createElement("button");
       duplicate.type = "button";
       duplicate.textContent = "Dupliquer ce devis";
@@ -655,8 +663,7 @@
         `/admin/orders/${encodeURIComponent(order.id)}/duplicate-preview`, { cache: "no-store" }
       );
       const { source, catalog } = await response.json();
-      if (!source || source.sourceBackend !== "d1-admin"
-        || !["public", "soc", "membre frj"].includes(String(source.buyerAvatar || "").trim().toLowerCase())) {
+      if (!source || source.status !== "admin_quote") {
         throw new Error("Ce devis n'est plus disponible pour duplication.");
       }
       if (!source.items?.length || source.items.length > 10) throw new Error("Un devis doit contenir entre 1 et 10 articles.");
@@ -664,6 +671,8 @@
       clearNewOrderResult();
       orderCatalog = [...(catalog.items || [])].sort(compareCatalogItems);
       duplicateSourceId = source.id;
+      document.getElementById("newOrderAdminQuote").checked = false;
+      document.getElementById("newOrderAdminQuote").disabled = true;
       document.getElementById("newOrderAvatar").value = source.buyerAvatar;
       document.getElementById("newOrderProfile").value = source.frjMember ? "frj" : "public";
       document.getElementById("newOrderContact").value = source.buyerContact || "";
@@ -775,6 +784,7 @@
 
   function resetNewOrderForm() {
     document.getElementById("newOrderForm")?.reset();
+    if (document.getElementById("newOrderAdminQuote")) document.getElementById("newOrderAdminQuote").disabled = false;
     newOrderEditors = [];
     duplicateSourceId = null;
     document.getElementById("newOrderLines")?.replaceChildren();
@@ -812,11 +822,19 @@
           buyerAvatar: document.getElementById("newOrderAvatar").value,
           frjMember: document.getElementById("newOrderProfile").value === "frj",
           buyerContact: document.getElementById("newOrderContact")?.value || "",
+          adminQuote: !duplicateSourceId && document.getElementById("newOrderAdminQuote")?.checked === true,
           ...(duplicateSourceId ? { duplicateSourceId } : {}),
           items: values.map((value) => value.payload)
         })
       });
       const result = await response.json();
+      if (result.order.status === "admin_quote") {
+        resultPanel.textContent = `${result.order.publicReference} créé au statut Devis Admin. Utilisez Dupliquer ce devis pour préparer une demande client.`;
+        resultPanel.hidden = false;
+        resetNewOrderForm();
+        await loadOrders();
+        return;
+      }
       const trackingUrl = adminTrackingUrl(result.trackingPath);
       const copied = await copyTrackingUrl(trackingUrl);
       const message = document.createElement("p");
@@ -1137,6 +1155,10 @@
   }
 
   async function updateStatus(id, select) {
+    if (select.value === "admin_quote" && !global.confirm("Convertir cette demande en modèle Devis Admin ? Son suivi client sera désactivé. Le modèle restera hors progression ; utilisez Dupliquer pour créer une demande normale.")) {
+      await loadOrders();
+      return;
+    }
     select.disabled = true;
     try {
       await global.FRJ_API.fetchD1Admin(`/admin/orders/${encodeURIComponent(id)}/status`, {

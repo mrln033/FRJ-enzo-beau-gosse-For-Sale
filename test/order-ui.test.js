@@ -16,7 +16,11 @@ test("les statuts partagés conservent les libellés Admin, FR et EN", () => {
   assert.equal(ui.statusLabel("submitted", "FR", "admin"), "Transmise");
   assert.equal(ui.statusLabel("submitted", "FR"), "Demande transmise");
   assert.equal(ui.statusLabel("submitted", "EN"), "Request submitted");
-  assert.equal(ui.statusKeys.length, 8);
+  assert.equal(ui.statusKeys.length, 9);
+  assert.equal(ui.statusLabel("admin_quote","FR"),"Devis Admin");
+  assert.equal(ui.statusLabel("admin_quote","EN"),"Admin quote");
+  assert.equal(ui.canEditProposal("admin_quote"),true);
+  assert.equal(ui.canCancel("admin_quote"),false);
 });
 
 test("les statuts de prix partagent leurs libellés Admin, FR et EN", () => {
