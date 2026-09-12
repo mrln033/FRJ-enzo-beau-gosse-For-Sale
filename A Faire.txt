@@ -20,7 +20,7 @@ Convention d'identification à compter du 31/08/2026 :
 ----------------------------------------
 POINT DE REPRISE — 12/09/2026
 
-T-019 réalisée et publiée : Devis Admin indépendant de l'avatar/origine. FRJ-20260904-D37391 convertie et synchronisée, autres demandes inchangées. Tests utilisateur en production attendus. Retour arrière ciblé dans docs/DEVIS-ADMIN.md. Prochain identifiant : T-020 (remplace le repère T-019 des étapes précédentes).
+T-019/T-020/T-021 réalisées et publiées : Devis Admin explicite, demandes Terminées verrouillées, conversion interdite depuis À préparer/Prête/Terminée et suppression manuelle réservée aux modèles. Validation utilisateur en production attendue. Retours ciblés et limites de récupération dans docs/DEVIS-ADMIN.md. Prochain identifiant : T-022 ; d.4 reste en attente de cadrage.
 
 Ordre recommandé déjà réalisé et validé : d.1 -> d.2 -> d.3 -> d.7 -> d.8 -> d.6 -> d.10 -> d.11 -> d.5 -> d.13 -> d.12.
 Les demandes d.13, d.12 et d.9 sont terminées. D.9 fournit les promotions quotidiennes et les soldes communs à GAS et D1.
@@ -34,9 +34,9 @@ T-017 terminée : liens courts des titres Discord publiés et anciens messages a
 -------------------------------
 DEMANDES  => CE QUI EST A FAIRE
 
->>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-021 <<<
+>>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-022 <<<
 
-Aucune nouvelle demande active ; T-020 réalisée ci-dessous, validation utilisateur en production attendue.
+T-021 réalisée ci-dessous ; validation utilisateur en production attendue.
 
 
 
@@ -47,6 +47,13 @@ d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> a
 
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
+
+12/09/2026 — T-021 [ÉVOLUTION] [RÉALISÉE — VALIDATION PRODUCTION ATTENDUE] — Suppression définitive manuelle des Devis Admin.
+Demande originale : « En tant que modèle, un 'Devis Admin' devrait pouvoir être entièrement supprimable, si les articles qu'il contient sont obsolète ou n'existe tout simplement plus dans l'inventaire... Mais celà ne doit pas être automatique : un bouton doit permettre à l'admin de le supprimer définitivement de toutes les tables. »
+Réalisation : bouton rouge réservé aux modèles, confirmation explicite indiquant la référence et le caractère irréversible. D1 supprime atomiquement le devis, ses articles, événements et liens de suivi. Les demandes issues de duplications restent intactes. Suppression du message Discord, avec reprise si indisponible. Nettoyage précis des trois feuilles COMMANDES_APP / COMMANDES_LIGNES / COMMANDES_HISTORIQUE au prochain poll GAS (~5 minutes si accessible) avant les envois ; aucun inventaire touché ni nouveau trigger.
+Migration 0026 additive : registre technique sans contenu métier et gardes anti-résurrection. Seuls identifiant/date/accusés sont conservés, identifiant Discord temporaire effacé après succès ; marqueur GAS empêchant les anciens miroirs de réapparaître. Aucun effacement automatique décidé sur la disponibilité des articles.
+Contrôles : 255 tests réussis ; reprise après perte d'accusé, échec/404 Discord, cascade, copies et en-têtes préservés, ancien import bloqué. Worker 5fd49ad4-abaa-49b1-a52f-175ab6cda0a2, GAS 45 (Web App + HEAD), migration 0026 appliquée. Sources GAS relues identiques. Contrôle D1 non mutatif : 35 demandes dont 5 modèles, aucun marqueur de suppression ; aucun devis réel effacé pour tester. Frontend livré par le commit de ce lot.
+Sauvegarde privée save/20260912-before-quote-deletion.sql (12 945 988 octets), exclue de Git. Retour ciblé documenté dans docs/DEVIS-ADMIN.md : masquer le bouton, terminer les nettoyages demandés et conserver les protections anti-résurrection. Le retour du code ne restaure pas les données volontairement supprimées. Références préalables Git 43beb04 / Worker 6b8fdab9-13ea-48a8-a873-df1d89d2283a / GAS 44. Guides racine, PANIER, GAS et Worker actualisés. d.4 reste en attente, sans élargir la suppression aux demandes normales.
 
 12/09/2026 — T-020 [CORRECTION] [RÉALISÉE — VALIDATION PRODUCTION ATTENDUE] — Compléments Devis Admin et demandes Terminées.
 Demande conversation : Terminée signifie livrée/payée et doit être définitivement non modifiable. Conversion directe Devis Admin également interdite depuis À préparer et Prête. Case à cocher devant le texte ; avatar facultatif pour un modèle, avec Public ou Membre Soc par défaut selon profil obligatoire ; avatar personnalisé conservé.

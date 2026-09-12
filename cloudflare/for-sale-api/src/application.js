@@ -35,6 +35,7 @@ import {
 import { sendOrUpdateDiscordOrder } from "./discord.js";
 import { applySheetOrder, readSheetOrder } from "./order-sheet-sync.js";
 import { isAdminQuote, requireQuoteTransition } from "./admin-quotes.js";
+import { deleteAdminQuote, pendingQuoteDeletions, acknowledgeQuoteDeletion } from "./order-deletion.js";
 
 function sheetOrderHelpers() {
   return { mapAdminOrder, mapOrderItem, readAdminOrderCatalog, deriveBaseMarkup, synchronizeDiscordOrder };
@@ -453,6 +454,7 @@ export async function handlePost(request, url, env) {
 }
 
 export async function handleSyncGet(url, env) {
+  if (url.pathname === "/sync/order-deletions") return json(await pendingQuoteDeletions(env));
   if (url.pathname === "/sync/order-edit") {
     return json({ snapshot: (await readSheetOrder(env, url.searchParams.get("id"), sheetOrderHelpers())).snapshot });
   }
@@ -538,6 +540,9 @@ export async function handleSyncPost(request, url, env) {
   if (url.pathname === "/sync/order-edit") {
     if (!isCartEnabled(env)) throw new ApiError(503, "Suivi des demandes désactivé");
     return json(await applySheetOrder(env, payload, sheetOrderHelpers()));
+  }
+  if (url.pathname === "/sync/order-deletions/ack") {
+    return json(await acknowledgeQuoteDeletion(env,payload.id));
   }
   if (url.pathname === "/sync/order-history") {
     if (!isCartEnabled(env)) throw new ApiError(503, "Suivi des demandes désactivé");
@@ -2113,6 +2118,8 @@ async function updateContainerConfig(env, payload) {
 }
 
 export async function handleAdminDelete(url, env) {
+  const quoteMatch = url.pathname.match(/^\/admin\/orders\/([a-f0-9-]{36})\/admin-quote$/i);
+  if (quoteMatch) return json(await deleteAdminQuote(env,quoteMatch[1].toLowerCase(),url.searchParams.get("confirm")));
   const orderItemMatch = url.pathname.match(/^\/admin\/orders\/([a-f0-9-]{36})\/items\/(\d+)$/i);
   if (!orderItemMatch) throw new ApiError(404, "Endpoint administrateur inconnu");
 

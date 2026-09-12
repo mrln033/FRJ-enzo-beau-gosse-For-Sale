@@ -80,6 +80,7 @@ function purchaseHistoryEventFromRow_(row, indexes) {
 }
 
 function upsertPurchaseOrderHistoryMirror_(events, force) {
+  if (typeof frjOrderWasDeleted_ === "function" && Array.isArray(events)) events=events.filter(function(event) { return !frjOrderWasDeleted_(event.orderId); });
   if (!Array.isArray(events) || !events.length) return 0;
   var ss = SpreadsheetApp.openById(FRJ_SYNC_CONFIG.appSpreadsheetId);
   var sheet = getOrCreatePurchaseOrderHistorySheet_(ss);

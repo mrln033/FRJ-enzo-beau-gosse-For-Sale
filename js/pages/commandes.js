@@ -218,6 +218,12 @@
       duplicate.textContent = "Dupliquer ce devis";
       duplicate.addEventListener("click", () => duplicateQuote(order, duplicate));
       headerActions.appendChild(duplicate);
+      const removeQuote = document.createElement("button");
+      removeQuote.type = "button";
+      removeQuote.textContent = "Supprimer définitivement";
+      removeQuote.className = "danger";
+      removeQuote.addEventListener("click", () => deleteQuote(order,removeQuote));
+      headerActions.appendChild(removeQuote);
     }
     header.append(identity, headerActions);
     article.appendChild(header);
@@ -719,6 +725,25 @@
       toggle.textContent = "Ajouter une nouvelle demande";
     });
     form.addEventListener("submit", submitNewOrder);
+  }
+
+  async function deleteQuote(order, button) {
+    if (order.status !== "admin_quote") return;
+    if (!global.confirm("Supprimer définitivement le Devis Admin " + order.publicReference + " ?\nSon contenu, ses lignes, son historique et ses liens seront effacés de D1 puis de Google Sheets à la prochaine synchronisation. Son message Discord sera supprimé. Les demandes créées par duplication seront conservées. Cette action est irréversible.")) return;
+    button.disabled = true;
+    try {
+      const response = await global.FRJ_API.fetchD1Admin("/admin/orders/" + encodeURIComponent(order.id) +
+        "/admin-quote?confirm=" + encodeURIComponent(order.publicReference), {method:"DELETE"});
+      const result = await response.json();
+      if (!result.ok) throw new Error(result.error || "Suppression impossible");
+      if (duplicateSourceId === order.id) resetNewOrderForm();
+      await loadOrders();
+      global.alert("Devis supprimé de D1. Nettoyage Google Sheets programmé au prochain contrôle (environ 5 minutes si accessible)." +
+        (result.discordDone === false ? " Suppression Discord en attente de reprise." : ""));
+    } catch (error) {
+      global.alert(error.message || "Suppression impossible");
+      button.disabled = false;
+    }
   }
 
   function updateQuoteAvatarRequirement() {

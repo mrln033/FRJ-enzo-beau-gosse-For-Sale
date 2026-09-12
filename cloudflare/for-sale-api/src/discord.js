@@ -1,3 +1,14 @@
+export async function deleteDiscordOrderMessage(options) {
+  const webhookUrl = normalizeWebhookUrl(options.webhookUrl);
+  const messageId = normalizeMessageId(options.messageId);
+  if (!webhookUrl || !messageId) throw new Error("Suppression Discord non configurée");
+  const url = new URL(webhookUrl);
+  url.pathname = url.pathname.replace(/\/+$/, "") + "/messages/" + messageId;
+  const result = await discordRequest(options.fetchImpl || fetch,url,"DELETE");
+  if (!result.response.ok && result.response.status!==404) throw discordError("suppression",result.response,result.body);
+  return {ok:true};
+}
+
 const DISCORD_RESPONSE_LIMIT = 20_000;
 const ADMIN_ORDERS_URL = "https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/commandes.html";
 const SHORT_TRACKING_URL = "https://mrln033.github.io/FRJ-enzo-beau-gosse-For-Sale/s.html";

@@ -137,6 +137,12 @@ test("T-018 duplication : profil, remises, stock, MU absent et en-tête éditabl
   assert.equal(avatar.required, true);
   const buttons = walk(elements.get("ordersList")).filter(e => e.textContent === "Dupliquer ce devis");
   assert.equal(buttons.length, 1);
+  const deleteButtons=walk(elements.get("ordersList")).filter(e=>e.textContent==="Supprimer définitivement");
+  assert.equal(deleteButtons.length,1);
+  window.confirm=()=>false;
+  await deleteButtons[0].listeners.get("click")();
+  assert.equal(requests.some(r=>r.options?.method==="DELETE"),false);
+  window.confirm=()=>true;
   await buttons[0].listeners.get("click")();
   const rows = elements.get("newOrderLines").children.slice(1);
   const control = (row, label) => walk(row).find(e => e.attributes?.get("aria-label") === label);

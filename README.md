@@ -1,5 +1,7 @@
 # FRJ For Sale
 
+T-021 : bouton de suppression définitive réservé aux Devis Admin, avec confirmation. Cascade D1, purge ciblée des trois feuilles de demandes au poll GAS existant et suppression Discord avec reprise. Copies conservées ; marqueurs techniques sans contenu contre les résurrections. Voir [Devis Admin](docs/DEVIS-ADMIN.md) pour les délais, tests et limites du retour arrière.
+
 T-020 : demandes Terminées définitivement en lecture seule, conversion Devis Admin interdite depuis À préparer / Prête / Terminée. Avatar facultatif pour un modèle (Public ou Membre Soc selon profil obligatoire). Ces gardes couvrent aussi les éditions Sheets ; GAS reste en version 44. Voir les règles, tests et le retour ciblé dans [Devis Admin](docs/DEVIS-ADMIN.md).
 
 Catalogue bilingue d'articles, panier et suivi de demandes d'achat pour **enzo beau gosse**.

@@ -241,6 +241,8 @@ function frjD1SignalPollTrigger() {
       frjRequestSynchronization_(pending.reason || "modification-d1", pending.dataset || "", pending.createdAt);
       scheduled.push("D1:" + (pending.dataset || "tous"));
     }
+    var deletedQuotes = frjProcessPendingQuoteDeletions_();
+    if (deletedQuotes) scheduled.push("DEVIS-SUPPRIMES:" + deletedQuotes);
     var ordersPushed = frjPushPendingPurchaseOrders_();
     if (ordersPushed) scheduled.push("COMMANDES:" + ordersPushed);
     var historyPushed = frjPushPendingPurchaseOrderHistory_();

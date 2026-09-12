@@ -1,4 +1,7 @@
 function frjPushPendingPurchaseOrders_() {
+  return withFrjDataLock_(frjPushPendingPurchaseOrdersLocked_);
+}
+function frjPushPendingPurchaseOrdersLocked_() {
   var featureValue = PropertiesService.getScriptProperties().getProperty("FRJ_CART_ENABLED");
   if (String(featureValue || "true").toLowerCase() === "false") return 0;
   var ss = SpreadsheetApp.openById(FRJ_SYNC_CONFIG.appSpreadsheetId);
@@ -30,6 +33,9 @@ function frjPushPendingPurchaseOrders_() {
 }
 
 function frjPushPendingPurchaseOrderHistory_() {
+  return withFrjDataLock_(frjPushPendingPurchaseOrderHistoryLocked_);
+}
+function frjPushPendingPurchaseOrderHistoryLocked_() {
   var featureValue = PropertiesService.getScriptProperties().getProperty("FRJ_CART_ENABLED");
   if (String(featureValue || "true").toLowerCase() === "false") return 0;
   var pending = purchaseReadPendingHistoryEvents_();
@@ -52,6 +58,9 @@ function frjPushPendingPurchaseOrderHistory_() {
 }
 
 function frjPullPurchaseOrdersFromD1_() {
+  return withFrjDataLock_(frjPullPurchaseOrdersFromD1Locked_);
+}
+function frjPullPurchaseOrdersFromD1Locked_() {
   var properties = PropertiesService.getScriptProperties();
   var cursorKey = "FRJ_D1_ORDERS_EVENT_CURSOR";
   // Rattrapage unique des événements historiques dont ORDER_ID était omis par le DTO.

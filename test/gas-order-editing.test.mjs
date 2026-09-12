@@ -48,10 +48,11 @@ function fixture() {
 }
 test("GAS : historique rattaché à sa demande et replay de réparation unique",()=>{
   const properties=new Map(), seen=[];
+  const withFrjDataLock_=callback=>callback();
   const context=vm.createContext({
     PropertiesService:{getScriptProperties:()=>({getProperty:k=>properties.get(k),setProperty:(k,v)=>properties.set(k,v)})},
     frjD1Request_:path=>{seen.push(path);return {cursor:10,hasMore:false,orders:[{id:snapshot.id,historyEvents:[{eventKey:"d1-10"}]}]};},
-    upsertPurchaseOrderMirror_:()=>{},upsertPurchaseOrderHistoryMirror_:events=>assert.equal(events[0].orderId,snapshot.id)
+    withFrjDataLock_,upsertPurchaseOrderMirror_:()=>{},upsertPurchaseOrderHistoryMirror_:events=>assert.equal(events[0].orderId,snapshot.id)
   });
   vm.runInContext(fs.readFileSync(new URL("../gas/SyncOrders.gs",import.meta.url),"utf8"),context);
   properties.set("FRJ_D1_ORDERS_EVENT_CURSOR","500");

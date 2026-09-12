@@ -11,6 +11,7 @@ function processPurchaseOrderRequest(rawBody) {
 
   try {
     var normalized = normalizePurchaseOrderPayload_(payload);
+    if (typeof frjOrderWasDeleted_ === "function" && frjOrderWasDeleted_(normalized.id)) throw new Error("Devis définitivement supprimé");
     var priced = pricePurchaseOrderFromSheet_(normalized);
     if (priced.discrepancies.length) {
       return purchaseJsonOutput_({
@@ -327,6 +328,7 @@ function upsertPurchaseOrderMirror_(snapshot, force) {
   var items = snapshot && Array.isArray(snapshot.items) ? snapshot.items : (Array.isArray(order && order.items) ? order.items : []);
   var orderId = String(order && order.id || "").trim().toLowerCase();
   if (!/^[a-f0-9-]{36}$/.test(orderId)) throw new Error("Commande D1 invalide");
+  if (typeof frjOrderWasDeleted_ === "function" && frjOrderWasDeleted_(orderId)) return 0;
 
   var ss = SpreadsheetApp.openById("13r_PzIZE8dJiPFU8w7UXxtEednHhS-yijNgTiYLqYP0");
   var sheet = getOrCreatePurchaseOrderSheet_(ss);

@@ -1,4 +1,30 @@
-# Devis Admin — T-019 / T-020
+# Devis Admin — T-019 / T-020 / T-021
+
+## T-021 : supprimer un modèle
+
+Le bouton **Supprimer définitivement** est réservé aux Devis Admin. Une confirmation explicite affiche la référence et explique l'effacement. L'obsolescence des articles n'est pas évaluée automatiquement : l'Admin décide, même si certains articles sont encore en stock. Annuler la confirmation n'envoie aucune requête.
+
+D1 efface le modèle, ses articles, événements d'historique et jetons de suivi dans une transaction. Les demandes déjà créées par duplication, leurs lignes, leurs liens et leur historique restent intacts. Aucun changement de statut ne simule une suppression ; aucune demande normale, y compris Terminée, n'est supprimable par ce bouton. L'ancienne d.4 reste en attente de cadrage.
+
+Le message Discord du modèle est supprimé ; une réponse 404 signifie déjà absent, sans recréation. Si Discord est indisponible, l'identifiant du message reste en attente pour réessayer.
+
+Google Sheets est nettoyé au prochain poll existant (~5 minutes si accessible), avant les envois de demandes : suppression ciblée des lignes portant ORDER_ID dans COMMANDES_APP, COMMANDES_LIGNES et COMMANDES_HISTORIQUE, y compris les JSON, conflits et éditions en attente sur ces lignes. En-têtes, autres demandes et inventaires ne sont pas touchés. Les opérations de transfert et de suppression sont sérialisées par le verrou de script. Si le nettoyage échoue ou l'accusé réseau est perdu, il sera rejoué.
+
+Migration additive **0026_delete_admin_quotes.sql** : registre technique purchase_order_deletions et gardes anti-résurrection. Seuls l'identifiant du modèle, la date et les accusés techniques sont conservés ; aucun avatar, article, prix, historique ou jeton de suivi. L'identifiant Discord temporaire est effacé après succès. GAS conserve également un marqueur FRJ_DELETED_ORDER_<id>=1 ; les anciens miroirs ne peuvent pas recréer le modèle. Ce marqueur n'est pas un devis archivé. Les sauvegardes privées antérieures, hors tables actives, ne sont pas purgées par le bouton.
+
+API Admin authentifiée : DELETE /admin/orders/<id>/admin-quote?confirm=<référence>. Refus sans confirmation ou si le statut n'est pas un modèle ; répétition idempotente. GET /sync/order-deletions expose un lot borné de 20 identifiants en attente, avec index partiel ; POST /sync/order-deletions/ack acquitte le nettoyage GAS et reprend Discord. Ces deux routes utilisent l'authentification de synchronisation existante. Pas de nouveau trigger, pas de scan D1 complet des demandes, pas de suppression automatique sans décision Admin.
+
+### Publication T-021
+
+Worker **5fd49ad4-abaa-49b1-a52f-175ab6cda0a2**, GAS **45** (Web App et sources HEAD), migration **0026**. Sauvegarde privée préalable : **save/20260912-before-quote-deletion.sql**, 12 945 988 octets, exclue de Git. Interface publiée via le commit T-021 ; validation utilisateur attendue.
+
+### Tests et retour ciblé T-021
+
+255 tests automatisés réussis : confirmation annulée, refus des demandes normales, cascade D1, conservation des copies, ancien import bloqué, trois feuilles purgées précisément, ancien miroir ignoré, en-têtes invalides interrompant l'opération, panne/reprise et absence Discord. Aucun devis réel supprimé pendant les contrôles de publication.
+
+Référence avant T-021 : Git **43beb04**, Worker **6b8fdab9-13ea-48a8-a873-df1d89d2283a**, GAS **44**.
+En cas de non-validation, masquer le bouton par un revert ciblé. Terminer d'abord les nettoyages déjà demandés. Si aucune suppression n'a été effectuée, Worker/GAS peuvent revenir aux versions de référence. Sinon, conserver 0026, les marqueurs et les gardes GAS anti-résurrection : ne pas restaurer aveuglément GAS 44 qui ignore ces gardes. Ne pas restaurer intégralement une sauvegarde après de nouveaux achats. Le retour du code ne recrée ni les devis ni leurs messages supprimés : une récupération de données depuis une sauvegarde privée éventuelle exige une décision explicite et une restauration sélective accompagnée. Ne pas supprimer 0024/0025.
+
 
 ## Compléments T-020 : clôture et identité
 

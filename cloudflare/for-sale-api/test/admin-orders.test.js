@@ -139,6 +139,7 @@ function setupDatabase() {
   applyMigration(database, "0023_mutable_order_discounts.sql");
   applyMigration(database, "0024_admin_quotes.sql");
   applyMigration(database, "0025_completed_order_lock.sql");
+  applyMigration(database, "0026_delete_admin_quotes.sql");
   database.exec(`
     INSERT INTO avatars VALUES ('enzo', 'Enzo', 'Inventaire Enzo');
     INSERT INTO catalog_items (name, unit_price_ped) VALUES ('Item A', 10), ('Item B', 5), ('Sans stock', 2);
@@ -181,6 +182,61 @@ async function sheetFixture() {
   return {db,env,id,initial,get,operation,send,items,writes};
 }
 
+
+test("Suppression Devis Admin : confirmation, cascade, copies conservées, anti-résurrection et reprise", async()=>{
+  const f=await sheetFixture();
+  const post=async(path,payload)=>{const u=new URL("https://api.example"+path);return (await handleAdminPost(new Request(u,{method:"POST",body:JSON.stringify(payload)}),u,f.env)).json();};
+  const remove=()=>handleAdminDelete(new URL("https://api.example/admin/orders/"+f.id+"/admin-quote?confirm="+f.initial.publicReference),f.env);
+  await assert.rejects(remove,e=>e.status===409);
+  await post("/admin/orders/"+f.id+"/status",{status:"admin_quote"});
+  await assert.rejects(()=>handleAdminDelete(new URL("https://api.example/admin/orders/"+f.id+"/admin-quote"),f.env),e=>e.status===400);
+  const preview=await (await handleAdminGet(new URL("https://api.example/admin/orders/"+f.id+"/duplicate-preview"),f.env)).json();
+  const copy=await post("/admin/orders",{buyerAvatar:"Client",frjMember:false,duplicateSourceId:f.id,items:[{...lineA,catalogSnapshot:preview.catalog.items.find(item=>item.itemName==="Item A")}]});
+  const copyBefore=f.db.prepare("SELECT * FROM purchase_orders WHERE id=?").get(copy.order.id);
+  f.db.prepare("INSERT INTO purchase_order_tracking_tokens(token_hash,order_id) VALUES (?,?)").run("f".repeat(64),f.id);
+  const stale={order:{...f.initial,accessTokenHash:"b".repeat(64)},items:f.items()};
+  assert.equal((await (await remove()).json()).deleted,true);
+  for(const table of ["purchase_order_items","purchase_order_events","purchase_order_tracking_tokens"])
+    assert.equal(f.db.prepare("SELECT COUNT(*) n FROM "+table+" WHERE order_id=?").get(f.id).n,0);
+  assert.equal(f.db.prepare("SELECT COUNT(*) n FROM purchase_orders WHERE id=?").get(f.id).n,0);
+  assert.deepEqual(f.db.prepare("SELECT * FROM purchase_orders WHERE id=?").get(copy.order.id),copyBefore);
+  assert.equal((await (await remove()).json()).alreadyDeleted,true);
+  const sync=new URL("https://api.example/sync/order");
+  await assert.rejects(()=>handleSyncPost(new Request(sync,{method:"POST",body:JSON.stringify(stale)}),sync,f.env),/supprime/);
+  const pending=new URL("https://api.example/sync/order-deletions");
+  assert.deepEqual((await (await handleSyncGet(pending,f.env)).json()).deletions,[{id:f.id}]);
+  const ack=new URL("https://api.example/sync/order-deletions/ack");
+  const acknowledge=()=>handleSyncPost(new Request(ack,{method:"POST",body:JSON.stringify({id:f.id})}),ack,f.env);
+  await acknowledge();await acknowledge();
+  assert.deepEqual((await (await handleSyncGet(pending,f.env)).json()).deletions,[]);
+  const tombstone=f.db.prepare("SELECT * FROM purchase_order_deletions WHERE order_id=?").get(f.id);
+  assert.equal(tombstone.discord_message_id,null);
+  assert.equal(tombstone.gas_done,1);
+});
+
+test("Suppression du devis : panne Discord conservée dans l'outbox puis reprise", async()=>{
+  const f=await sheetFixture();
+  f.db.prepare("UPDATE purchase_orders SET admin_quote=1,approval_required=0,discord_message_id=? WHERE id=?").run("123456789012345678",f.id);
+  f.env.DISCORD_ORDER_WEBHOOK_URL="https://discord.com/api/webhooks/123456789012345678/test-token";
+  const originalFetch=globalThis.fetch;
+  let status=503,calls=0;
+  globalThis.fetch=async(url,options)=>{
+    assert.equal(options.method,"DELETE");
+    assert.match(String(url),/\/messages\/123456789012345678$/);
+    calls++;return new Response(null,{status});
+  };
+  try {
+    const url=new URL("https://api.example/admin/orders/"+f.id+"/admin-quote?confirm="+f.initial.publicReference);
+    const result=await (await handleAdminDelete(url,f.env)).json();
+    assert.equal(result.discordDone,false);
+    assert.equal(f.db.prepare("SELECT discord_message_id FROM purchase_order_deletions WHERE order_id=?").get(f.id).discord_message_id,"123456789012345678");
+    status=404; // Déjà supprimé : pas de recréation.
+    const ack=new URL("https://api.example/sync/order-deletions/ack");
+    await handleSyncPost(new Request(ack,{method:"POST",body:JSON.stringify({id:f.id})}),ack,f.env);
+    assert.equal(f.db.prepare("SELECT discord_message_id FROM purchase_order_deletions WHERE order_id=?").get(f.id).discord_message_id,null);
+    assert.equal(calls,2);
+  } finally {globalThis.fetch=originalFetch;}
+});
 
 test("Devis Admin : avatar facultatif uniquement avec profil explicite", () => {
   for (const [frjMember, avatar] of [[false,"Public"],[true,"Membre Soc"]]) {

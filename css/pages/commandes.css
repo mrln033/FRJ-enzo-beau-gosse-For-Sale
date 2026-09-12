@@ -31,6 +31,8 @@ body { max-width: 1250px; margin: 0 auto; padding: 78px 18px 40px; box-sizing: b
     .order-comment { margin: 10px 0 0; padding: 8px; background: #f1ece3; white-space: pre-wrap; }
     .order-status { padding: 6px; border-radius: 5px; }
     .order-header-actions { display: grid; justify-items: end; gap: 8px; min-width: 185px; }
+    .order-header-actions .danger { padding: 7px 11px; border: 1px solid #a94b43; border-radius: 6px; color: #8c241d; background: #fff1ef; cursor: pointer; }
+    .order-header-actions .danger:disabled { opacity: .6; cursor: wait; }
     .order-tracking-control { display: grid; justify-items: end; gap: 5px; }
     .order-tracking-button { padding: 7px 11px; border: 1px solid #55708d; border-radius: 6px; background: #e8f0f7; cursor: pointer; font-weight: 700; }
     .order-tracking-button:disabled { cursor: wait; opacity: .65; }
