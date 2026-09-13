@@ -1,5 +1,7 @@
 # Devis Admin — T-019 / T-020 / T-021
 
+T-022 (13/09/2026) : l'origine visible dans la liste Admin et Discord est **Client** (d1 ou gas-fallback) ou **Admin** (d1-admin, saisie manuelle et duplication). Le backend technique reste conservé dans source_backend/sourceBackend pour l'historique et la synchronisation. Aucun changement de données ou de statut ; convertir une demande en Devis Admin conserve l'origine de sa saisie initiale.
+
 ## T-021 : supprimer un modèle
 
 Le bouton **Supprimer définitivement** est réservé aux Devis Admin. Une confirmation explicite affiche la référence et explique l'effacement. L'obsolescence des articles n'est pas évaluée automatiquement : l'Admin décide, même si certains articles sont encore en stock. Annuler la confirmation n'envoie aucune requête.

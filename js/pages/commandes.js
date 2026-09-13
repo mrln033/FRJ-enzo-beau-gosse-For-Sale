@@ -178,9 +178,7 @@
     meta.className = "order-meta";
     [
       ui.formatDate(order.createdAt),
-      order.sourceBackend === "gas-fallback"
-        ? "Reçue par secours GAS"
-        : (order.sourceBackend === "d1-admin" ? "Demande directe" : "Reçue par D1"),
+      "Origine : " + (order.sourceBackend === "d1-admin" ? "Admin" : "Client"),
       order.frjMember ? "Membre FRJ" : "Public",
       order.buyerContact || "Pas de contact"
     ].forEach((value) => {

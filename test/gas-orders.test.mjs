@@ -4,6 +4,18 @@ import test from "node:test";
 import vm from "node:vm";
 import { buildDiscordOrderPayload } from "../cloudflare/for-sale-api/src/discord.js";
 
+test("T-022 GAS et D1 affichent Client ou Admin sans modifier l'origine technique", () => {
+  const gas = vm.createContext({});
+  vm.runInContext(fs.readFileSync(new URL("../gas/PurchaseOrders.gs",import.meta.url),"utf8"),gas);
+  for (const sourceBackend of ["d1","gas-fallback","d1-admin"]) {
+    const order={sourceBackend,publicReference:"FRJ-20260913-ABC123",status:"admin_quote",frjMember:true};
+    for (const payload of [gas.purchaseDiscordPayload_(order,[]),buildDiscordOrderPayload(order,[])]) {
+      assert.equal(payload.embeds[0].fields.find(field=>field.name==="Origine").value,sourceBackend==="d1-admin"?"Admin":"Client");
+    }
+    assert.equal(order.sourceBackend,sourceBackend);
+  }
+});
+
 test("T-017 le titre Discord ouvre le lien court de la bonne demande dans GAS et D1", () => {
   const gas = loadPurchaseOrders();
   for (const reference of ["FRJ-20260911-ABC123", " frj-20260911-def456 "]) {

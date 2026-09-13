@@ -466,7 +466,7 @@ function purchaseDiscordPayload_(order, items) {
     { name: "Total TT", value: purchaseDiscordNumber_(tt, 2) + " PED", inline: true },
     { name: "Total MU", value: purchaseDiscordNumber_(markup, 2) + " PED (" + purchaseDiscordNumber_(markupPercent, 2) + " %)", inline: true },
     { name: confirmed ? "Total Confirmé" : "Total Estimé", value: purchaseDiscordNumber_(order.totalSalePed, 2) + " PED", inline: true },
-    { name: "Origine", value: "Secours GAS", inline: true },
+    { name: "Origine", value: order.sourceBackend === "d1-admin" ? "Admin" : "Client", inline: true },
     { name: "Profil tarifaire", value: order.frjMember ? "Membre FRJ" : "Public", inline: true }
   ];
   purchaseDiscordItemFields_(items, memberLabel).forEach(function(field) { fields.push(field); });

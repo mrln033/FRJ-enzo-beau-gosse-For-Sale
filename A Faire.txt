@@ -18,9 +18,9 @@ Convention d'identification à compter du 31/08/2026 :
 - les anciennes références d.N restent inchangées dans l'historique afin de préserver la trace des échanges passés.
 
 ----------------------------------------
-POINT DE REPRISE — 12/09/2026
+POINT DE REPRISE — 13/09/2026
 
-T-019/T-020/T-021 réalisées et publiées : Devis Admin explicite, demandes Terminées verrouillées, conversion interdite depuis À préparer/Prête/Terminée et suppression manuelle réservée aux modèles. Validation utilisateur en production attendue. Retours ciblés et limites de récupération dans docs/DEVIS-ADMIN.md. Prochain identifiant : T-022 ; d.4 reste en attente de cadrage.
+T-019 à T-022 réalisées et publiées : Devis Admin explicite, verrouillage des demandes avancées/Terminées, suppression manuelle des modèles et origine simplifiée Client/Admin dans la console et Discord. Validation utilisateur en production attendue. Retours ciblés et limites de récupération documentés. Prochain identifiant : T-023 ; d.4 reste en attente de cadrage.
 
 Ordre recommandé déjà réalisé et validé : d.1 -> d.2 -> d.3 -> d.7 -> d.8 -> d.6 -> d.10 -> d.11 -> d.5 -> d.13 -> d.12.
 Les demandes d.13, d.12 et d.9 sont terminées. D.9 fournit les promotions quotidiennes et les soldes communs à GAS et D1.
@@ -34,9 +34,9 @@ T-017 terminée : liens courts des titres Discord publiés et anciens messages a
 -------------------------------
 DEMANDES  => CE QUI EST A FAIRE
 
->>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-022 <<<
+>>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-023 <<<
 
-T-021 réalisée ci-dessous ; validation utilisateur en production attendue.
+T-022 réalisée ci-dessous ; validation utilisateur en production attendue.
 
 
 
@@ -47,6 +47,12 @@ d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> a
 
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
+
+13/09/2026 — T-022 [CORRECTIF] [RÉALISÉE — VALIDATION PRODUCTION ATTENDUE] — Origine affichée Client / Admin.
+Demande originale : « seules 2 origines sont pertinentes : soit la saisie vient du Client, soit elle vient de l'Admin. Et peu importe le backend finalement. Pour historisation ou raison technique, tu peux garder un trace de l'origine technique si tu veux, mais l'affichage tant sur la listing admin que sur le post discord doit etre clair et simplifié : Client ou Admin »
+Réalisation : liste Admin « Origine : Client » / « Origine : Admin », champ Discord « Origine » limité à Client / Admin, côté D1 comme GAS. d1 et gas-fallback => Client ; d1-admin => Admin (saisie manuelle, modèles créés et duplications). Conversion en Devis Admin sans réécriture de l'origine de saisie. Valeurs techniques source_backend/sourceBackend inchangées pour l'historique et la synchronisation.
+Contrôles : 257 tests réussis, cohérence GAS/D1 et interface, profils/statuts indépendants de l'origine. Worker a4453730-787a-483c-81ed-3b3fe84c25ba et GAS 46 (Web App + HEAD) publiés. 32 messages Discord existants mis à jour et relus : seul le champ Origine modifié ; 3 anciens messages introuvables, non recréés. Aucun changement des données, statuts ou inventaires, aucune migration ni nouveau trigger.
+Documentation racine, PANIER, DEVIS-ADMIN, GAS et Worker actualisée. Retour ciblé : revert du commit T-022, Worker 5fd49ad4-abaa-49b1-a52f-175ab6cda0a2 / GAS 45 + HEAD. Si souhaité, rétablir uniquement le champ Origine des messages selon les valeurs techniques conservées ; ne pas reconstruire les messages ou restaurer la base.
 
 12/09/2026 — T-021 [ÉVOLUTION] [RÉALISÉE — VALIDATION PRODUCTION ATTENDUE] — Suppression définitive manuelle des Devis Admin.
 Demande originale : « En tant que modèle, un 'Devis Admin' devrait pouvoir être entièrement supprimable, si les articles qu'il contient sont obsolète ou n'existe tout simplement plus dans l'inventaire... Mais celà ne doit pas être automatique : un bouton doit permettre à l'admin de le supprimer définitivement de toutes les tables. »

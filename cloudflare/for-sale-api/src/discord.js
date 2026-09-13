@@ -57,9 +57,7 @@ export function buildDiscordOrderPayload(order, items) {
     { name: confirmed ? "Total Confirmé" : "Total Estimé", value: `${formatNumber(order?.totalSalePed)} PED`, inline: true },
     {
       name: "Origine",
-      value: order?.sourceBackend === "gas-fallback"
-        ? "Secours GAS"
-        : (order?.sourceBackend === "d1-admin" ? "Demande directe" : "Cloudflare D1"),
+      value: order?.sourceBackend === "d1-admin" ? "Admin" : "Client",
       inline: true
     },
     { name: "Profil tarifaire", value: order?.frjMember ? "Membre FRJ" : "Public", inline: true }

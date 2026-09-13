@@ -1,5 +1,7 @@
 # Panier d'achat — fonctionnement et retour arrière
 
+T-022 (13/09/2026) : l'origine visible dans la liste Admin et Discord est **Client** (d1 ou gas-fallback) ou **Admin** (d1-admin, saisie manuelle et duplication). Le backend technique reste conservé dans source_backend/sourceBackend pour l'historique et la synchronisation. Aucun changement de données ou de statut ; convertir une demande en Devis Admin conserve l'origine de sa saisie initiale.
+
 T-021 : bouton de suppression définitive réservé aux Devis Admin, avec confirmation. Cascade D1, purge ciblée des trois feuilles de demandes au poll GAS existant et suppression Discord avec reprise. Copies conservées ; marqueurs techniques sans contenu contre les résurrections. Voir [Devis Admin](DEVIS-ADMIN.md) pour les délais, tests et limites du retour arrière.
 
 T-020 : demandes Terminées définitivement en lecture seule, conversion Devis Admin interdite depuis À préparer / Prête / Terminée. Avatar facultatif pour un modèle (Public ou Membre Soc selon profil obligatoire). Ces gardes couvrent aussi les éditions Sheets ; GAS reste en version 44. Voir les règles, tests et le retour ciblé dans [Devis Admin](DEVIS-ADMIN.md).

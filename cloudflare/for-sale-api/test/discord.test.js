@@ -31,7 +31,20 @@ test("affiche explicitement une proposition à valider", () => {
 
 test("identifie une demande créée directement par l'administrateur", () => {
   const payload = buildDiscordOrderPayload({ ...order, sourceBackend: "d1-admin" }, items);
-  assert.equal(payload.embeds[0].fields.find((field) => field.name === "Origine").value, "Demande directe");
+  assert.equal(payload.embeds[0].fields.find((field) => field.name === "Origine").value, "Admin");
+});
+
+test("origine Discord Client/Admin indépendante du backend, du profil et du statut", () => {
+  for (const sourceBackend of ["d1","gas-fallback","d1-admin"]) {
+    for (const status of ["submitted","admin_quote","completed"]) {
+      for (const frjMember of [false,true]) {
+        const input={...order,sourceBackend,status,frjMember};
+        const payload=buildDiscordOrderPayload(input,items);
+        assert.equal(payload.embeds[0].fields.find(field=>field.name==="Origine").value,sourceBackend==="d1-admin"?"Admin":"Client");
+        assert.equal(input.sourceBackend,sourceBackend);
+      }
+    }
+  }
 });
 
 test("publie avec wait=true et récupère l'identifiant Discord", async () => {

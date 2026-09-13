@@ -137,6 +137,8 @@ test("T-018 duplication : profil, remises, stock, MU absent et en-tête éditabl
   assert.equal(avatar.required, true);
   const buttons = walk(elements.get("ordersList")).filter(e => e.textContent === "Dupliquer ce devis");
   assert.equal(buttons.length, 1);
+  const origins=walk(elements.get("ordersList")).filter(e=>String(e.textContent || "").startsWith("Origine : ")).map(e=>e.textContent);
+  assert.deepEqual(origins,["Origine : Admin","Origine : Admin","Origine : Client"]);
   const deleteButtons=walk(elements.get("ordersList")).filter(e=>e.textContent==="Supprimer définitivement");
   assert.equal(deleteButtons.length,1);
   window.confirm=()=>false;
