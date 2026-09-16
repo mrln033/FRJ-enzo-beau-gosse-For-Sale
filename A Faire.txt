@@ -38,8 +38,6 @@ DEMANDES  => CE QUI EST A FAIRE
 
 T-022 réalisée ci-dessous ; validation utilisateur en production attendue.
 
-
-
 	
 
 [EN ATTENTE DE CADRAGE]
