@@ -20,7 +20,7 @@ Convention d'identification à compter du 31/08/2026 :
 ----------------------------------------
 POINT DE REPRISE — 19/09/2026
 
-T-023 réalisée : images du catalogue recherchées à la racine puis dans le dossier de catégorie, sinon No image. 263 tests réussis ; validation visuelle utilisateur en production attendue. Publication frontend uniquement, aucun déploiement GAS/D1 nécessaire. Prochain identifiant : T-024.
+T-023 terminée et validée par l'utilisateur en production le 19/09/2026 : images du catalogue recherchées à la racine puis dans le dossier de catégorie, sinon No image. 263 tests réussis. Publication frontend uniquement, aucun déploiement GAS/D1 nécessaire. Prochain identifiant : T-024.
 
 T-019 à T-022 réalisées et publiées : Devis Admin explicite, verrouillage des demandes avancées/Terminées, suppression manuelle des modèles et origine simplifiée Client/Admin dans la console et Discord. Validation utilisateur en production attendue. Retours ciblés et limites de récupération documentés. Prochain identifiant : T-023 ; d.4 reste en attente de cadrage.
 
@@ -40,15 +40,14 @@ DEMANDES  => CE QUI EST A FAIRE
 
 T-022 réalisée ci-dessous ; validation utilisateur en production attendue.
 
-T-023 réalisée ci-dessous ; validation utilisateur en production attendue.
-
 [EN ATTENTE DE CADRAGE]
 d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> ajouter un bouton 'Supprimer' à chaque demande avec message de confirmation. Celà supprimerais l'enregistrement complet dans D1. Propagation Discord avec modification du statut en 'SUPPRIMEE' pour archivage.
 
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
 
-19/09/2026 — T-023 [ÉVOLUTION] [RÉALISÉE — VALIDATION PRODUCTION ATTENDUE] — Images par catégorie.
+19/09/2026 — T-023 [ÉVOLUTION] [TERMINÉE — VALIDÉE EN PRODUCTION] — Images par catégorie.
+Validation finale utilisateur reçue le 19/09/2026 : « tout est bon, je valide ». Livraison 1beb0cd publiée sur GitHub Pages ; code servi identique et une image de chacune des dix catégories contrôlée en ligne.
 Demande originale :
 T-023  ==> Catalogue, affichage des images
 	J'ai entrepris de classer et donc déplacer les images dans des répertoires du nom des Catégories (en majuscules) : CLOTHES / ARMORS / WEAPONS / MATERIALS / RESOURCES / TOOLS / MINDFORCE / MISCELLANEOUS / VEHICLES / BLUEPRINTS.
