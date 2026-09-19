@@ -560,6 +560,52 @@ function applyItemDiscountToMU(muStr, item) {
 }
 
 	// Génère les cartes et branche leurs interactions après création du HTML.
+// T-023 : priorité au chemin historique, puis au dossier de la catégorie de l'article.
+function catalogImageCandidates(item) {
+    const filename = String(item.IMAGE ?? "").trim();
+    if (!filename || /^-+$/.test(filename)) return [];
+    if (/^https?:\/\//i.test(filename)) return [filename];
+    const parts = filename.split("/");
+    if (parts.some(part => !part || part === "." || part === "..") || filename.includes("\\") || filename.includes(":")) return [];
+    const path = parts.map(encodeURIComponent).join("/");
+    const candidates = [IMG_URL + path];
+    const category = String(item.STORAGE || "").trim().toUpperCase();
+    if (parts.length === 1 && Object.prototype.hasOwnProperty.call(CATEGORY_IMAGES, category)) {
+        candidates.push(IMG_URL + encodeURIComponent(category) + "/" + path);
+    }
+    return candidates;
+}
+
+function renderCatalogImage(container, item) {
+    const candidates = catalogImageCandidates(item);
+    const placeholder = () => {
+        container.replaceChildren(document.createTextNode("No image"));
+        container.style.background = "#eee";
+    };
+    placeholder();
+    if (!candidates.length) return;
+    const img = document.createElement("img");
+    img.alt = String(item.ITEM || "");
+    img.style.display = "none";
+    let index = 0;
+    // Installer les gestionnaires avant src, y compris pour les réponses en cache.
+    img.onload = () => {
+        img.onload = img.onerror = null;
+        container.replaceChildren(img);
+        container.style.background = "";
+        img.style.display = "";
+    };
+    img.onerror = () => {
+        if (++index < candidates.length) {
+            img.src = candidates[index];
+        } else {
+            img.onload = img.onerror = null;
+            placeholder();
+        }
+    };
+    img.src = candidates[index];
+}
+
 	function renderCards(items) {
         const container = document.getElementById('cardContainer');
 		const emptyState = document.getElementById('emptyState');
@@ -597,25 +643,7 @@ function applyItemDiscountToMU(muStr, item) {
 			const card = document.createElement('div');
 			card.className = 'card';
 
-			// Image ou placeholder
-			let imageSrc = "";
-
-			// Vérifie si IMAGE est valide
-			if (item.IMAGE && item.IMAGE !== '--') {
-
-				// Si ce n'est PAS une URL complète → on préfixe avec IMG_URL
-				if (!item.IMAGE.startsWith("http")) {
-					imageSrc = IMG_URL + item.IMAGE;
-				} else {
-					imageSrc = item.IMAGE;
-				}
-			}
-
-			const imgHTML = imageSrc
-				? `<div class="image-container">
-					<img src="${imageSrc}" alt="${item.ITEM}">
-				</div>`
-				: `<div class="image-container" style="background:#eee;">No image</div>`;
+			const imgHTML = '<div class="image-container" style="background:#eee;">No image</div>';
 
 			// Affichage prix et total avec 2 décimales + monnaie "peds"
 			let prixUnitaire = "--";
@@ -715,6 +743,8 @@ function applyItemDiscountToMU(muStr, item) {
 
 				<div class="card-back"></div>
 			`;
+			renderCatalogImage(card.querySelector(".image-container"), item);
+
 			const rayonLink = card.querySelector(".rayon-link");
 			if (rayonLink) {
 				rayonLink.addEventListener("click", (event) => {

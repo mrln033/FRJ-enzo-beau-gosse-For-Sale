@@ -15,6 +15,8 @@
 
 `index.html` appelle `js/api-client.js`. GAS est actuellement prioritaire pour une URL normale et D1 devient prioritaire avec `?backend=d1`. Une lecture peut se replier vers l'autre backend.
 
+T-023 : `js/pages/index.js` charge les images d'articles dans `img/`, puis dans `img/CATEGORIE/` après échec, en utilisant le champ `STORAGE` de chaque article. Le repli est local au navigateur, sans appel API supplémentaire. Les noms absents/`-`/`--` et les échecs finaux affichent uniquement `No image`. Les chemins déjà classés et URL HTTP(S) restent compatibles. Le conteneur et sa mise en page ne changent pas ; les pictogrammes de catégories dans `img/storage/` sont inchangés.
+
 ### Panier et demandes
 
 Le panier reste dans le stockage local jusqu'à sa transmission. D1 reçoit la demande en priorité ; GAS sert de secours en cas d'indisponibilité serveur. Les demandes GAS sont ensuite transférées vers D1 par la synchronisation.

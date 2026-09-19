@@ -51,6 +51,90 @@ function loadCatalogController(search = "") {
   return { context, documentListeners };
 }
 
+function imageFixture(item) {
+  const { context } = loadCatalogController();
+  const requests = [];
+  const images = [];
+  context.document.createTextNode = text => ({ textContent: text });
+  context.document.createElement = () => {
+    const img = {
+      style: {},
+      set src(value) {
+        assert.equal(typeof this.onload, "function");
+        assert.equal(typeof this.onerror, "function");
+        requests.push(value);
+      }
+    };
+    images.push(img);
+    return img;
+  };
+  const container = { style: {}, replaceChildren(...children) { this.children = children; } };
+  context.renderCatalogImage(container, item);
+  return { context, requests, images, container };
+}
+
+test("T-023 : image historique prioritaire, dimensions et position inchangées", () => {
+  const { requests, images, container } = imageFixture({ IMAGE: "Boar.png", STORAGE: "ARMORS", ITEM: "Boar" });
+  assert.match(requests[0], /\/img\/Boar.png$/);
+  images[0].onload();
+  assert.equal(requests.length, 1);
+  assert.equal(container.children[0], images[0]);
+  assert.equal(images[0].style.display, "");
+  assert.equal(container.style.background, "");
+  assert.match(source, /renderCatalogImage\(card.querySelector\(".image-container"\), item\)/);
+});
+
+test("T-023 : repli catégorie capturée et caractères spéciaux encodés", () => {
+  const item = { IMAGE: "Casque #1?.png", STORAGE: " armors " };
+  const { requests, images, container } = imageFixture(item);
+  item.STORAGE = "TOOLS";
+  images[0].onerror();
+  assert.equal(requests.length, 2);
+  assert.match(requests[1], /\/img\/ARMORS\/Casque%20%231%3F.png$/);
+  images[0].onload();
+  assert.equal(container.children[0], images[0]);
+  assert.equal(images[0].onerror, null);
+});
+
+test("T-023 : deux échecs donnent uniquement No image, sans boucle", () => {
+  const { requests, images, container } = imageFixture({ IMAGE: "absente.png", STORAGE: "TOOLS" });
+  images[0].onerror();
+  images[0].onerror();
+  assert.equal(requests.length, 2);
+  assert.deepEqual(container.children, [{ textContent: "No image" }]);
+  assert.equal(images[0].onerror, null);
+  assert.equal(images[0].onload, null);
+});
+
+test("T-023 : noms absents et marqueurs sans requête réseau", () => {
+  for (const IMAGE of [null, undefined, "", " ", "-", "--", " -- "]) {
+    const { requests, container } = imageFixture({ IMAGE, STORAGE: "ARMORS" });
+    assert.equal(requests.length, 0);
+    assert.deepEqual(container.children, [{ textContent: "No image" }]);
+  }
+});
+
+test("T-023 : URL complète et chemin déjà classé restent compatibles", () => {
+  for (const IMAGE of ["https://example.test/a.png", "ARMORS/a.png"]) {
+    const { requests, images, container } = imageFixture({ IMAGE, STORAGE: "ARMORS" });
+    if (IMAGE.startsWith("https")) assert.equal(requests[0], IMAGE);
+    else assert.match(requests[0], /\/img\/ARMORS\/a.png$/);
+    images[0].onerror();
+    assert.equal(requests.length, 1);
+    assert.deepEqual(container.children, [{ textContent: "No image" }]);
+  }
+});
+
+test("T-023 : catégorie inconnue et chemins invalides sans repli arbitraire", () => {
+  const { requests, images } = imageFixture({ IMAGE: "a.png", STORAGE: "../other" });
+  images[0].onerror();
+  assert.equal(requests.length, 1);
+  for (const IMAGE of ["../a.png", "javascript:alert(1)", "/a.png"]) {
+    assert.equal(imageFixture({ IMAGE, STORAGE: "ARMORS" }).requests.length, 0);
+  }
+});
+
+
 test("le contrôleur expose les règles de calcul historiques après extraction", () => {
   const { context } = loadCatalogController();
   const percent = vm.runInContext('parseMU("125 %")', context);

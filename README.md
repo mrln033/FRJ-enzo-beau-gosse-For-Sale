@@ -28,7 +28,7 @@ Les noms et emplacements de ces pages restent stables, car certains liens sont e
 
 - `js/` : code frontend partagé et scripts des pages.
 - `css/` : styles partagés, composants et feuilles propres aux pages.
-- `img/` : images publiques du catalogue ; conserver ce chemin stable.
+- `img/` : images publiques du catalogue. Pour un nom de fichier, le catalogue essaie la racine puis `img/CATEGORIE/` (champ `STORAGE` en majuscules). Nom vide, `-`, `--` ou échec final : `No image`. Les URL complètes et chemins déjà classés restent acceptés ; conserver les noms exacts, casse comprise.
 - `gas/` : backend et synchronisation Google Apps Script, rangés par catalogue, imports, demandes et synchronisation ; voir son [guide de déploiement](gas/README.md).
 - `cloudflare/for-sale-api/` : Worker Cloudflare, schéma D1, tests et outils.
 - `docs/` : documentation fonctionnelle et technique.

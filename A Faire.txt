@@ -18,7 +18,9 @@ Convention d'identification à compter du 31/08/2026 :
 - les anciennes références d.N restent inchangées dans l'historique afin de préserver la trace des échanges passés.
 
 ----------------------------------------
-POINT DE REPRISE — 13/09/2026
+POINT DE REPRISE — 19/09/2026
+
+T-023 réalisée : images du catalogue recherchées à la racine puis dans le dossier de catégorie, sinon No image. 263 tests réussis ; validation visuelle utilisateur en production attendue. Publication frontend uniquement, aucun déploiement GAS/D1 nécessaire. Prochain identifiant : T-024.
 
 T-019 à T-022 réalisées et publiées : Devis Admin explicite, verrouillage des demandes avancées/Terminées, suppression manuelle des modèles et origine simplifiée Client/Admin dans la console et Discord. Validation utilisateur en production attendue. Retours ciblés et limites de récupération documentés. Prochain identifiant : T-023 ; d.4 reste en attente de cadrage.
 
@@ -34,17 +36,29 @@ T-017 terminée : liens courts des titres Discord publiés et anciens messages a
 -------------------------------
 DEMANDES  => CE QUI EST A FAIRE
 
->>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-023 <<<
+>>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-024 <<<
 
 T-022 réalisée ci-dessous ; validation utilisateur en production attendue.
 
-	
+T-023 réalisée ci-dessous ; validation utilisateur en production attendue.
 
 [EN ATTENTE DE CADRAGE]
 d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> ajouter un bouton 'Supprimer' à chaque demande avec message de confirmation. Celà supprimerais l'enregistrement complet dans D1. Propagation Discord avec modification du statut en 'SUPPRIMEE' pour archivage.
 
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
+
+19/09/2026 — T-023 [ÉVOLUTION] [RÉALISÉE — VALIDATION PRODUCTION ATTENDUE] — Images par catégorie.
+Demande originale :
+T-023  ==> Catalogue, affichage des images
+	J'ai entrepris de classer et donc déplacer les images dans des répertoires du nom des Catégories (en majuscules) : CLOTHES / ARMORS / WEAPONS / MATERIALS / RESOURCES / TOOLS / MINDFORCE / MISCELLANEOUS / VEHICLES / BLUEPRINTS.
+	Actuellement, les images sont recherchées dans le répertoire 'img\', avec le nom de fichier présent dans la base.
+	Ce que je voudrais : la recherche doit continuer dans le répertoire 'img\', mais si le fichier n'y est pas trouvé, le chercher aussi dans le répertoire 'img\[CATEGORIE]\', et si il n'est pas trouvé, afficher le texte 'No image' par défaut. Idem en cas d'erreur  : il faut afficher 'No image' en lieu et place de tout autre message.
+	Il se peut que dans la base le nom du fichier soit '-' ou '--' ou vide : c'est le message par défaut 'No image' qu'il convient d'afficher dans ces cas-là.
+
+Réalisation : tentative img/nom, puis img/CATEGORIE/nom avec la catégorie STORAGE de l'article en majuscules. Un échec final affiche uniquement No image, sans icône cassée ni texte alternatif d'erreur. Nom absent, vide, - ou -- : No image sans requête réseau. URL HTTP(S) complète et chemin déjà classé restent utilisables ; caractères spéciaux des noms locaux encodés. Aucun changement CSS, dimensions, emplacement des textes/calculette/stickers ou données GAS/D1.
+Contrôles : 263 tests réussis, dont six nouveaux tests de priorité, repli, erreur, noms absents et compatibilité. Les 624 images retirées de la racine sont retrouvées à contenu identique dans les nouveaux dossiers ; un fichier supplémentaire Rifle BLP (7).png accompagne le classement utilisateur. Renommage utilisateur conservé : Aclarias.png -> MISCELLANEOUS/Asclarias.png ; la base doit employer ce nouveau nom. Documentation README et ARCHITECTURE actualisée. Livraison par GitHub Pages, sans migration ni trigger, aucune consommation D1 supplémentaire.
+Retour ciblé : revenir sur le contrôleur et ses tests depuis 388283a ; avant cela, recopier les images déplacées vers leurs anciens chemins publics, sans effacer les dossiers classés, pour préserver la compatibilité avec l'ancien code. Ne pas restaurer les bases ni annuler les évolutions métier antérieures.
 
 13/09/2026 — T-022 [CORRECTIF] [RÉALISÉE — VALIDATION PRODUCTION ATTENDUE] — Origine affichée Client / Admin.
 Demande originale : « seules 2 origines sont pertinentes : soit la saisie vient du Client, soit elle vient de l'Admin. Et peu importe le backend finalement. Pour historisation ou raison technique, tu peux garder un trace de l'origine technique si tu veux, mais l'affichage tant sur la listing admin que sur le post discord doit etre clair et simplifié : Client ou Admin »
