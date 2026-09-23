@@ -1,5 +1,7 @@
 # FRJ For Sale
 
+T-025 (23/09/2026) : bouton **Actualiser les MU** sur les Devis Admin, profil Public/FRJ hors promotions. MU absent/invalide/périmé : valeur conservée et signalée en rouge ; dernier bilan historisé. Mise à jour ciblée, sans modification de quantité ou TT. Tests, fonctionnement et retour arrière dans [le guide Devis Admin](docs/DEVIS-ADMIN.md).
+
 T-022 (13/09/2026) : l'origine visible dans la liste Admin et Discord est **Client** (d1 ou gas-fallback) ou **Admin** (d1-admin, saisie manuelle et duplication). Le backend technique reste conservé dans source_backend/sourceBackend pour l'historique et la synchronisation. Aucun changement de données ou de statut ; convertir une demande en Devis Admin conserve l'origine de sa saisie initiale.
 
 T-021 : bouton de suppression définitive réservé aux Devis Admin, avec confirmation. Cascade D1, purge ciblée des trois feuilles de demandes au poll GAS existant et suppression Discord avec reprise. Copies conservées ; marqueurs techniques sans contenu contre les résurrections. Voir [Devis Admin](docs/DEVIS-ADMIN.md) pour les délais, tests et limites du retour arrière.

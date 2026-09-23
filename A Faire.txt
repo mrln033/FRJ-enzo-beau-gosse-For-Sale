@@ -20,6 +20,8 @@ Convention d'identification à compter du 31/08/2026 :
 ----------------------------------------
 POINT DE REPRISE — 23/09/2026
 
+T-025 réalisée et publiée : actualisation manuelle des MU des Devis Admin selon profil, hors promotions ; MU absent/invalide/périmé conservé et signalé en rouge. 275 tests réussis. Validation utilisateur en production attendue. Prochain identifiant : T-026 ; d.4 reste en attente de cadrage.
+
 T-024 terminée et validée par l'utilisateur en production le 23/09/2026 : D1 prioritaire sans backend dans l'URL, secours GAS automatique des lectures, préférence explicite conservée pour contrôle. Liens ordinaires et de suivi sans backend ajouté ; imports et circuits D1 spécialisés inchangés. Prochain identifiant : T-025.
 
 T-023 terminée et validée par l'utilisateur en production le 19/09/2026 : images du catalogue recherchées à la racine puis dans le dossier de catégorie, sinon No image. 263 tests réussis. Publication frontend uniquement, aucun déploiement GAS/D1 nécessaire. Prochain identifiant : T-024.
@@ -38,15 +40,30 @@ T-017 terminée : liens courts des titres Discord publiés et anciens messages a
 -------------------------------
 DEMANDES  => CE QUI EST A FAIRE
 
->>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-025 <<<
+>>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-026 <<<
 
 T-022 réalisée ci-dessous ; validation utilisateur en production attendue.
+
+T-025 réalisée ci-dessous ; validation utilisateur en production attendue.
 
 [EN ATTENTE DE CADRAGE]
 d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> ajouter un bouton 'Supprimer' à chaque demande avec message de confirmation. Celà supprimerais l'enregistrement complet dans D1. Propagation Discord avec modification du statut en 'SUPPRIMEE' pour archivage.
 
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
+
+23/09/2026 — T-025 [ÉVOLUTION] [RÉALISÉE — VALIDATION PRODUCTION ATTENDUE] — Actualisation des MU des Devis Admin.
+Demande originale :
+T-025  ==>  Devis
+	Les MU changent et évoluent... J'aimerais ajouter un bouton sur les Devis afin de pouvoir les mettre à jour selon le profil (MU Public ou MU FRJ).
+	Mais plusieurs cas se préentent :
+	- MU absent de la base  ==>  Pas de changement sur le devis, mais affichage en rouge sur le devis, pour indiquer visuellement de mettre la base à jour
+	- MU dans la Base <> MU sur le devis  ==> appliquer le MU présent dans la base
+
+Cadrage validé avant développement : bouton réservé aux Devis Admin, profil enregistré Public/FRJ, hors promotion, remplacement des MU manuels confirmé, aucun changement de quantité/TT/article/profil/statut ; copies intactes. Réalisation : MU courant valide en PED ou pourcentage appliqué, quantités et TT conservés, totaux recalculés. Article absent ou MU absent/invalide/périmé (règle existante de sept jours) : ligne conservée, MU rouge et mention explicite. Stock nul non bloquant. Dernier bilan daté persistant, alerte levée lors du contrôle suivant après correction. Aucun contrôle automatique continu.
+Sécurité : route Admin authentifiée, révision vérifiée, reçu idempotent et écritures atomiques, garde contre éditions concurrentes ; saisies locales non enregistrées à traiter avant le clic. Seules les lignes actualisables sont écrites. Historique existant avec bilan et anciennes lignes ; propagation prix/lignes/historique par le miroir GAS et mise à jour Discord habituelle. Aucune nouvelle table, migration, feuille, modification d'inventaire ou nouveau trigger.
+Contrôles : 275 tests réussis, déploiement à blanc valide, profils Public/FRJ, remises exclues, absence/péremption/invalidité et zéro PED, correction d'alerte, concurrence et reprise, rollback SQL, interface et notification Discord simulée. Sauvegarde privée save/20260923-before-T025.sql (13 358 136 octets). État initial lu sans écriture : 36 demandes, dont 5 modèles, 179 lignes. Aucun devis réel actualisé pour tester.
+Worker publié : 6c85c57b-3dbf-4df8-8d9d-53843b8887ff ; GAS 46 inchangé. Frontend livré par le commit de ce lot via GitHub Pages. Guides racine, DEVIS-ADMIN, PANIER, GAS et Worker mis à jour. Retour ciblé du code : Git préalable 6c218ca / Worker a4453730-787a-483c-81ed-3b3fe84c25ba, sans restauration globale de données. Les actualisations déjà demandées ne sont pas annulées par le retour du code ; anciennes lignes conservées dans details.previous pour une éventuelle restauration sélective après contrôle des éditions ultérieures.
 
 23/09/2026 — T-024 [ÉVOLUTION] [TERMINÉE — VALIDÉE EN PRODUCTION] — D1 par défaut, GAS en secours.
 Validation finale utilisateur reçue le 23/09/2026 : « T-024 validé ». Commit aeba2c5 publié sur GitHub Pages ; sept fichiers servis contrôlés identiques, catégories lues avec succès sur D1 par défaut et GAS sur choix explicite.

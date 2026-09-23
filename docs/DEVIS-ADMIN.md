@@ -1,4 +1,29 @@
-# Devis Admin — T-019 / T-020 / T-021
+# Devis Admin — T-019 / T-020 / T-021 / T-025
+
+## T-025 : actualiser les MU d'un modèle (23/09/2026)
+
+Le bouton **Actualiser les MU** est réservé aux Devis Admin. Enregistrer d'abord les modifications locales. La confirmation précise le profil enregistré (Public ou FRJ), l'absence de promotion et le remplacement des MU manuels par ceux de la base.
+
+- Lecture ciblée du MU courant par nom d'article, sans condition de stock ; règle de fraîcheur existante de sept jours.
+- MU valide en % ou PED : tarif du profil via le calcul partagé, sans promotion. Les anciens marqueurs de promotion sont retirés sur les lignes actualisables.
+- MU absent, périmé ou invalide, ou article absent du catalogue : ligne intacte, MU rouge et texte « MU à renseigner dans la base ». Un MU PED de zéro est valide.
+- Quantités, prix TT, identité et statut Devis Admin inchangés ; les autres demandes/copies ne sont pas modifiées. Les prix de vente et le total sont recalculés sur les lignes actualisées.
+- Le bilan daté représente le dernier contrôle manuel, pas un suivi continu de la base. Après correction de la base et synchronisation vers D1, recliquer retire les alertes résolues. Un changement de profil ultérieur nécessite un nouveau contrôle.
+
+### API, historique et synchronisation
+
+POST authentifié `/admin/orders/<id>/refresh-markups` : `{ operationId: UUID, baseRevision: entier }`. Le serveur relit le profil et les lignes ; le navigateur ne fournit pas de prix. Refus des demandes normales et des révisions périmées. Reçu d'opération, lignes modifiées, totaux et bilan sont enregistrés dans un batch atomique ; une répétition avec la même clé ne rejoue pas les écritures.
+
+Le bilan et les anciennes lignes modifiées sont stockés dans les détails d'un événement existant `proposal-changed`, avec commentaire lisible. La liste Admin retrouve le dernier bilan par l'index d'historique du devis ; pas de lecture globale du catalogue, nouvelle table, migration ou trigger. Les quantités/prix et l'événement repartent vers Google Sheets au poll existant, et Discord est actualisé par le circuit habituel. L'alerte rouge concerne la console Admin ; le détail du contrôle reste dans l'historique synchronisé.
+
+### Tests et retour arrière
+
+275 tests réussis : Public/FRJ, hors promotion, stock nul, TT inchangé, absence/péremption/invalidité, zéro PED, correction des alertes, répétition idempotente, concurrence, transaction annulée sur erreur SQL, demandes normales/Terminées protégées, notification Discord simulée et interface.
+
+Sauvegarde privée avant publication : `save/20260923-before-T025.sql` (13 358 136 octets), exclue de Git. Références préalables : Git **6c218ca**, Worker **a4453730-787a-483c-81ed-3b3fe84c25ba**, GAS **46** inchangé.
+
+Retour du code : revert ciblé du commit T-025, publication GitHub Pages et retour du Worker à la version préalable. Garder les données et l'historique ; aucune migration à annuler. Ce retour masque la fonction mais n'annule pas les actualisations déjà demandées. Pour restaurer des MU, utiliser sélectivement les anciennes lignes consignées dans `details.previous`, après vérification de toute modification ultérieure, puis recalcul et propagation habituelle. Ne jamais restaurer intégralement la base après de nouveaux achats.
+
 
 T-022 (13/09/2026) : l'origine visible dans la liste Admin et Discord est **Client** (d1 ou gas-fallback) ou **Admin** (d1-admin, saisie manuelle et duplication). Le backend technique reste conservé dans source_backend/sourceBackend pour l'historique et la synchronisation. Aucun changement de données ou de statut ; convertir une demande en Devis Admin conserve l'origine de sa saisie initiale.
 

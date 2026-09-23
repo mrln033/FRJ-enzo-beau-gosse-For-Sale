@@ -13,6 +13,7 @@ const trackingHtml = await readFile(new URL("../suivi-commande.html", import.met
 class FakeElement {
   constructor(id = "") {
     this.id = id;
+    this.dataset = {};
     this.children = [];
     this.listeners = new Map();
     this.attributes = new Map();
@@ -68,6 +69,48 @@ function createStorage(initial = {}) {
 async function settle() {
   await new Promise((resolve) => setImmediate(resolve));
 }
+
+test("T-025 : bouton réservé au devis, confirmation, édition non enregistrée et alerte rouge persistante", async () => {
+  const ids=["ordersList","ordersSummary","ordersError","ordersFilters","refreshOrders"];
+  const elements=new Map(ids.map(id=>[id,new FakeElement(id)])), created=[], posts=[], alerts=[];
+  const item={lineNo:1,itemName:"Item A",storage:"ARMORS",aisle:"PARTS",quantity:2,
+    unitTtPed:10,markupKind:"percent",markupValue:1.2,lineSalePed:24};
+  const order={id:"11111111-1111-4111-8111-111111111111",publicReference:"FRJ-20260923-ABC123",
+    status:"admin_quote",editRevision:42,pricingStatus:"estimated",frjMember:true,totalTtPed:20,totalSalePed:24,
+    items:[item],markupRefresh:{checkedAt:"2026-09-23T10:00:00Z",profile:"frj",missing:[item]}};
+  const document={getElementById:id=>elements.get(id),createTextNode:text=>({textContent:text}),
+    createElement:()=>{const e=new FakeElement();created.push(e);return e;}};
+  let confirmed=false;
+  const window={FRJ_ADMIN:{require:()=>true},localStorage:createStorage(),
+    crypto:{randomUUID:()=>"22222222-2222-4222-8222-222222222222"},
+    confirm:()=>confirmed,alert:message=>alerts.push(message),
+    FRJ_API:{fetchD1Admin:async(path,options)=>{
+      if(options?.method==="POST"){posts.push({path,body:JSON.parse(options.body)});return {json:async()=>({ok:true,
+        report:{changed:0,unchanged:0,missing:[item]}})};}
+      return {json:async()=>({enabled:true,orders:[order,{...order,id:"normal",status:"completed"}]})};
+    }}};
+  const context=vm.createContext({window,document,console,URL});
+  vm.runInContext(commonSource,context);vm.runInContext(adminSource,context);await settle();
+  const button=created.find(e=>e.textContent==="Actualiser les MU");
+  assert.equal(created.filter(e=>e.textContent==="Actualiser les MU").length,1);
+  assert.equal(created.filter(e=>e.classList.contains("quote-mu-missing")).length,1);
+  await button.listeners.get("click")();await settle();assert.equal(posts.length,0);
+  confirmed=true;
+  const save=created.find(e=>e.textContent==="Enregistrer les modifications");
+  save.disabled=false;
+  await button.listeners.get("click")();await settle();assert.equal(posts.length,0);
+  assert.match(alerts.at(-1),/Enregistrez/);
+  save.disabled=true;
+  const quantity=created.find(e=>e.attributes.get("aria-label")==="Quantité Item A");
+  quantity.value=0;
+  await button.listeners.get("click")();await settle();assert.equal(posts.length,0);
+  quantity.value=2;
+  await button.listeners.get("click")();await settle();
+  assert.equal(posts.length,1);
+  assert.match(posts[0].path,/refresh-markups$/);
+  assert.equal(posts[0].body.baseRevision,42);
+  assert.match(alerts.at(-1),/1 à renseigner/);
+});
 
 test("T-018 duplication : profil, remises, stock, MU absent et en-tête éditable avant création", async () => {
   const ids = ["ordersList", "ordersSummary", "ordersError", "ordersFilters", "refreshOrders",

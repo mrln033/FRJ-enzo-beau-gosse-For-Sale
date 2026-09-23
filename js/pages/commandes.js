@@ -216,6 +216,12 @@
       duplicate.textContent = "Dupliquer ce devis";
       duplicate.addEventListener("click", () => duplicateQuote(order, duplicate));
       headerActions.appendChild(duplicate);
+      const refreshMu = document.createElement("button");
+      refreshMu.type = "button";
+      refreshMu.textContent = "Actualiser les MU";
+      refreshMu.addEventListener("click", () => refreshQuoteMarkups(order, refreshMu,
+        !save.disabled || editors.some(editor => !readEditor(editor).valid)));
+      headerActions.appendChild(refreshMu);
       const removeQuote = document.createElement("button");
       removeQuote.type = "button";
       removeQuote.textContent = "Supprimer définitivement";
@@ -233,6 +239,13 @@
       article.appendChild(hint);
     }
 
+    if (order.status === "admin_quote" && order.markupRefresh?.checkedAt) {
+      const audit = document.createElement("p");
+      audit.className = "quote-mu-audit";
+      audit.textContent = "Dernier contrôle MU : " + new Date(order.markupRefresh.checkedAt).toLocaleString("fr-FR") +
+        " — profil " + (order.markupRefresh.profile === "frj" ? "FRJ" : "Public") + ", hors promotion.";
+      article.appendChild(audit);
+    }
     const table = document.createElement("table");
     const saleHeading = pricingStatus === "confirmed" ? "Prix de vente" : "Estimation vente";
     const actionHeading = proposalEditable ? "<th>Action</th>" : "";
@@ -286,6 +299,16 @@
         if (kind.value === "none") amount.value = "";
       });
       markupCell.append(kind, amount);
+      const missingMu = order.status === "admin_quote" && order.markupRefresh?.missing?.some(line =>
+        Number(line.lineNo) === Number(item.lineNo) && line.itemName === item.itemName &&
+        line.storage === item.storage && line.aisle === item.aisle);
+      if (missingMu) {
+        markupCell.classList.add("quote-mu-missing");
+        const warning = document.createElement("span");
+        warning.className = "quote-mu-warning";
+        warning.textContent = "MU à renseigner dans la base — valeur du devis conservée";
+        markupCell.appendChild(warning);
+      }
 
       const estimateCell = document.createElement("td");
       estimateCell.textContent = `${ui.formatPed(item.lineSalePed)} PED`;
@@ -723,6 +746,35 @@
       toggle.textContent = "Ajouter une nouvelle demande";
     });
     form.addEventListener("submit", submitNewOrder);
+  }
+
+  async function refreshQuoteMarkups(order, button, hasUnsavedChanges) {
+    if (order.status !== "admin_quote") return;
+    if (hasUnsavedChanges) {
+      global.alert("Enregistrez vos modifications avant d’actualiser les MU.");
+      return;
+    }
+    if (!global.confirm("Actualiser les MU du Devis Admin " + order.publicReference +
+      " selon le profil " + (order.frjMember ? "FRJ" : "Public") +
+      ", hors promotion ? Les MU manuels seront remplacés si la base possède un MU valide. Les valeurs absentes ou invalides seront conservées et signalées en rouge. Quantités et prix TT inchangés.")) return;
+    button.disabled = true;
+    try {
+      // Même identifiant après une réponse perdue : pas de double actualisation.
+      button.dataset.markupOperationId ||= global.crypto.randomUUID();
+      const response = await global.FRJ_API.fetchD1Admin("/admin/orders/" + encodeURIComponent(order.id) + "/refresh-markups", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ operationId: button.dataset.markupOperationId, baseRevision: order.editRevision })
+      });
+      const result = await response.json();
+      if (!result.ok) throw new Error(result.error || "Actualisation impossible");
+      await loadOrders();
+      global.alert("MU actualisés : " + result.report.changed + " modifiés, " + result.report.unchanged +
+        " inchangés, " + result.report.missing.length + " à renseigner dans la base." +
+        (result.discord?.ok === false ? " Mise à jour Discord en attente." : ""));
+    } catch (error) {
+      global.alert(error.message || "Actualisation impossible");
+      button.disabled = false;
+    }
   }
 
   async function deleteQuote(order, button) {

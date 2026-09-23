@@ -35,6 +35,7 @@ import {
 import { sendOrUpdateDiscordOrder } from "./discord.js";
 import { applySheetOrder, readSheetOrder } from "./order-sheet-sync.js";
 import { isAdminQuote, requireQuoteTransition } from "./admin-quotes.js";
+import { refreshQuoteMarkups, quoteMarkupReportSql, orderEditRevisionSql } from "./quote-markup.js";
 import { deleteAdminQuote, pendingQuoteDeletions, acknowledgeQuoteDeletion } from "./order-deletion.js";
 
 function sheetOrderHelpers() {
@@ -1778,6 +1779,11 @@ SET status = 'submitted', approval_required = CASE WHEN admin_quote = 1 THEN 0 E
 }
 
 export async function handleAdminPost(request, url, env) {
+  const markupRefreshMatch = url.pathname.match(/^\/admin\/orders\/([a-f0-9-]{36})\/refresh-markups$/i);
+  if (markupRefreshMatch) {
+    const payload = parseJsonBody(await readTextBody(request, 2000));
+    return json(await refreshQuoteMarkups(env, markupRefreshMatch[1].toLowerCase(), payload, sheetOrderHelpers()));
+  }
   if (url.pathname === "/admin/discounts/generate") {
     const payload = parseJsonBody(await readTextBody(request, 20_000));
     const result = payload.date
@@ -3086,7 +3092,9 @@ async function readAdminOrders(env) {
 SELECT id, public_reference, status, approval_required, proposal_version, admin_quote,
              buyer_avatar, buyer_contact, buyer_comment,
              language, frj_member, source_backend, total_tt_ped, total_sale_ped,
-             pricing_status, client_created_at, created_at, updated_at
+             pricing_status, client_created_at, created_at, updated_at,
+             CASE WHEN admin_quote=1 THEN ${orderEditRevisionSql} ELSE 0 END AS edit_revision,
+             ${quoteMarkupReportSql} AS markup_refresh
       FROM purchase_orders ORDER BY created_at DESC LIMIT 200
     `),
     env.DB.prepare(`
@@ -3297,7 +3305,9 @@ function mapAdminOrder(order) {
     buyerComment: order.buyer_comment || null,
     sourceBackend: order.source_backend || "d1",
     clientCreatedAt: order.client_created_at ? normalizeSyncTimestamp(order.client_created_at) : null,
-    discordMessageId: order.discord_message_id || null
+    discordMessageId: order.discord_message_id || null,
+    editRevision: Number(order.edit_revision || 0),
+    markupRefresh: order.markup_refresh ? JSON.parse(order.markup_refresh) : null
   };
 }
 

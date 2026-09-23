@@ -22,6 +22,13 @@ test("conserve la protection des routes administrateur", async () => {
   assert.deepEqual(await response.json(), { error: "Unauthorized" });
 });
 
+test("T-025 : actualisation des MU inaccessible sans jeton Admin", async () => {
+  const response = await worker.fetch(new Request(
+    "https://api.example/admin/orders/11111111-1111-4111-8111-111111111111/refresh-markups",
+    { method: "POST", body: "{}" }), {});
+  assert.equal(response.status, 401);
+});
+
 test("protège aussi l'historique détaillé d'une demande", async () => {
   const request = new Request(
     "https://api.example/admin/orders/11111111-1111-4111-8111-111111111111/history",

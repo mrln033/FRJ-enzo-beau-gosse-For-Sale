@@ -118,6 +118,9 @@ body { max-width: 1250px; margin: 0 auto; padding: 78px 18px 40px; box-sizing: b
       .order-tracking-feedback { max-width: none; text-align: left; }
       .order-history-controls { align-items: stretch; flex-direction: column; }
     }
+.quote-mu-missing input, .quote-mu-missing select, .quote-mu-warning { color: #b42318; }
+.quote-mu-warning { display: block; font-weight: 600; font-size: 0.85em; }
+.quote-mu-audit { color: #555; font-size: 0.9em; }
 .direct-order-line-error {
   border: 1px solid #b42318;
   background: #fff1f0;

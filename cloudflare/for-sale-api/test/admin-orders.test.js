@@ -183,6 +183,132 @@ async function sheetFixture() {
 }
 
 
+async function quoteMuFixture(frj = false) {
+  const f = await sheetFixture();
+  f.db.prepare("UPDATE purchase_orders SET admin_quote=1, approval_required=0, frj_member=? WHERE id=?").run(frj ? 1 : 0, f.id);
+  const endpoint = new URL("https://api.example/admin/orders/" + f.id + "/refresh-markups");
+  const payload = async () => ({ operationId: crypto.randomUUID(), baseRevision: (await f.get()).editRevision });
+  const refresh = async body => (await handleAdminPost(new Request(endpoint, { method: "POST", body: JSON.stringify(body) }), endpoint, f.env)).json();
+  const listing = async () => (await (await handleAdminGet(new URL("https://api.example/admin/orders"), f.env)).json()).orders.find(o => o.id === f.id);
+  return { ...f, payload, refresh, listing };
+}
+
+test("T-025 : MU Public/FRJ hors promotion, sans stock, TT et quantités conservés", async () => {
+  for (const frj of [false, true]) {
+    const f = await quoteMuFixture(frj);
+    const before = f.items();
+    f.db.exec("UPDATE inventory_current SET quantity=0; UPDATE catalog_items SET unit_price_ped=999");
+    f.db.exec("INSERT INTO discount_campaigns(id,campaign_type,starts_on,ends_on,discount_rate) VALUES ('sale','sale','2020-01-01','2099-01-01',0.5)");
+    const body = await f.payload();
+    const result = await f.refresh(body);
+    assert.equal(result.report.profile, frj ? "frj" : "public");
+    const after = f.items();
+    assert.equal(after[0].markup_value, frj ? 1.1 : 1.2);
+    assert.equal(after[1].markup_value, frj ? 1.25 : 2.5);
+    after.forEach((line,i) => {
+      for (const key of ["quantity","unit_tt_ped","line_tt_ped","stock_at_submission","item_name","storage","aisle"]) assert.equal(line[key],before[i][key]);
+      assert.equal(line.discount_rate,null);
+    });
+    const saved = await f.listing();
+    assert.equal(saved.status, "admin_quote");
+    assert.equal(saved.totalTtPed, 25);
+    assert.equal(saved.totalSalePed, frj ? 28.25 : 31.5);
+    assert.deepEqual(saved.markupRefresh,result.report);
+    const count = f.db.prepare("SELECT COUNT(*) n FROM purchase_order_events").get().n;
+    assert.equal((await f.refresh(body)).duplicate,true);
+    assert.equal(f.db.prepare("SELECT COUNT(*) n FROM purchase_order_events").get().n,count);
+    const again = await f.refresh(await f.payload());
+    assert.equal(again.report.changed,0);
+    assert.equal(again.report.unchanged,2);
+    const mirror = await (await handleSyncGet(new URL("https://api.example/sync/orders?cursor=0"),f.env)).json();
+    // Le miroir et l'historique restent sur le circuit existant.
+    assert.ok(JSON.stringify(mirror).includes("markupRefresh"));
+  }
+});
+
+test("T-025 : MU absents, périmés, invalides, article absent conservés ; alerte retirée après correction", async () => {
+  for (const sql of [
+    "DELETE FROM market_current WHERE item_name='Item A'",
+    "UPDATE market_current SET observed_at='2000-01-01' WHERE item_name='Item A'",
+    "UPDATE market_current SET weighted_value=-1 WHERE item_name='Item A'",
+    "UPDATE purchase_order_items SET item_name='Article disparu' WHERE line_no=1"
+  ]) {
+    const f=await quoteMuFixture();
+    f.db.exec(sql);
+    const before=f.items()[0];
+    const result=await f.refresh(await f.payload());
+    assert.equal(result.report.missing.length,1);
+    assert.deepEqual(f.items()[0],before);
+    assert.equal((await f.listing()).markupRefresh.missing.length,1);
+  }
+  const f=await quoteMuFixture();
+  f.db.exec("UPDATE market_current SET weighted_value=NULL WHERE item_name='Item B'");
+  await f.refresh(await f.payload());
+  f.db.exec("UPDATE market_current SET weighted_value=0 WHERE item_name='Item B'");
+  const result=await f.refresh(await f.payload());
+  assert.equal(result.report.missing.length,0);
+  assert.equal(f.items()[1].markup_value,0);
+  assert.equal((await f.listing()).markupRefresh.missing.length,0);
+});
+
+test("T-025 : refus demande normale, version périmée et modification concurrente sans écrasement", async () => {
+  const f=await quoteMuFixture();
+  const body=await f.payload();
+  f.db.prepare("UPDATE purchase_orders SET admin_quote=0 WHERE id=?").run(f.id);
+  await assert.rejects(()=>f.refresh(body),e=>e.status===409);
+  f.db.prepare("UPDATE purchase_orders SET admin_quote=1 WHERE id=?").run(f.id);
+  await assert.rejects(()=>f.refresh({...body,baseRevision:body.baseRevision+1}),e=>e.status===409);
+  await assert.rejects(()=>f.refresh({}),e=>e.status===400);
+  const before=f.items();
+  const originalBatch=f.env.DB.batch;
+  f.env.DB.batch=statements=>{
+    if(statements[0].sql.includes("INSERT INTO purchase_order_events")) {
+      f.db.prepare("INSERT INTO purchase_order_events(order_id,action,details) VALUES (?,'proposal-changed','{}')").run(f.id);
+    }
+    return originalBatch(statements);
+  };
+  await assert.rejects(()=>f.refresh(body),e=>e.status===409);
+  assert.deepEqual(f.items(),before);
+  assert.equal(f.db.prepare("SELECT COUNT(*) n FROM purchase_order_events WHERE event_key=?").get(body.operationId).n,0);
+});
+
+test("T-025 : autres demandes intactes et message Discord actualisé avec les nouveaux MU", async () => {
+  const f=await quoteMuFixture();
+  const endpoint=new URL("https://api.example/admin/orders");
+  const copy=await (await handleAdminPost(new Request(endpoint,{method:"POST",body:JSON.stringify({
+    buyerAvatar:"Client",frjMember:false,items:[lineA,lineB]
+  })}),endpoint,f.env)).json();
+  const before=f.db.prepare("SELECT * FROM purchase_orders WHERE id=?").get(copy.order.id);
+  const copyItems=f.db.prepare("SELECT * FROM purchase_order_items WHERE order_id=?").all(copy.order.id);
+  f.env.DISCORD_ORDER_WEBHOOK_URL="https://discord.com/api/webhooks/123456789012345678/fake";
+  f.db.prepare("UPDATE purchase_orders SET discord_message_id=? WHERE id=?").run("123456789012345678",f.id);
+  const originalFetch=globalThis.fetch, requests=[];
+  globalThis.fetch=async(url,options)=>{requests.push({url:String(url),options});return new Response(JSON.stringify({id:"123456789012345678"}),{status:200});};
+  try {
+    const result=await f.refresh(await f.payload());
+    assert.equal(result.discord.ok,true);
+    assert.equal(requests[0].options.method,"PATCH");
+    const payload=JSON.parse(requests[0].options.body);
+    assert.ok(JSON.stringify(payload).includes("120"));
+    assert.ok(JSON.stringify(payload).includes("Devis Admin"));
+  } finally { globalThis.fetch=originalFetch; }
+  assert.deepEqual(f.db.prepare("SELECT * FROM purchase_orders WHERE id=?").get(copy.order.id),before);
+  assert.deepEqual(f.db.prepare("SELECT * FROM purchase_order_items WHERE order_id=?").all(copy.order.id),copyItems);
+});
+
+
+test("T-025 : rollback atomique sur échec SQL et demandes terminées intactes", async () => {
+  const f=await quoteMuFixture();
+  const before=f.items(), body=await f.payload();
+  f.db.exec("CREATE TRIGGER fail_mu BEFORE UPDATE ON purchase_order_items BEGIN SELECT RAISE(ABORT,'test failure'); END;");
+  await assert.rejects(()=>f.refresh(body),/test failure/);
+  assert.deepEqual(f.items(),before);
+  assert.equal(f.db.prepare("SELECT COUNT(*) n FROM purchase_order_events WHERE event_key=?").get(body.operationId).n,0);
+  f.db.exec("DROP TRIGGER fail_mu");
+  f.db.prepare("UPDATE purchase_orders SET admin_quote=0,status='completed' WHERE id=?").run(f.id);
+  await assert.rejects(()=>f.refresh(body),e=>e.status===409);
+});
+
 test("Suppression Devis Admin : confirmation, cascade, copies conservées, anti-résurrection et reprise", async()=>{
   const f=await sheetFixture();
   const post=async(path,payload)=>{const u=new URL("https://api.example"+path);return (await handleAdminPost(new Request(u,{method:"POST",body:JSON.stringify(payload)}),u,f.env)).json();};
