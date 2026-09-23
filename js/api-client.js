@@ -9,7 +9,8 @@
   const ADMIN_TOKEN_KEY = "FRJ_D1_ADMIN_TOKEN";
   const TRACKING_IDENTIFIER_PATTERN = /^(?:FRJ-\d{8}-[A-F0-9]{6}|[a-f0-9-]{70,80})$/i;
   const requestedBackend = new URLSearchParams(global.location.search).get("backend");
-  const preferredBackend = requestedBackend === "d1" ? "d1" : "gas";
+  const explicitBackend = ["d1", "gas"].includes(requestedBackend) ? requestedBackend : null;
+  const preferredBackend = explicitBackend || "d1";
   let activeBackend = preferredBackend;
 
   reflectBackend(preferredBackend);
@@ -253,11 +254,11 @@
     return result;
   }
 
-  function shortTrackingUrl(publicReference, catalogBackend = "d1") {
+  function shortTrackingUrl(publicReference, catalogBackend = explicitBackend) {
     const reference = String(publicReference || "").trim().toUpperCase();
     if (!/^FRJ-\d{8}-[A-F0-9]{6}$/.test(reference)) throw new Error("Référence de demande invalide");
     const url = new URL("./s.html", global.location.href);
-    if (catalogBackend === "gas") url.searchParams.set("backend", "gas");
+    if (catalogBackend === "gas" || catalogBackend === "d1") url.searchParams.set("backend", catalogBackend);
     url.hash = reference;
     return url.toString();
   }
@@ -464,10 +465,10 @@
   }
 
   function preserveBackendInAdminLinks() {
-    if (preferredBackend !== "d1") return;
+    if (!explicitBackend) return;
     document.querySelectorAll(".nav-admin a").forEach((link) => {
       const url = new URL(link.href, global.location.href);
-      url.searchParams.set("backend", "d1");
+      url.searchParams.set("backend", explicitBackend);
       link.href = url.toString();
     });
   }
@@ -487,6 +488,7 @@
     getVisitCounter,
     shortTrackingUrl,
     backend: preferredBackend,
+    explicitBackend,
     get activeBackend() { return activeBackend; },
     label: preferredBackend === "d1" ? "Cloudflare D1" : "Google Sheets / GAS",
     clearAdminToken,

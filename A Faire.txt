@@ -18,7 +18,9 @@ Convention d'identification à compter du 31/08/2026 :
 - les anciennes références d.N restent inchangées dans l'historique afin de préserver la trace des échanges passés.
 
 ----------------------------------------
-POINT DE REPRISE — 19/09/2026
+POINT DE REPRISE — 23/09/2026
+
+T-024 réalisée : D1 prioritaire sans backend dans l'URL, secours GAS automatique des lectures, préférence explicite conservée pour contrôle. Liens ordinaires et de suivi sans backend ajouté ; imports et circuits D1 spécialisés inchangés. Validation utilisateur en production attendue. Prochain identifiant : T-025.
 
 T-023 terminée et validée par l'utilisateur en production le 19/09/2026 : images du catalogue recherchées à la racine puis dans le dossier de catégorie, sinon No image. 263 tests réussis. Publication frontend uniquement, aucun déploiement GAS/D1 nécessaire. Prochain identifiant : T-024.
 
@@ -36,15 +38,28 @@ T-017 terminée : liens courts des titres Discord publiés et anciens messages a
 -------------------------------
 DEMANDES  => CE QUI EST A FAIRE
 
->>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-024 <<<
+>>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-025 <<<
 
 T-022 réalisée ci-dessous ; validation utilisateur en production attendue.
+
+T-024 réalisée ci-dessous ; validation utilisateur en production attendue.
 
 [EN ATTENTE DE CADRAGE]
 d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> ajouter un bouton 'Supprimer' à chaque demande avec message de confirmation. Celà supprimerais l'enregistrement complet dans D1. Propagation Discord avec modification du statut en 'SUPPRIMEE' pour archivage.
 
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
+
+23/09/2026 — T-024 [ÉVOLUTION] [RÉALISÉE — VALIDATION PRODUCTION ATTENDUE] — D1 par défaut, GAS en secours.
+Demande originale :
+T-024  ==>  il existe toujours 2 paramètres utilisés dans l'URL : backend et admin.
+	Aujourdh'ui, je souhaite supprimer le paramètre backend.
+	Par défaut, je veux que D1 soit utilisé, sans paramètre backend, dans tous les cas. Cependant, en cas d'indisponibilité, le repli vers GAS est à conserver, de préférence 'silencieusement', c'est à dire qu'il est inutile de l'activer explicitement via le paramètre backend.
+	Mais pour des raisons d'administration et de controle, le paramètre doit pouvoir être utilisé malgré tout ;)
+
+Résumé et périmètre validés avant développement. Réalisation : D1 prioritaire sans paramètre (également si valeur backend inconnue), backend=gas/d1 disponible pour choisir la priorité avec secours conservé. Aucune intervention ni réécriture d'URL pour le repli des lectures ; double panne signalée. Choix explicite séparé du backend actif. Liens du panier, de la console, redirection courte et retour au catalogue sans backend implicite ; anciens liens explicites compatibles. Anciennes préférences mémorisées et referrer ne forcent plus GAS. Entrée admin inchangée. Doubles imports GAS + D1, transmission des achats et fonctions D1 spécialisées inchangés ; messages d'import partiel et attente de transfert conservés.
+Contrôles : 268 tests automatisés réussis, incluant D1 par défaut, préférence GAS/D1, repli réseau/HTTP, double panne, retour à la priorité, liens sans paramètre et suivi historique. Aucun changement de données, schéma, inventaire, trigger ou synchronisation ; publication frontend uniquement. Documentation README, ARCHITECTURE et PANIER mise à jour.
+Retour ciblé : revert du commit T-024 puis publication GitHub Pages ; référence préalable 13d5bff. Aucun retour GAS/Worker ni restauration de base nécessaire. Ne pas annuler les déplacements d'images utilisateur.
 
 19/09/2026 — T-023 [ÉVOLUTION] [TERMINÉE — VALIDÉE EN PRODUCTION] — Images par catégorie.
 Validation finale utilisateur reçue le 19/09/2026 : « tout est bon, je valide ». Livraison 1beb0cd publiée sur GitHub Pages ; code servi identique et une image de chacune des dix catégories contrôlée en ligne.

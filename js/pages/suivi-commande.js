@@ -49,50 +49,18 @@
   const token = searchParams.get("token") || "";
   const publicReference = (searchParams.get("ref") || "").trim().toUpperCase();
   const trackingIdentifier = publicReference || token;
-  const catalogBackend = resolveCatalogBackend(searchParams, trackingIdentifier);
+  const explicitBackend = normalizeBackend(searchParams.get("backend"));
+  const catalogBackend = explicitBackend || "d1";
   const ui = global.FRJ_ORDER_UI;
   let lang = global.localStorage.getItem("lang") === "FR" ? "FR" : "EN";
   let refreshing = false;
 
-  document.getElementById("catalogReturnLink").href = `./?backend=${catalogBackend}`;
-  canonicalizeTrackingUrl();
+  document.getElementById("catalogReturnLink").href = explicitBackend ? `./?backend=${explicitBackend}` : "./";
 
   function normalizeBackend(value) {
     return value === "d1" || value === "gas" ? value : null;
   }
 
-  function resolveCatalogBackend(params, accessToken) {
-    const explicitBackend = normalizeBackend(params.get("backend"));
-    if (explicitBackend) return explicitBackend;
-    try {
-      const requests = JSON.parse(global.localStorage.getItem(REQUESTS_KEY) || "[]");
-      const remembered = Array.isArray(requests)
-        ? requests.find((request) => request?.accessToken === accessToken
-          || String(request?.reference || "").toUpperCase() === String(accessToken || "").toUpperCase())
-        : null;
-      const rememberedBackend = normalizeBackend(remembered?.catalogBackend);
-      if (rememberedBackend) return rememberedBackend;
-    } catch {
-      // Un lien privé reste utilisable si le stockage local est indisponible.
-    }
-    try {
-      const referrer = new URL(global.document.referrer);
-      if (referrer.origin === global.location.origin) {
-        const referrerBackend = normalizeBackend(referrer.searchParams.get("backend"));
-        if (referrerBackend) return referrerBackend;
-      }
-    } catch {
-      // Un accès direct sans provenance conserve le mode historique GAS.
-    }
-    return "gas";
-  }
-
-  function canonicalizeTrackingUrl() {
-    if (normalizeBackend(searchParams.get("backend"))) return;
-    const url = new URL(global.location.href);
-    url.searchParams.set("backend", catalogBackend);
-    global.history.replaceState(null, "", url);
-  }
 
   function text(key) {
     return COPY[lang][key] || key;
@@ -232,7 +200,7 @@
     copy.type = "button";
     copy.textContent = text("copy");
     copy.addEventListener("click", async () => {
-      await global.navigator.clipboard.writeText(global.FRJ_API.shortTrackingUrl(order.publicReference, catalogBackend));
+      await global.navigator.clipboard.writeText(global.FRJ_API.shortTrackingUrl(order.publicReference, explicitBackend));
       copy.textContent = text("copied");
     });
     actions.append(refresh, copy);

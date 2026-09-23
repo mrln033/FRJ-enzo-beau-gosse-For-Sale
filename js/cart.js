@@ -735,14 +735,13 @@
   }
 
   function trackingUrl(request) {
-    const backend = request?.catalogBackend === "d1" || request?.catalogBackend === "gas"
-      ? request.catalogBackend
-      : currentCatalogBackend();
+    // Une observation GAS (secours ou ancienne demande) ne doit pas forcer la navigation.
+    const backend = global.FRJ_API?.explicitBackend || null;
     const reference = String(request?.reference || "").trim().toLocaleUpperCase("en-US");
     if (REFERENCE_PATTERN.test(reference)) return global.FRJ_API.shortTrackingUrl(reference, backend);
     const url = new URL("./suivi-commande.html", global.location.href);
     url.searchParams.set("token", String(request?.accessToken || ""));
-    url.searchParams.set("backend", backend);
+    if (backend) url.searchParams.set("backend", backend);
     return url.toString();
   }
 

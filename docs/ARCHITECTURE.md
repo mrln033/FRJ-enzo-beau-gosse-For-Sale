@@ -13,7 +13,9 @@
 
 ### Catalogue
 
-`index.html` appelle `js/api-client.js`. GAS est actuellement prioritaire pour une URL normale et D1 devient prioritaire avec `?backend=d1`. Une lecture peut se replier vers l'autre backend.
+`index.html` appelle `js/api-client.js`. Depuis T-024 (23/09/2026), D1 est prioritaire sans paramètre ; `?backend=gas` / `?backend=d1` reste une préférence explicite de contrôle. Les lectures essaient le secours après une erreur réseau ou HTTP, sans modifier l'URL ni demander d'intervention. La lecture suivante réessaie le backend préféré. Une double panne reste signalée. `activeBackend` décrit le service effectivement utilisé ; `explicitBackend` est null hors choix manuel et ne dépend jamais du secours. Les liens ordinaires et la redirection de suivi n'ajoutent plus de backend ; les anciens liens explicites restent compatibles. Ni les anciens choix stockés avec une demande, ni le referrer ne forcent plus le catalogue à GAS.
+
+Les écritures génériques n'ont pas de repli automatique : conserver les gardes et éviter une double écriture. Les imports restent GAS + D1, la transmission client D1 puis secours GAS selon ses règles existantes, le suivi et les actions propres à D1 restent sur D1. L'indicateur technique et les messages d'import partiel/attente de transfert sont conservés. Aucun changement de schéma, de synchronisation ou de l'entrée Admin.
 
 T-023 : `js/pages/index.js` charge les images d'articles dans `img/`, puis dans `img/CATEGORIE/` après échec, en utilisant le champ `STORAGE` de chaque article. Le repli est local au navigateur, sans appel API supplémentaire. Les noms absents/`-`/`--` et les échecs finaux affichent uniquement `No image`. Les chemins déjà classés et URL HTTP(S) restent compatibles. Le conteneur et sa mise en page ne changent pas ; les pictogrammes de catégories dans `img/storage/` sont inchangés.
 

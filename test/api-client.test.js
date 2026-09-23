@@ -41,7 +41,7 @@ function loadClient(search, fetchImpl, promptImpl = () => "", localValues = new 
   return { api: window.FRJ_API, events, localValues, values };
 }
 
-test("GAS reste le backend de lecture par défaut", async () => {
+test("D1 est le backend de lecture par défaut sans paramètre", async () => {
   const urls = [];
   const { api, events } = loadClient("", async (url) => {
     urls.push(url);
@@ -49,15 +49,16 @@ test("GAS reste le backend de lecture par défaut", async () => {
   });
 
   await api.fetch("?action=categories");
-  assert.equal(api.backend, "gas");
-  assert.equal(api.activeBackend, "gas");
-  assert.equal(events.at(-1).detail.backend, "gas");
-  assert.match(urls[0], /AKfycbxD_sOPcjLT-eWPrDMfLgaSx16yAeH17SCd8xByP2faU24z8ge5AiAWOueVBRanHjGx/);
+  assert.equal(api.backend, "d1");
+  assert.equal(api.explicitBackend, null);
+  assert.equal(api.activeBackend, "d1");
+  assert.equal(events.at(-1).detail.backend, "d1");
+  assert.match(urls[0], /workers\.dev/);
 });
 
 test("une lecture D1 en échec se replie sur GAS", async () => {
   const urls = [];
-  const { api, events } = loadClient("?backend=d1", async (url) => {
+  const { api, events } = loadClient("", async (url) => {
     urls.push(url);
     if (urls.length === 1) throw new Error("D1 indisponible");
     return new Response("[]", { status: 200 });
@@ -68,6 +69,41 @@ test("une lecture D1 en échec se replie sur GAS", async () => {
   assert.match(urls[1], /^https:\/\/script\.google\.com\//);
   assert.equal(api.activeBackend, "gas");
   assert.equal(events.at(-1).detail.backend, "gas");
+});
+
+test("T-024 : choix explicites, repli silencieux HTTP et retour à la priorité au prochain appel", async () => {
+  for (const [search, preferred] of [["", "d1"], ["?backend=gas", "gas"], ["?backend=d1", "d1"], ["?backend=invalide", "d1"]]) {
+    const urls = [];
+    const { api } = loadClient(search, async url => {
+      urls.push(url);
+      return new Response("[]", { status: urls.length === 1 ? 503 : 200 });
+    }, () => { throw new Error("Aucune intervention attendue"); });
+    assert.equal(api.backend, preferred);
+    await api.fetch("?category=WEAPONS");
+    assert.equal(urls.length, 2);
+    assert.equal(urls[0].includes("workers.dev"), preferred === "d1");
+    assert.equal(urls[1].includes("workers.dev"), preferred !== "d1");
+    await api.fetch("?action=categories");
+    assert.equal(urls[2].includes("workers.dev"), preferred === "d1");
+    assert.equal(api.activeBackend, preferred);
+  }
+});
+
+test("T-024 : une panne des deux lectures reste signalée", async () => {
+  let attempts = 0;
+  const { api } = loadClient("", async () => { attempts++; throw new Error("Indisponible"); });
+  await assert.rejects(api.fetch("?action=categories"), /Indisponible/);
+  assert.equal(attempts, 2);
+});
+
+test("T-024 : liens courts sans paramètre implicite, choix manuel conservé", () => {
+  for (const [search, expected] of [["", null], ["?backend=gas", "gas"], ["?backend=d1", "d1"], ["?backend=autre", null]]) {
+    const { api } = loadClient(search, async () => new Response("[]"));
+    const url = new URL(api.shortTrackingUrl("FRJ-20260910-ABC123"));
+    assert.equal(url.searchParams.get("backend"), expected);
+    assert.equal(url.hash, "#FRJ-20260910-ABC123");
+    assert.equal(new URL(api.shortTrackingUrl("FRJ-20260910-ABC123", null)).search, "");
+  }
 });
 
 test("le suivi client interroge D1 sans demander de jeton administrateur", async () => {

@@ -16,9 +16,7 @@
 
   const destination = new URL("./suivi-commande.html", global.location.href);
   destination.searchParams.set("ref", reference);
-  destination.searchParams.set(
-    "backend",
-    new URLSearchParams(global.location.search).get("backend") === "gas" ? "gas" : "d1"
-  );
+  const backend = new URLSearchParams(global.location.search).get("backend");
+  if (backend === "gas" || backend === "d1") destination.searchParams.set("backend", backend);
   global.location.replace(destination.toString());
 })(window);

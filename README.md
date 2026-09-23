@@ -43,7 +43,7 @@ Le paramètre d'entrée `?admin=1` active le menu Admin dans l'onglet courant, p
 
 ## Liens directs du catalogue
 
-Le paramètre public `category` ouvre directement une catégorie du catalogue. Il peut être combiné avec `backend=d1` ou `backend=gas`, par exemple `?backend=d1&category=WEAPONS`. Lorsqu'un visiteur change de catégorie, l'URL est mise à jour afin de pouvoir être copiée et partagée.
+Le paramètre public `category` ouvre directement une catégorie du catalogue, par exemple `?category=WEAPONS`. D1 est prioritaire sans paramètre ; les lectures se replient automatiquement sur GAS en cas d'échec, sans changer l'URL. Pour les contrôles, `?backend=gas` ou `?backend=d1` choisit explicitement la priorité, tout en conservant le secours. Ce choix ne remplace pas les circuits spécialisés (imports GAS + D1, suivi et administration D1). Les liens ordinaires n'ajoutent plus `backend` ; seuls les choix explicites peuvent être transmis. Le paramètre `admin` et les droits restent inchangés.
 
 ## Liens courts de suivi
 

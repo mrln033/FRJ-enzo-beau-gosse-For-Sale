@@ -5,7 +5,7 @@ import vm from "node:vm";
 
 const source = await readFile(new URL("../js/cart.js", import.meta.url), "utf8");
 
-function loadCartHelpers() {
+function loadCartHelpers(explicitBackend = null) {
   const instrumented = source.replace(
     "  global.FRJ_CART = Object.freeze({",
     "  global.__FRJ_CART_TEST__ = { mergeRequests, requestIdentifier, trackingUrl };\n\n  global.FRJ_CART = Object.freeze({"
@@ -19,7 +19,8 @@ function loadCartHelpers() {
   const window = {
     FRJ_FEATURES: { cart: false },
     FRJ_API: {
-      activeBackend: "d1",
+      activeBackend: "gas",
+      explicitBackend,
       shortTrackingUrl: (reference, backend) => `https://example.test/s.html#${reference}:${backend}`
     },
     localStorage,
@@ -46,8 +47,19 @@ test("le panier conserve une demande ouverte par sa référence, même sans jeto
   assert.equal(helpers.requestIdentifier(requests[0]), "FRJ-20260910-ABC123");
   assert.equal(
     helpers.trackingUrl(requests[0]),
-    "https://example.test/s.html#FRJ-20260910-ABC123:d1"
+"https://example.test/s.html#FRJ-20260910-ABC123:null"
   );
+});
+
+test("T-024 : liens du panier indépendants du secours et des anciens choix mémorisés", () => {
+  for (const backend of [null, "d1", "gas"]) {
+    const helpers = loadCartHelpers(backend);
+    const request = { reference: "FRJ-20260910-ABC123", catalogBackend: "gas", backend: "gas" };
+    assert.equal(helpers.trackingUrl(request), `https://example.test/s.html#FRJ-20260910-ABC123:${backend}`);
+    const legacy = new URL(helpers.trackingUrl({ accessToken: "ancien-jeton", catalogBackend: "gas" }));
+    assert.equal(legacy.searchParams.get("backend"), backend);
+    assert.equal(legacy.searchParams.get("token"), "ancien-jeton");
+  }
 });
 
 test("une mise à jour par référence ne fait pas perdre un éventuel jeton historique", () => {

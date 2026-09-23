@@ -7,7 +7,7 @@
 
   const items = [
     { section: "catalog", backend: "gas", label: "Catalogue (GAS)", href: "./?backend=gas" },
-    { section: "catalog", backend: "d1", label: "Catalogue (D1)", href: "./?backend=d1" },
+    { section: "catalog", backend: "d1", label: "Catalogue (D1)", href: "./" },
     {
       section: "update",
       backend: "",
@@ -35,7 +35,7 @@
       : pathname.includes("rapport-sync")
       ? "report"
       : (pathname.includes("maj_") ? "update" : "catalog");
-    const backend = params.get("backend") === "d1" ? "d1" : "gas";
+    const backend = params.get("backend") === "gas" ? "gas" : "d1";
     const drawer = document.createElement("div");
     drawer.className = "admin-menu-drawer";
 

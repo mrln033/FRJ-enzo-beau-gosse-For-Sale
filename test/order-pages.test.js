@@ -787,6 +787,7 @@ test("un lien de suivi incomplet affiche l'erreur sans appeler l'API", async () 
   await settle();
 
   assert.equal(apiCalled, false);
+  assert.equal(elements.get("catalogReturnLink").href, "./");
   assert.equal(elements.get("trackingContent").className, "tracking-message error");
   assert.equal(elements.get("trackingContent").textContent, "Lien de suivi invalide ou incomplet.");
 });
@@ -806,6 +807,23 @@ test("la page courte du domaine applicatif redirige la référence vers le suivi
   vm.runInContext(shortTrackingSource, vm.createContext({ window, URL, URLSearchParams }));
   assert.equal(
     redirectedTo,
-    "https://example.test/suivi-commande.html?ref=FRJ-20260910-ABC123&backend=d1"
+"https://example.test/suivi-commande.html?ref=FRJ-20260910-ABC123"
   );
+});
+
+test("T-024 : les anciens liens courts explicites restent compatibles", () => {
+  for (const backend of ["d1", "gas", "inconnu"]) {
+    let destination;
+    const window = {
+      location: {
+        href: `https://example.test/s.html?backend=${backend}#FRJ-20260910-ABC123`,
+        search: `?backend=${backend}`, hash: "#FRJ-20260910-ABC123",
+        replace: url => { destination = new URL(url); }
+      },
+      document: { getElementById: () => ({}) }
+    };
+    vm.runInContext(shortTrackingSource, vm.createContext({ window, URL, URLSearchParams }));
+    assert.equal(destination.searchParams.get("backend"), backend === "inconnu" ? null : backend);
+    assert.equal(destination.searchParams.get("ref"), "FRJ-20260910-ABC123");
+  }
 });

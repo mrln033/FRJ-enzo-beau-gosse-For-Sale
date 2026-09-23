@@ -990,7 +990,7 @@
       button.textContent = trackingUrl ? "Ouverture…" : "Préparation du lien…";
       feedback.hidden = true;
       try {
-        if (!trackingUrl) trackingUrl = global.FRJ_API.shortTrackingUrl(order.publicReference, "d1");
+        if (!trackingUrl) trackingUrl = global.FRJ_API.shortTrackingUrl(order.publicReference);
         const copied = await copyTrackingUrl(trackingUrl);
         if (trackingWindow) {
           trackingWindow.opener = null;
@@ -1047,7 +1047,7 @@
   function adminTrackingUrl(trackingPath) {
     const url = new URL(trackingPath, global.location.href);
     const reference = url.searchParams.get("ref");
-    return global.FRJ_API.shortTrackingUrl(reference, "d1");
+    return global.FRJ_API.shortTrackingUrl(reference);
   }
 
   function createHistoryPanel(order) {
