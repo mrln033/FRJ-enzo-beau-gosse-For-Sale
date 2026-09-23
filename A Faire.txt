@@ -20,7 +20,7 @@ Convention d'identification à compter du 31/08/2026 :
 ----------------------------------------
 POINT DE REPRISE — 23/09/2026
 
-T-025 réalisée et publiée : actualisation manuelle des MU des Devis Admin selon profil, hors promotions ; MU absent/invalide/périmé conservé et signalé en rouge. 275 tests réussis. Validation utilisateur en production attendue. Prochain identifiant : T-026 ; d.4 reste en attente de cadrage.
+T-025 terminée et validée par l'utilisateur en production le 23/09/2026 : actualisation manuelle des MU des Devis Admin selon profil, hors promotions ; MU absent/invalide/périmé conservé et signalé en rouge. 275 tests réussis. Prochain identifiant : T-026 ; d.4 reste en attente de cadrage.
 
 T-024 terminée et validée par l'utilisateur en production le 23/09/2026 : D1 prioritaire sans backend dans l'URL, secours GAS automatique des lectures, préférence explicite conservée pour contrôle. Liens ordinaires et de suivi sans backend ajouté ; imports et circuits D1 spécialisés inchangés. Prochain identifiant : T-025.
 
@@ -44,15 +44,14 @@ DEMANDES  => CE QUI EST A FAIRE
 
 T-022 réalisée ci-dessous ; validation utilisateur en production attendue.
 
-T-025 réalisée ci-dessous ; validation utilisateur en production attendue.
-
 [EN ATTENTE DE CADRAGE]
 d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> ajouter un bouton 'Supprimer' à chaque demande avec message de confirmation. Celà supprimerais l'enregistrement complet dans D1. Propagation Discord avec modification du statut en 'SUPPRIMEE' pour archivage.
 
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
 
-23/09/2026 — T-025 [ÉVOLUTION] [RÉALISÉE — VALIDATION PRODUCTION ATTENDUE] — Actualisation des MU des Devis Admin.
+23/09/2026 — T-025 [ÉVOLUTION] [TERMINÉE — VALIDÉE EN PRODUCTION] — Actualisation des MU des Devis Admin.
+Validation finale utilisateur reçue le 23/09/2026 : « T-025 validé ». Commit b19161d publié sur GitHub Pages ; contrôleur et styles servis vérifiés identiques. Worker 6c85c57b-3dbf-4df8-8d9d-53843b8887ff publié.
 Demande originale :
 T-025  ==>  Devis
 	Les MU changent et évoluent... J'aimerais ajouter un bouton sur les Devis afin de pouvoir les mettre à jour selon le profil (MU Public ou MU FRJ).
