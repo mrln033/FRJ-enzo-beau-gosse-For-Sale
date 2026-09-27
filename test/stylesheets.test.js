@@ -8,6 +8,17 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 const htmlFiles = (await readdir(root)).filter((name) => name.endsWith(".html"));
 const commandesCss = await readFile(path.join(root, "css/pages/commandes.css"), "utf8");
 
+test("T-026 : cadrage bilingue et sélecteur latéral sans agrandir les cases ou la hauteur réservée", async () => {
+  const css = await readFile(path.join(root, "css/site.css"), "utf8");
+  const html = await readFile(path.join(root, "index.html"), "utf8");
+  assert.match(css, /\.rayon-header-space\s*\{[^}]*aspect-ratio:\s*453\s*\/\s*35/);
+  assert.match(css, /\.rayon-header-window\[data-design="v19"\]\s*\{[^}]*min\(540px, 100%\)/);
+  assert.match(css, /\[data-lang="FR"\][^{]*\{[^}]*12\s*\/\s*152/);
+  assert.match(css, /@container\s*\(max-width: 760px\)/);
+  assert.match(css, /\.category-button\s*\{[^}]*width:\s*60px;[^}]*height:\s*60px;/);
+  assert.ok(html.indexOf('id="inventoryHeaderLayout"') < html.indexOf('id="inventoryDesign"'));
+});
+
 test("toutes les feuilles référencées par les pages existent", async () => {
   for (const name of htmlFiles) {
     const html = await readFile(path.join(root, name), "utf8");

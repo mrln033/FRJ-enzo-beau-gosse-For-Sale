@@ -227,6 +227,10 @@ document.addEventListener("DOMContentLoaded", () => {
     select.value = inventoryDesign;
     document.getElementById("inventoryDesignLabel").textContent = t("inventoryDesign");
     document.getElementById("inventoryDesignOld").textContent = t("inventoryOld");
+    const headerWindow = document.getElementById("storageHeaderWindow");
+    document.getElementById("inventoryHeaderLayout").dataset.design = inventoryDesign;
+    headerWindow.dataset.design = inventoryDesign;
+    headerWindow.dataset.lang = currentLang === "FR" ? "FR" : "EN";
     const header = document.getElementById("storageHeader");
     header.src = IMG_URL + t(inventoryDesign === "v19" ? "img_storage_v19" : "img_storage");
     header.alt = t("inventoryHeader");

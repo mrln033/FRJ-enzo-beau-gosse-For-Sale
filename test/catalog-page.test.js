@@ -264,6 +264,11 @@ test("le catalogue démarre avec les traductions et les catégories disponibles"
   assert.match(button.children[0].src, /V19_03_Armors.png$/);
   assert.equal(button.children[1].textContent, "5");
   assert.equal(button.title, "Armors");
+  assert.equal(getElement("storageHeaderWindow").dataset.design, "v19");
+  assert.equal(getElement("storageHeaderWindow").dataset.lang, "EN");
+  context.setLanguage("FR");
+  assert.equal(getElement("storageHeaderWindow").dataset.lang, "FR");
+  assert.match(getElement("storageHeader").src, /V19_00_EnTete-Storage-FR.png$/);
 });
 
 test("T-026 : V19 par défaut, ordre propre et trois images de chaque design", async () => {

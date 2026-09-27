@@ -2,7 +2,7 @@
 
 ## Fonctionnement
 
-Depuis le 27/09/2026, **V19** est le choix par défaut. La petite liste **Design**, au-dessus du bandeau, permet de choisir **Ancien / Old**. Le choix est conservé dans le navigateur (`FRJ_INVENTORY_DESIGN`), indépendamment de la langue et du profil. Une valeur absente ou inconnue revient à V19.
+Depuis le 27/09/2026, **V19** est le choix par défaut. La petite liste sombre **Design**, juste à droite de l'en-tête centré (juste dessous sur écran étroit), permet de choisir **Ancien / Old**. Le choix est conservé dans le navigateur (`FRJ_INVENTORY_DESIGN`), indépendamment de la langue et du profil. Une valeur absente ou inconnue revient à V19.
 
 Changer de design ne recharge pas les données, ne modifie pas l'URL, la catégorie, le rayon, le panier ou le profil et n'enregistre pas une nouvelle visite de catégorie.
 
@@ -16,7 +16,9 @@ Les catégories sans stock publiable restent masquées. Les noms internes STORAG
 
 Précision finale validée en conversation : conserver l'**emplacement historique de 60 × 60 px**, en largeur comme en hauteur, sans étirement ni élargissement du bandeau. Les PNG V19 de 52 × 38 px sont affichés à environ **60 × 43,85 px**, centrés dans cet emplacement. Les PNG anciens restent à 60 × 60 px. L'espacement de 10 px et les retours à la ligne sont conservés.
 
-L'en-tête occupe une boîte commune de ratio 453/35, limitée à 400 px de large ; chaque PNG garde ses proportions. Le sélecteur est extérieur au bandeau pour ne pas en augmenter la hauteur. Les tuiles d'articles, calculatrices, stickers et prix ne changent pas.
+La hauteur réservée à l'en-tête reste celle de la boîte historique de ratio 453/35, limitée à 400 px de large. Depuis le complément demandé le 27/09/2026, l'image V19 est affichée dans une fenêtre de **540 px maximum** (environ +35 %), en utilisant l'espace libre existant avant les boutons, sans agrandir le bandeau. Sur un conteneur de 760 px ou moins, la fenêtre est limitée à 400 px et à la largeur disponible ; le sélecteur passe dessous dans l'espacement déjà réservé. Le centrage de l'en-tête est indépendant de la largeur du sélecteur. Couleurs sombres, contours discrets et focus clavier visible.
+
+Les PNG sources restent intacts : le cadrage CSS masque leur marge blanche et compense le décalage de six pixels entre EN et FR. Fenêtre source commune 2099 × 152 px : x=2, y=6 en EN / y=12 en FR (source 2101 × 164). L'image conserve ses proportions. Ce cadrage dépend des fichiers fournis : le réévaluer si les PNG sont remplacés. Les tuiles d'articles, calculatrices, stickers et prix ne changent pas.
 
 Les 35 nouveaux PNG utilisés sont dans `img/storage/V19_*.png` (deux en-têtes et onze boutons à trois états). La capture de référence `V19_Visuel_Compteurs_d_Items.png` et les archives ZIP de préparation ne sont pas nécessaires au site et restent locales.
 

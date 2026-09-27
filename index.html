@@ -3,7 +3,7 @@
   <head>
     <base target="_self">
 	<link rel="icon" href="./favicon.ico">
-	<link rel="stylesheet" href="./css/site.css?v=20260927-1">
+	<link rel="stylesheet" href="./css/site.css?v=20260927-2">
 	<link rel="stylesheet" href="./css/components/cart.css?v=20260820-1">
 	<script src="./js/admin-session.js?v=20260820-1"></script>
 	<script src="./js/langues.js?v=20260927-1"></script>
@@ -11,7 +11,7 @@
 <script src="./js/api-client.js?v=20260927-1"></script>
 	<script src="./js/common/order-ui.js?v=20260904-1"></script>
 	<script defer src="./js/visit-tracking.js?v=20260831-1"></script>
-	<script defer src="./js/pages/index.js?v=20260927-1"></script>
+	<script defer src="./js/pages/index.js?v=20260927-2"></script>
 	<script defer src="./js/cart.js?v=20260910-2"></script>
 	<script defer src="./js/admin-menu.js?v=20260830-1"></script>
 	<title>[FRJ] - enzo beau gosse : Item List</title>
@@ -54,16 +54,19 @@
     <div align="center"><b><p id="subtitle">PM Offer InGame @ enzo beau gosse  |  -=> New Oxford Storage <=-</b></div>
     <hr>
 	<a name="top"></a>
-	<div class="inventory-design-control">
-			<label id="inventoryDesignLabel" for="inventoryDesign">Design</label>
-			<select id="inventoryDesign">
-				<option value="v19" selected>V19</option>
-				<option id="inventoryDesignOld" value="old">Old</option>
-			</select>
-	</div>
 	<div class="rayon-images">
-		<div class="rayon-header-container">
-			<img id="storageHeader" class="rayon-header" alt="">
+		<div id="inventoryHeaderLayout" class="rayon-header-container">
+			<div class="rayon-header-space" aria-hidden="true"></div>
+			<div id="storageHeaderWindow" class="rayon-header-window">
+				<img id="storageHeader" class="rayon-header" alt="">
+			</div>
+			<div class="inventory-design-control">
+				<label id="inventoryDesignLabel" for="inventoryDesign">Design</label>
+				<select id="inventoryDesign">
+					<option value="v19" selected>V19</option>
+					<option id="inventoryDesignOld" value="old">Old</option>
+				</select>
+			</div>
 		</div>
 		<div id="rayonImages"></div>
 	</div>

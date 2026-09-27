@@ -54,6 +54,7 @@ d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> a
 REALISATIONS ==> CE QUI A ETE FAIT :
 
 27/09/2026 — T-026 [ÉVOLUTION] [RÉALISÉE — VALIDATION PRODUCTION ATTENDUE] — En-tête et boutons V19 / Ancien.
+Complément du 27/09/2026 : alignement des en-têtes EN/FR et marge blanche corrigés par cadrage CSS, PNG originaux intacts (décalage source de 6 px). En-tête V19 agrandi à 540 px maximum, proportions et hauteur totale du bandeau conservées ; boutons toujours dans des cases 60 × 60 px. Sélecteur Design déplacé juste à droite de l'en-tête, qui reste centré, couleurs fondues dans le décor sombre ; sous l'en-tête lorsque la largeur manque, dans l'espace déjà réservé. Tests Chromium 1280/768/375 px : hauteur du bandeau identique, cadrage FR/EN et proportions contrôlés. 284 tests automatisés. Frontend uniquement, aucun déploiement GAS/Worker requis. Retour ciblé de ce complément depuis 096dd83 ; guide mis à jour. Validation utilisateur attendue.
 Publication vérifiée : commit c7be91c poussé, build GitHub Pages terminé ; cinq fichiers frontend et 35 PNG servis identiques. Contrôles navigateur sur le site de production avec D1 puis GAS : compteurs concordants, deux designs/ordres, sélection directe et langues opérationnels, aucune erreur JavaScript. Visites de test neutralisées. Validation finale utilisateur toujours attendue.
 Demande originale :
 T-026  ==> [EVOLUTION] [A FAIRE] Entête et Boutons d'inventaire.

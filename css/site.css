@@ -339,6 +339,7 @@ html[data-frj-backend="d1"] .backend-status-dot {
 .MU-style del, #calcSell del { opacity: .65; margin-right: 4px; }
 
 .rayon-images {
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -402,34 +403,85 @@ html[data-frj-backend="d1"] .backend-status-dot {
 }
 
 .inventory-design-control {
+  position: absolute;
+  left: calc(50% + var(--header-display-width) / 2 + 8px);
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
-  justify-content: flex-end;
   align-items: center;
   gap: 6px;
-  color: #555;
-  font-size: 12px;
-  margin-bottom: 4px;
+  color: #8e9caa;
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 .inventory-design-control select {
+  color-scheme: dark;
   font: inherit;
-  color: inherit;
-  background: transparent;
-  border: 1px solid #b7bcc5;
+  color: #b4c1c8;
+  background: #10181d;
+  border: 1px solid #36464c;
   border-radius: 4px;
-  padding: 2px 4px;
+  height: 18px;
+  padding: 0 3px;
+}
+
+.inventory-design-control select:focus-visible {
+  outline: 1px solid #a6d889;
+  outline-offset: 2px;
 }
 
 .rayon-header-container {
+  --header-display-width: 400px;
   position: relative;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.rayon-header-container[data-design="v19"] {
+  --header-display-width: 540px;
+}
+
+.rayon-header-container[data-design="v19"] .inventory-design-control {
+  top: calc(540px * 152 / 2099 / 2);
+}
+
+/* Le témoin réserve exactement la hauteur précédente, quel que soit le design.
+   L'en-tête V19 agrandi utilise uniquement l'espace libre avant les boutons. */
+.rayon-header-space {
   width: min(400px, 100%);
   aspect-ratio: 453 / 35;
   margin-inline: auto;
-  text-align: center;
-  margin-bottom: 10px;
+}
+
+.rayon-header-window {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(400px, 100%);
+  aspect-ratio: 453 / 35;
+  overflow: hidden;
+}
+
+.rayon-header-window[data-design="v19"] {
+  width: min(540px, 100%);
+  aspect-ratio: 2099 / 152;
+}
+
+/* Sources 2101x164 : cadrage commun x=2, y=6 EN / y=12 FR, 2099x152.
+   Le PNG reste proportionnel ; seule sa marge blanche est masquée. */
+.rayon-header-window[data-design="v19"] .rayon-header {
+  width: calc(100% * 2101 / 2099);
+  max-width: none;
+  height: auto;
+  left: calc(-100% * 2 / 2099);
+  top: calc(-100% * 6 / 152);
+  transform: none;
+}
+
+.rayon-header-window[data-design="v19"][data-lang="FR"] .rayon-header {
+  top: calc(-100% * 12 / 152);
 }
 
 .rayon-header {
@@ -442,6 +494,20 @@ html[data-frj-backend="d1"] .backend-status-dot {
   max-width: 100%;
   object-fit: contain;
   display: block;
+}
+
+/* Faute de place latérale, utiliser l'espacement déjà réservé sous l'en-tête.
+   Aucun chevauchement et aucune hauteur ajoutée au bandeau, même à 375px. */
+@container (max-width: 760px) {
+  .rayon-header-window[data-design="v19"] {
+    width: min(400px, 100%);
+  }
+  .rayon-header-container .inventory-design-control,
+  .rayon-header-container[data-design="v19"] .inventory-design-control {
+    top: calc(100% + 1px);
+    left: 50%;
+    transform: translateX(-50%);
+  }
 }
 
 /* =========================
