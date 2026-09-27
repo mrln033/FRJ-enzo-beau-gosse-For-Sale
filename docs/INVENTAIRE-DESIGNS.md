@@ -66,6 +66,8 @@ Frontend : commit `c7be91c` publié sur GitHub Pages le 27/09/2026 (build termin
 
 ## Retour arrière ciblé
 
+Publication finale des ajustements d'en-tête : commit `b3e5eb6`, build GitHub Pages terminé. Trois fichiers frontend et les deux nouveaux PNG servis vérifiés identiques. 285 tests réussis, contrôles Chromium avec 1/2/3/11 boutons à 1280/768/375 px, puis contrôle réel sur D1 et GAS : en-tête à gauche et sélecteur à droite des boutons (295/985 px sur la vue 1280 px), image entière de 233,33 × 40 px, aucune erreur JavaScript. Validation utilisateur en production attendue.
+
 Complément nouveaux en-têtes : état préalable `35b52b5` (fichiers utilisateur déjà enregistrés). **Ne pas réappliquer l'ancien cadrage CSS aux PNG 350 × 60** : il visait les anciens fichiers 2101 × 164. Préférer le sélecteur Ancien pour un retour immédiat. Un retour complet vers `096dd83` doit restaurer ensemble les fichiers frontend et les deux anciens PNG d'en-tête, en conservant les nouvelles images dans l'historique Git ; ne pas écraser de modifications utilisateur ultérieures.
 
 1. Pour un retour visuel individuel immédiat, sélectionner **Ancien / Old**.
