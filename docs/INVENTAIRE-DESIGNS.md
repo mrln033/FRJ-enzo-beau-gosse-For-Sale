@@ -1,5 +1,7 @@
 # Inventaire : designs V19 et Ancien (T-026)
 
+T-026 terminée : **les deux designs V19 et Ancien / Old ont été validés par l'utilisateur en production le 27/09/2026**, après publication des derniers alignements avec le commit `699c0f4`. Cette validation lève les attentes des publications intermédiaires ci-dessous. Les procédures de retour restent disponibles.
+
 ## Fonctionnement
 
 Depuis le 27/09/2026, **V19** est le choix par défaut. La petite liste sombre **Design**, sur la même ligne que l'en-tête, permet de choisir **Ancien / Old**. Le choix est conservé dans le navigateur (`FRJ_INVENTORY_DESIGN`), indépendamment de la langue et du profil. Une valeur absente ou inconnue revient à V19.
