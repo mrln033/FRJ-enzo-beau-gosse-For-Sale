@@ -8,15 +8,20 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 const htmlFiles = (await readdir(root)).filter((name) => name.endsWith(".html"));
 const commandesCss = await readFile(path.join(root, "css/pages/commandes.css"), "utf8");
 
-test("T-026 : cadrage bilingue et sélecteur latéral sans agrandir les cases ou la hauteur réservée", async () => {
+test("T-026 : nouveaux en-têtes entiers et sélecteur côte à côte, cases et hauteur réservée inchangées", async () => {
   const css = await readFile(path.join(root, "css/site.css"), "utf8");
   const html = await readFile(path.join(root, "index.html"), "utf8");
   assert.match(css, /\.rayon-header-space\s*\{[^}]*aspect-ratio:\s*453\s*\/\s*35/);
-  assert.match(css, /\.rayon-header-window\[data-design="v19"\]\s*\{[^}]*min\(540px, 100%\)/);
-  assert.match(css, /\[data-lang="FR"\][^{]*\{[^}]*12\s*\/\s*152/);
-  assert.match(css, /@container\s*\(max-width: 760px\)/);
+  assert.match(css, /\.rayon-header-window\[data-design="v19"\]\s*\{[^}]*350px\s*\*\s*40\s*\/\s*60/);
+  assert.doesNotMatch(css, /2099|\[data-lang="FR"\]/);
+  assert.match(css, /\.inventory-header-controls\s*\{[^}]*height:\s*40px;[^}]*display:\s*flex;/);
   assert.match(css, /\.category-button\s*\{[^}]*width:\s*60px;[^}]*height:\s*60px;/);
   assert.ok(html.indexOf('id="inventoryHeaderLayout"') < html.indexOf('id="inventoryDesign"'));
+  for (const lang of ["EN", "FR"]) {
+    const png = await readFile(path.join(root, "img/storage/V19_00_EnTete-Storage-" + lang + ".png"));
+    assert.equal(png.readUInt32BE(16), 350);
+    assert.equal(png.readUInt32BE(20), 60);
+  }
 });
 
 test("toutes les feuilles référencées par les pages existent", async () => {

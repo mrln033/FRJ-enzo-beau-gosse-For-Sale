@@ -268,7 +268,7 @@ test("le catalogue démarre avec les traductions et les catégories disponibles"
   assert.equal(getElement("storageHeaderWindow").dataset.lang, "EN");
   context.setLanguage("FR");
   assert.equal(getElement("storageHeaderWindow").dataset.lang, "FR");
-  assert.match(getElement("storageHeader").src, /V19_00_EnTete-Storage-FR.png$/);
+  assert.match(getElement("storageHeader").src, /V19_00_EnTete-Storage-FR\.png\?v=/);
 });
 
 test("T-026 : V19 par défaut, ordre propre et trois images de chaque design", async () => {
@@ -320,6 +320,15 @@ test("T-026 : préférence Ancien conservée, préférence absente ou invalide =
     const { context } = loadCatalogController("", value);
     assert.equal(vm.runInContext("inventoryDesign", context), value === "old" ? "old" : "v19");
   }
+});
+
+test("T-026 : alignement sur les boutons ou groupe centré côte à côte sans débordement", () => {
+  const { context } = loadCatalogController();
+  const place = (...args) => JSON.parse(JSON.stringify(context.getInventoryHeaderPlacement(...args)));
+  assert.deepEqual(place(1000, 150, 850, 233, 90), { left: 150, width: 700, mode: "aligned" });
+  assert.deepEqual(place(1000, 470, 530, 233, 90), { left: 332.5, width: 335, mode: "centered" });
+  assert.deepEqual(place(289, 0, 270, 233, 90), { left: 0, width: 289, mode: "centered" });
+  assert.deepEqual(place(1000, 0, 0, 400, 90), { left: 249, width: 502, mode: "centered" });
 });
 
 test("T-026 : réponse tardive d'une catégorie ne remplace pas la sélection courante", async () => {

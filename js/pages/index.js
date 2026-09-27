@@ -4,6 +4,11 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("btnEN").addEventListener("click", () => setLanguage("EN"));
   document.getElementById("btnFR").addEventListener("click", () => setLanguage("FR"));
   document.getElementById("rayonFilter").addEventListener("change", applyFilter);
+  if (typeof ResizeObserver === "function") {
+    new ResizeObserver(positionInventoryHeader).observe(document.getElementById("rayonImages"));
+  } else {
+    window.addEventListener("resize", positionInventoryHeader);
+  }
   document.getElementById("inventoryDesign").addEventListener("change", event => {
     inventoryDesign = event.target.value === "old" ? "old" : "v19";
     try { localStorage.setItem(INVENTORY_DESIGN_KEY, inventoryDesign); } catch {}
@@ -232,9 +237,35 @@ document.addEventListener("DOMContentLoaded", () => {
     headerWindow.dataset.design = inventoryDesign;
     headerWindow.dataset.lang = currentLang === "FR" ? "FR" : "EN";
     const header = document.getElementById("storageHeader");
-    header.src = IMG_URL + t(inventoryDesign === "v19" ? "img_storage_v19" : "img_storage");
+    header.src = IMG_URL + t(inventoryDesign === "v19" ? "img_storage_v19" : "img_storage") + "?v=20260927-3";
     header.alt = t("inventoryHeader");
     updateCategoryCounts();
+    positionInventoryHeader();
+  }
+
+  function getInventoryHeaderPlacement(availableWidth, buttonLeft, buttonRight, headerWidth, selectorWidth) {
+    const needed = headerWidth + selectorWidth + 12;
+    const span = Math.max(0, buttonRight - buttonLeft);
+    if (span >= needed) return { left: buttonLeft, width: span, mode: "aligned" };
+    const width = Math.min(availableWidth, needed);
+    return { left: (availableWidth - width) / 2, width, mode: "centered" };
+  }
+
+  function positionInventoryHeader() {
+    const layout = document.getElementById("inventoryHeaderLayout");
+    const controls = document.getElementById("inventoryHeaderControls");
+    if (!layout?.getBoundingClientRect || !controls) return;
+    const bounds = layout.getBoundingClientRect();
+    const buttons = [...document.querySelectorAll(".category-button")].map(button => button.getBoundingClientRect());
+    // Sur plusieurs lignes, les bords extérieurs de la grille restent la référence.
+    const left = buttons.length ? Math.min(...buttons.map(button => button.left)) - bounds.left : 0;
+    const right = buttons.length ? Math.max(...buttons.map(button => button.right)) - bounds.left : 0;
+    const selector = controls.querySelector(".inventory-design-control").getBoundingClientRect();
+    const placement = getInventoryHeaderPlacement(bounds.width, left, right,
+      inventoryDesign === "v19" ? 350 * 40 / 60 : 400, selector.width);
+    controls.style.left = placement.left + "px";
+    controls.style.width = placement.width + "px";
+    controls.dataset.placement = placement.mode;
   }
 
 	function getCategoryFromUrl() {

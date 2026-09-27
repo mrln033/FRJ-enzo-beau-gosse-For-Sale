@@ -2,7 +2,7 @@
 
 ## Fonctionnement
 
-Depuis le 27/09/2026, **V19** est le choix par défaut. La petite liste sombre **Design**, juste à droite de l'en-tête centré (juste dessous sur écran étroit), permet de choisir **Ancien / Old**. Le choix est conservé dans le navigateur (`FRJ_INVENTORY_DESIGN`), indépendamment de la langue et du profil. Une valeur absente ou inconnue revient à V19.
+Depuis le 27/09/2026, **V19** est le choix par défaut. La petite liste sombre **Design**, sur la même ligne que l'en-tête, permet de choisir **Ancien / Old**. Le choix est conservé dans le navigateur (`FRJ_INVENTORY_DESIGN`), indépendamment de la langue et du profil. Une valeur absente ou inconnue revient à V19.
 
 Changer de design ne recharge pas les données, ne modifie pas l'URL, la catégorie, le rayon, le panier ou le profil et n'enregistre pas une nouvelle visite de catégorie.
 
@@ -16,9 +16,17 @@ Les catégories sans stock publiable restent masquées. Les noms internes STORAG
 
 Précision finale validée en conversation : conserver l'**emplacement historique de 60 × 60 px**, en largeur comme en hauteur, sans étirement ni élargissement du bandeau. Les PNG V19 de 52 × 38 px sont affichés à environ **60 × 43,85 px**, centrés dans cet emplacement. Les PNG anciens restent à 60 × 60 px. L'espacement de 10 px et les retours à la ligne sont conservés.
 
-La hauteur réservée à l'en-tête reste celle de la boîte historique de ratio 453/35, limitée à 400 px de large. Depuis le complément demandé le 27/09/2026, l'image V19 est affichée dans une fenêtre de **540 px maximum** (environ +35 %), en utilisant l'espace libre existant avant les boutons, sans agrandir le bandeau. Sur un conteneur de 760 px ou moins, la fenêtre est limitée à 400 px et à la largeur disponible ; le sélecteur passe dessous dans l'espacement déjà réservé. Le centrage de l'en-tête est indépendant de la largeur du sélecteur. Couleurs sombres, contours discrets et focus clavier visible.
+La hauteur réservée à l'en-tête reste celle de la boîte historique de ratio 453/35, limitée à 400 px de large. Les **nouveaux PNG utilisateur de 350 × 60 px** remplacent les fichiers initiaux de 2101 × 164 px. Ils sont affichés **entiers**, sans recadrage ni déformation, à **40 px de haut maximum** (environ 233,33 px de large). Cette rangée utilise l'espace libre existant avant les boutons sans agrandir le bandeau. Le design Ancien garde son image de 400 px maximum.
 
-Les PNG sources restent intacts : le cadrage CSS masque leur marge blanche et compense le décalage de six pixels entre EN et FR. Fenêtre source commune 2099 × 152 px : x=2, y=6 en EN / y=12 en FR (source 2101 × 164). L'image conserve ses proportions. Ce cadrage dépend des fichiers fournis : le réévaluer si les PNG sont remplacés. Les tuiles d'articles, calculatrices, stickers et prix ne changent pas.
+Règle finale d'alignement demandée le 27/09/2026 :
+
+- si la largeur des boutons suffit, l'en-tête commence sur le bord gauche du premier bouton et le sélecteur se termine sur le bord droit du dernier ;
+- sur plusieurs lignes, les bords extérieurs de l'ensemble des boutons servent de référence ;
+- avec trop peu de boutons, l'ensemble en-tête + sélecteur est **centré côte à côte**, avec 12 px d'écart ;
+- sur écran étroit, seule l'image est réduite proportionnellement, le sélecteur reste lisible et sur la même ligne ;
+- placement recalculé au changement de design, de langue, au chargement des catégories et au redimensionnement, sans appel réseau supplémentaire.
+
+Le sélecteur conserve ses couleurs sombres, contours discrets et focus clavier visible. L'ancien recadrage spécifique FR/EN et le passage du sélecteur sous l'en-tête sont supprimés. Les PNG utilisateur restent intacts ; leur URL est versionnée pour éviter l'ancien fichier en cache. Les tuiles d'articles, calculatrices, stickers et prix ne changent pas.
 
 Les 35 nouveaux PNG utilisés sont dans `img/storage/V19_*.png` (deux en-têtes et onze boutons à trois états). La capture de référence `V19_Visuel_Compteurs_d_Items.png` et les archives ZIP de préparation ne sont pas nécessaires au site et restent locales.
 
@@ -57,6 +65,8 @@ Publication backend du 27/09/2026 :
 Frontend : commit `c7be91c` publié sur GitHub Pages le 27/09/2026 (build terminé). Les cinq fichiers frontend et les 35 PNG servis ont été vérifiés identiques. Contrôles Chromium sur le site public avec D1 puis `backend=gas` : dix catégories, compteurs concordants, sélection directe, FR/EN et V19/Ancien, aucune erreur JavaScript. Les appels de statistiques ont été neutralisés pendant ces contrôles pour ne pas gonfler les visites. 283 tests automatisés réussis. Validation finale utilisateur attendue en production.
 
 ## Retour arrière ciblé
+
+Complément nouveaux en-têtes : état préalable `35b52b5` (fichiers utilisateur déjà enregistrés). **Ne pas réappliquer l'ancien cadrage CSS aux PNG 350 × 60** : il visait les anciens fichiers 2101 × 164. Préférer le sélecteur Ancien pour un retour immédiat. Un retour complet vers `096dd83` doit restaurer ensemble les fichiers frontend et les deux anciens PNG d'en-tête, en conservant les nouvelles images dans l'historique Git ; ne pas écraser de modifications utilisateur ultérieures.
 
 1. Pour un retour visuel individuel immédiat, sélectionner **Ancien / Old**.
 2. Pour retirer l'évolution, rétablir les fichiers frontend du lot depuis le commit préalable `5e63d65`, puis republier GitHub Pages. Ne pas annuler les changements ultérieurs ni supprimer les fichiers utilisateur non suivis.
