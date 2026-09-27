@@ -1,5 +1,7 @@
 # FRJ For Sale API — Cloudflare Worker + D1
 
+T-026 (27/09/2026) : lecture publique `?action=categorySummary`, `{categories, counts}`. Une requête SQL agrégée par catégorie, articles distincts actifs et stock Enzo vendable positif ; cache public habituel, aucune écriture/migration/Queue. Worker `bfd78af1-20f5-456a-9acc-dfaa803f5369`. Ancienne action `categories` compatible et inchangée. Voir [fonctionnement et retour ciblé](../../docs/INVENTAIRE-DESIGNS.md).
+
 T-025 (23/09/2026) : POST Admin `/admin/orders/<id>/refresh-markups`, corps `{operationId, baseRevision}`. Module `src/quote-markup.js` : MU valides/frais du profil, sans promotion ni filtre stock, prix TT/quantités conservés. Bilan et valeurs antérieures dans l'historique existant, garde de révision et reçu idempotent atomiques ; Discord et miroir GAS habituels. Sans migration. 275 tests ; sauvegarde et retour ciblé dans [Devis Admin](../../docs/DEVIS-ADMIN.md).
 
 T-022 (13/09/2026) : l'origine visible dans la liste Admin et Discord est **Client** (d1 ou gas-fallback) ou **Admin** (d1-admin, saisie manuelle et duplication). Le backend technique reste conservé dans source_backend/sourceBackend pour l'historique et la synchronisation. Aucun changement de données ou de statut ; convertir une demande en Devis Admin conserve l'origine de sa saisie initiale.

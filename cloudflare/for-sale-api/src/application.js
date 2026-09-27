@@ -98,6 +98,29 @@ export async function handleGet(url, env) {
     return publicJson({ cart: isCartEnabled(env) });
   }
 
+  if (action === "categorySummary") {
+    // Une seule lecture agrégée : un article présent dans plusieurs rayons
+    // ne compte qu'une fois, les quantités et conteneurs suivent le catalogue.
+    const result = await env.DB.prepare(`
+      SELECT l.storage, COUNT(DISTINCT l.item_name COLLATE NOCASE) AS item_count
+      FROM catalog_listings l
+      JOIN catalog_items c ON c.name = l.item_name COLLATE NOCASE
+      WHERE l.enabled = 1 AND l.storage <> '' AND l.aisle <> ''
+        AND EXISTS (
+          SELECT 1 FROM saleable_inventory ii
+          WHERE ii.avatar_id = 'enzo'
+            AND ii.item_name = l.item_name COLLATE NOCASE
+          GROUP BY ii.item_name COLLATE NOCASE
+          HAVING SUM(ii.quantity) > 0
+        )
+      GROUP BY l.storage ORDER BY l.storage
+    `).all();
+    return publicJson({
+      categories: result.results.map(row => row.storage),
+      counts: Object.fromEntries(result.results.map(row => [row.storage, row.item_count]))
+    });
+  }
+
   if (action === "categories") {
     const result = await env.DB.prepare(`
       SELECT DISTINCT l.storage

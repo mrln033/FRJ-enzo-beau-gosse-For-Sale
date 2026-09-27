@@ -39,6 +39,34 @@ function loadCatalog(overrides = {}) {
   return { context, cache };
 }
 
+test("T-026 : synthèse GAS distincte, positive et mise en cache, colonnes réordonnées", () => {
+  const rows = [
+    ["OTHER", "ITEM", "QUANTITE", "RAYON", "STORAGE", "IMAGE"],
+    ["", "Tool A", 200, "one", "tools", ""],
+    ["", "tool a", 200, "two", "TOOLS", ""],
+    ["", "Tool B", 1, "one", "TOOLS", ""],
+    ["", "Tool C", 0, "one", "TOOLS", ""],
+    ["", "Tool D", -1, "one", "TOOLS", ""],
+    ["", "Tool E", 1, "", "TOOLS", ""]
+  ];
+  const ranges = [];
+  let openings = 0;
+  const { context } = loadCatalog({ SpreadsheetApp: { openById() {
+    openings++;
+    return { getSheetByName: () => ({
+      getLastRow: () => rows.length, getLastColumn: () => rows[0].length,
+      getRange(row, col, count, width) {
+        ranges.push([row, col, count, width]);
+        return { getValues: () => rows.slice(row - 1, row - 1 + count).map(r => r.slice(col - 1, col - 1 + width)) };
+      }
+    })};
+  }}});
+  assert.deepEqual(JSON.parse(JSON.stringify(context.getCategorySummary())), { categories: ["TOOLS"], counts: { TOOLS: 2 } });
+  assert.equal(context.getCategorySummary().counts.TOOLS, 2);
+  assert.equal(openings, 1);
+  assert.deepEqual(ranges[1], [2, 2, 6, 4]);
+});
+
 test("d.6.4 lit seulement la tranche utile de BDD_APP puis met les catégories en cache", () => {
   const ranges = [];
   const rows = [

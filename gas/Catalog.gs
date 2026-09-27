@@ -94,6 +94,36 @@ function getDataFast(category) {
   return data;
 }
 
+// Métadonnées V19 : aucune lecture de MU ni de campagne, cache identique au catalogue.
+function getCategorySummary() {
+  const key = FRJ_CATALOG_CACHE_PREFIX + "summary";
+  const cached = frjReadCatalogCache_(key);
+  if (cached !== null) return cached;
+  const sheet = SpreadsheetApp.openById(FRJ_APP_SPREADSHEET_ID).getSheetByName("BDD_APP");
+  if (!sheet || sheet.getLastRow() < 2) return { categories: [], counts: {} };
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const indices = ["STORAGE", "RAYON", "ITEM", "QUANTITE"].map(name => headers.indexOf(name));
+  if (indices.some(index => index < 0)) throw new Error("Colonnes catalogue manquantes");
+  const first = Math.min.apply(null, indices);
+  const last = Math.max.apply(null, indices);
+  const rows = sheet.getRange(2, first + 1, sheet.getLastRow() - 1, last - first + 1).getValues();
+  const items = new Map();
+  rows.forEach(row => {
+    const storage = String(row[indices[0] - first] || "").trim().toUpperCase();
+    const rayon = String(row[indices[1] - first] || "").trim();
+    const item = String(row[indices[2] - first] || "").trim().toLowerCase();
+    if (!storage || !rayon || !item || !(Number(row[indices[3] - first]) > 0)) return;
+    if (!items.has(storage)) items.set(storage, new Set());
+    items.get(storage).add(item);
+  });
+  const categories = Array.from(items.keys()).sort();
+  const counts = {};
+  categories.forEach(category => { counts[category] = items.get(category).size; });
+  const result = { categories: categories, counts: counts };
+  frjWriteCatalogCache_(key, result);
+  return result;
+}
+
 function getAvailableCategories() {
   const cacheKey = FRJ_CATALOG_CACHE_PREFIX + "categories";
   const cached = frjReadCatalogCache_(cacheKey);

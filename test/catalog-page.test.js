@@ -20,7 +20,7 @@ test("index.html charge le contrôleur avant le panier et sans gestionnaire inli
   assert.match(source, /FRJ_VISITS\?\.resetCategoryView\?\.\(\)/);
 });
 
-function loadCatalogController(search = "") {
+function loadCatalogController(search = "", storedDesign = null) {
   const documentListeners = new Map();
   const windowListeners = new Map();
   const logo = { style: {} };
@@ -40,7 +40,7 @@ function loadCatalogController(search = "") {
     window,
     document,
     console,
-    localStorage: { getItem: () => null, setItem: () => {} },
+    localStorage: { getItem: key => key === "FRJ_INVENTORY_DESIGN" ? storedDesign : null, setItem: () => {} },
     navigator: {},
     setTimeout: () => 1,
     CustomEvent: class CustomEvent {},
@@ -191,6 +191,9 @@ test("le catalogue démarre avec les traductions et les catégories disponibles"
     appendChild(child) { this.children.push(child); return child; }
     append(...children) { this.children.push(...children); }
     setAttribute() {}
+    querySelector(selector) {
+      return this.children.find(child => "." + child.className === selector);
+    }
   }
 
   const elements = new Map();
@@ -206,7 +209,8 @@ test("le catalogue démarre avec les traductions et les catégories disponibles"
     getElementById: getElement,
     createElement: () => new Element(),
     createTextNode: (text) => ({ textContent: text }),
-    querySelector: (selector) => selector === ".filter" ? filter : null
+    querySelector: (selector) => selector === ".filter" ? filter : null,
+    querySelectorAll: (selector) => selector === ".category-button" ? getElement("rayonImages").children : []
   };
   const storage = new Map([["lang", "EN"]]);
   const localStorage = {
@@ -218,6 +222,7 @@ test("le catalogue démarre avec les traductions et les catégories disponibles"
     activeBackend: "gas",
     fetch: async (query) => {
       apiCalls.push(query);
+      if (query.includes("categorySummary")) return { json: async () => ({ categories: ["ARMORS"], counts: { ARMORS: 5 } }) };
       if (query.includes("categories")) return { json: async () => ["ARMORS"] };
       return { json: async () => ({ inventoryDate: "20/08/2026" }) };
     }
@@ -250,9 +255,99 @@ test("le catalogue démarre avec les traductions et les catégories disponibles"
   documentListeners.get("DOMContentLoaded")();
   await new Promise((resolve) => setImmediate(resolve));
 
-  assert.deepEqual(apiCalls.sort(), ["?action=categories", "?action=inventoryDate"]);
+  assert.deepEqual(apiCalls.sort(), ["?action=categorySummary", "?action=inventoryDate"]);
   assert.equal(getElement("rayonImages").children.length, 1);
   assert.equal(getElement("rayonFilter").listeners.has("change"), true);
   assert.equal(getElement("btnFR").listeners.has("click"), true);
   assert.equal(getElement("loadingState").style.display, "none");
+  const button = getElement("rayonImages").children[0];
+  assert.match(button.children[0].src, /V19_03_Armors.png$/);
+  assert.equal(button.children[1].textContent, "5");
+  assert.equal(button.title, "Armors");
+});
+
+test("T-026 : V19 par défaut, ordre propre et trois images de chaque design", async () => {
+  const { context } = loadCatalogController();
+  assert.equal(vm.runInContext("inventoryDesign", context), "v19");
+  const categories = vm.runInContext("V19_CATEGORY_ORDER", context);
+  assert.equal(categories.at(-1), "MINDFORCE");
+  for (const design of ["v19", "old"]) {
+    vm.runInContext('inventoryDesign = "' + design + '"', context);
+    for (const category of categories) {
+      const images = context.getCategoryImages(category);
+      for (const file of Object.values(images)) {
+        const buffer = await readFile(new URL("../img/" + file, import.meta.url));
+        assert.equal(buffer.readUInt32BE(16), design === "v19" ? 52 : 44);
+        assert.equal(buffer.readUInt32BE(20), design === "v19" ? 38 : 44);
+      }
+    }
+  }
+});
+
+test("T-026 : références distinctes, total hors sélection, filtre uniquement sur l'onglet actif", () => {
+  const { context } = loadCatalogController();
+  let rayon = "";
+  context.document.getElementById = () => ({ value: rayon });
+  vm.runInContext(`
+    data = [
+      { STORAGE: "TOOLS", ITEM: "Tool A", RAYON: "ONE", QUANTITE: 200 },
+      { STORAGE: "TOOLS", ITEM: "tool a", RAYON: "TWO", QUANTITE: 200 },
+      { STORAGE: "TOOLS", ITEM: "Tool B", RAYON: "ONE", QUANTITE: 1 },
+      { STORAGE: "TOOLS", ITEM: "Tool C", RAYON: "ONE", QUANTITE: 0 }
+    ];
+    categoryCounts = { TOOLS: 2, ARMORS: 7 };
+    selectedCategory = loadedCategory = "TOOLS";
+    isLoading = false;
+  `, context);
+  assert.equal(context.getCategoryCount("TOOLS"), 2);
+  rayon = "TWO";
+  assert.equal(context.getCategoryCount("TOOLS"), 1);
+  assert.equal(context.getCategoryCount("ARMORS"), 7);
+  rayon = "EMPTY";
+  assert.equal(context.getCategoryCount("TOOLS"), 0);
+  vm.runInContext("selectedCategory = null", context);
+  assert.equal(context.getCategoryCount("TOOLS"), 2);
+  assert.equal(context.getCategoryCount("UNKNOWN"), null);
+});
+
+test("T-026 : préférence Ancien conservée, préférence absente ou invalide => V19", () => {
+  for (const value of [null, "v19", "old", "invalid"]) {
+    const { context } = loadCatalogController("", value);
+    assert.equal(vm.runInContext("inventoryDesign", context), value === "old" ? "old" : "v19");
+  }
+});
+
+test("T-026 : réponse tardive d'une catégorie ne remplace pas la sélection courante", async () => {
+  const { context } = loadCatalogController();
+  const pending = [];
+  const rendered = [];
+  context.FRJ_API = { fetch: () => new Promise(resolve => pending.push(resolve)) };
+  context.document.getElementById = () => ({ style: {} });
+  context.document.querySelector = () => ({ style: {} });
+  context.updateCategoryCounts = context.updateFilterVisibility = context.updateRayonFilter = () => {};
+  context.renderCards = () => {};
+  context.applyFilter = () => rendered.push(vm.runInContext("loadedCategory", context));
+  vm.runInContext('selectedCategory = "ARMORS"', context);
+  context.loadCategoryData("ARMORS");
+  vm.runInContext('selectedCategory = "TOOLS"', context);
+  context.loadCategoryData("TOOLS");
+  pending[1]({ json: async () => [{ STORAGE: "TOOLS", ITEM: "Tool", QUANTITE: 1 }] });
+  await new Promise(resolve => setImmediate(resolve));
+  pending[0]({ json: async () => [{ STORAGE: "ARMORS", ITEM: "Armor", QUANTITE: 1 }] });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(rendered, ["TOOLS"]);
+  assert.equal(vm.runInContext("data[0].ITEM", context), "Tool");
+});
+
+test("T-026 : ancien backend sans synthèse conserve les onglets sans inventer de compteurs", async () => {
+  const { context } = loadCatalogController();
+  const calls = [];
+  context.FRJ_API = { fetch: async query => {
+    calls.push(query);
+    return { json: async () => query.includes("Summary") ? [] : ["ARMORS"] };
+  }};
+  const result = await context.loadCategorySummary();
+  assert.deepEqual(Array.from(result.categories), ["ARMORS"]);
+  assert.deepEqual(Object.keys(result.counts), []);
+  assert.deepEqual(calls, ["?action=categorySummary", "?action=categories"]);
 });

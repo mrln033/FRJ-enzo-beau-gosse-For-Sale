@@ -1,5 +1,7 @@
 # Backend Google Apps Script
 
+T-026 (27/09/2026) : GAS **47** publié sur la même Web App et HEAD. Nouvelle lecture publique `?action=categorySummary` : total distinct par catégorie depuis BDD_APP, stock positif, lecture groupée et cache de 300 secondes. Aucune écriture, aucun changement des inventaires/formules/triggers ; seuls Catalog.gs et Code.gs modifiés. Sources distantes comparées avant publication et 17 fichiers relus identiques après. Voir [fonctionnement et retour à la version 46](../docs/INVENTAIRE-DESIGNS.md).
+
 T-025 (23/09/2026) : aucun changement GAS (version 46). Les actualisations de MU des Devis Admin sont reçues par le miroir existant des demandes/lignes et leur événement proposal-changed (commentaire + DETAILS_JSON). Aucun onglet ni trigger ajouté, inventaires inchangés. Le contrôle est exécuté uniquement au clic dans la console Admin côté D1 ; aucune modification automatique depuis GAS.
 
 T-022 (13/09/2026) : l'origine visible dans la liste Admin et Discord est **Client** (d1 ou gas-fallback) ou **Admin** (d1-admin, saisie manuelle et duplication). Le backend technique reste conservé dans source_backend/sourceBackend pour l'historique et la synchronisation. Aucun changement de données ou de statut ; convertir une demande en Devis Admin conserve l'origine de sa saisie initiale.

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
+import { handleGet } from "../cloudflare/for-sale-api/src/application.js";
 
 const applicationSource = await readFile(
   new URL("../cloudflare/for-sale-api/src/application.js", import.meta.url),
@@ -104,6 +105,31 @@ const legacyCategorySql = `
   HAVING SUM(ii.quantity) > 0
   ORDER BY l.storage
 `;
+
+test("T-026 : synthèse D1 distincte, conteneurs et visibilité, une seule lecture sans écriture", async () => {
+  const database = createDatabase();
+  database.exec(`
+    INSERT INTO catalog_listings (item_name, storage, aisle, enabled)
+      VALUES ('item a', 'ARMORS', 'OTHER', 1),
+             ('Item A', 'HIDDEN', 'OTHER', 0),
+             ('Item A', 'NO AISLE', '', 1);
+  `);
+  let reads = 0;
+  const env = { DB: { prepare(sql) {
+    reads++;
+    assert.match(sql, /^\s*SELECT/);
+    return { all: async () => ({ results: database.prepare(sql).all() }) };
+  }}};
+  const response = await handleGet(new URL("https://example.test/?action=categorySummary"), env);
+  const result = await response.json();
+  assert.equal(reads, 1);
+  assert.equal(result.counts.ARMORS, 1);
+  assert.ok(!result.categories.includes("HIDDEN"));
+  assert.ok(!result.categories.includes("NO AISLE"));
+  assert.deepEqual(result.categories, database.prepare(optimizedCategorySql).all().map(row => row.storage));
+  assert.equal(response.headers.get("Cache-Control"), "public, max-age=60, s-maxage=300");
+  database.close();
+});
 
 const optimizedCategorySql = `
   SELECT DISTINCT l.storage

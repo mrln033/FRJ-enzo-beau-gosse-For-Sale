@@ -1,5 +1,7 @@
 # Architecture du projet
 
+T-026 : navigation V19/Ancien et compteurs distincts, sans modification des identifiants métier. La synthèse `?action=categorySummary` remplace la lecture initiale des catégories ; aucune lecture complète des articles par onglet. Le secours de cette seule action vise GAS_APP_URL, les anciennes routes restent inchangées. Voir [le contrat et le retour ciblé](INVENTAIRE-DESIGNS.md).
+
 ## Principes
 
 1. Le frontend GitHub Pages ne dépend pas d'un moteur de rendu GAS ou D1.

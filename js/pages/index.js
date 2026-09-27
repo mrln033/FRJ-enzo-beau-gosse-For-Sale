@@ -4,6 +4,11 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("btnEN").addEventListener("click", () => setLanguage("EN"));
   document.getElementById("btnFR").addEventListener("click", () => setLanguage("FR"));
   document.getElementById("rayonFilter").addEventListener("change", applyFilter);
+  document.getElementById("inventoryDesign").addEventListener("change", event => {
+    inventoryDesign = event.target.value === "old" ? "old" : "v19";
+    try { localStorage.setItem(INVENTORY_DESIGN_KEY, inventoryDesign); } catch {}
+    renderInventoryNavigation();
+  });
   updateLanguageButtons();
   applyTranslations();
   loadInventoryDate();
@@ -13,53 +18,12 @@ document.addEventListener("DOMContentLoaded", () => {
   container.innerHTML = "";
 
   // Le backend décide quelles catégories possèdent réellement du stock publiable.
-  FRJ_API.fetch("?action=categories")
-    .then(res => res.json())
-    .then(categories => {
-
-      Object.keys(CATEGORY_IMAGES).forEach(cat => {
-
-        // Ignorer une catégorie vide évite de créer un onglet inutilisable.
-        if (!categories.includes(cat)) return;
-
-        const img = document.createElement("img");
-        const config = CATEGORY_IMAGES[cat];
-
-        img.src = IMG_URL + config.normal;
-        img.className = "rayon-img";
-        img.dataset.category = cat;
-        img.title = cat;
-
-        img.onmouseenter = () => {
-          if (selectedCategory !== cat) {
-            img.src = IMG_URL + config.hover;
-          }
-        };
-
-        img.onmouseleave = () => {
-          if (selectedCategory !== cat) {
-            img.src = IMG_URL + config.normal;
-          }
-        };
-
-		img.onclick = () => {
-
-		  if (selectedCategory === cat) {
-			selectedCategory = null;
-			updateCategoryUrl("");
-			resetCategories();
-            resetRayonFilter();
-            updateFilterVisibility();
-            renderCards([]);
-            window.FRJ_VISITS?.resetCategoryView?.();
-            return;
-          }
-
-		  selectCategory(cat);
-		};
-
-        container.appendChild(img);
-      });
+  loadCategorySummary()
+    .then(summary => {
+      const categories = summary.categories;
+      availableCategories = categories;
+      categoryCounts = summary.counts;
+      renderInventoryNavigation();
 
       isLoading = false;
 	  document.getElementById("loadingState").style.display = "none";
@@ -87,6 +51,14 @@ document.addEventListener("DOMContentLoaded", () => {
 	let inventoryDate = "";
 	const FRJ_MEMBER_SESSION_KEY = "FRJ";
 	const PLAYER_NAME = "enzo beau gosse";
+
+  const INVENTORY_DESIGN_KEY = "FRJ_INVENTORY_DESIGN";
+  let inventoryDesign = "v19";
+  try { inventoryDesign = localStorage.getItem(INVENTORY_DESIGN_KEY) === "old" ? "old" : "v19"; } catch {}
+  let availableCategories = [];
+  let categoryCounts = {};
+  let loadedCategory = null;
+  let categoryRequest = 0;
 	
 		
 	const CATEGORY_IMAGES = {
@@ -146,6 +118,120 @@ document.addEventListener("DOMContentLoaded", () => {
 			selected: "storage/11_Miscellaneous_Select.png"
 		}
 	};
+
+  const V19_CATEGORY_ORDER = [
+    "MONEY AND DEEDS", "CLOTHES", "ARMORS", "WEAPONS", "TOOLS",
+    "MATERIALS", "RESOURCES", "BLUEPRINTS", "VEHICLES", "MISCELLANEOUS", "MINDFORCE"
+  ];
+
+  async function loadCategorySummary() {
+    try {
+      const response = await FRJ_API.fetch("?action=categorySummary");
+      const summary = await response.json();
+      if (!Array.isArray(summary.categories) || !summary.counts || typeof summary.counts !== "object") {
+        throw new Error("Synthèse catalogue indisponible");
+      }
+      return summary;
+    } catch (error) {
+      // Un ancien backend / retour arrière ne doit pas rendre le catalogue inutilisable.
+      console.warn("Compteurs indisponibles, catégories seules.", error);
+      const response = await FRJ_API.fetch("?action=categories");
+      return { categories: await response.json(), counts: {} };
+    }
+  }
+
+  function getCategoryImages(category) {
+    if (inventoryDesign === "old") return CATEGORY_IMAGES[category];
+    const oldName = CATEGORY_IMAGES[category].normal.replace(/^storage\/\d+_/, "");
+    const number = String(V19_CATEGORY_ORDER.indexOf(category) + 1).padStart(2, "0");
+    const base = "storage/V19_" + number + "_" + oldName.replace(/\.png$/, "");
+    return { normal: base + ".png", hover: base + "_Hover.png", selected: base + "_Select.png" };
+  }
+
+  function countDistinctItems(items) {
+    return new Set(items.filter(item => Number(item.QUANTITE) > 0)
+      .map(item => String(item.ITEM || "").trim().toLowerCase()).filter(Boolean)).size;
+  }
+
+  function getCategoryCount(category) {
+    if (category === selectedCategory && loadedCategory === category && !isLoading) {
+      const rayon = document.getElementById("rayonFilter").value;
+      return countDistinctItems(data.filter(item => item.STORAGE === category && (!rayon || item.RAYON === rayon)));
+    }
+    const total = categoryCounts[category];
+    return Number.isInteger(total) && total >= 0 ? total : null;
+  }
+
+  function updateCategoryCounts() {
+    document.querySelectorAll(".category-button").forEach(button => {
+      const count = getCategoryCount(button.dataset.category);
+      const counter = button.querySelector(".category-count");
+      counter.textContent = count === null ? "—" : String(count);
+      counter.hidden = inventoryDesign !== "v19";
+      button.setAttribute("aria-pressed", String(button.dataset.category === selectedCategory));
+      const label = t("inventoryCategories")[button.dataset.category] || formatRayon(button.dataset.category);
+      button.title = inventoryDesign === "old" ? label.toUpperCase() : label;
+      button.setAttribute("aria-label", button.title + (inventoryDesign === "v19"
+        ? ", " + (count === null ? t("inventoryCountUnavailable") : count + " " + t("inventoryItems")) : ""));
+    });
+  }
+
+  function renderInventoryNavigation() {
+    const container = document.getElementById("rayonImages");
+    container.dataset.design = inventoryDesign;
+    container.innerHTML = "";
+    const order = inventoryDesign === "v19" ? V19_CATEGORY_ORDER : Object.keys(CATEGORY_IMAGES);
+    order.filter(category => availableCategories.includes(category)).forEach(category => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "category-button";
+      button.dataset.category = category;
+      const image = document.createElement("img");
+      image.className = "rayon-img";
+      image.dataset.category = category;
+      image.alt = "";
+      image.draggable = false;
+      const config = getCategoryImages(category);
+      image.src = IMG_URL + (selectedCategory === category ? config.selected : config.normal);
+      const counter = document.createElement("span");
+      counter.className = "category-count";
+      counter.setAttribute("aria-hidden", "true");
+      button.append(image, counter);
+      button.onmouseenter = button.onfocus = () => {
+        if (selectedCategory !== category) image.src = IMG_URL + config.hover;
+      };
+      button.onmouseleave = button.onblur = () => {
+        image.src = IMG_URL + (selectedCategory === category ? config.selected : config.normal);
+      };
+      button.onclick = () => {
+        if (selectedCategory !== category) return selectCategory(category);
+        selectedCategory = null;
+        categoryRequest++;
+        isLoading = false;
+        document.getElementById("loadingState").style.display = "none";
+        updateCategoryUrl("");
+        resetCategories();
+        resetRayonFilter();
+        updateFilterVisibility();
+        renderCards([]);
+        window.FRJ_VISITS?.resetCategoryView?.();
+      };
+      container.appendChild(button);
+    });
+    updateInventoryLabels();
+    updateCategoryCounts();
+  }
+
+  function updateInventoryLabels() {
+    const select = document.getElementById("inventoryDesign");
+    select.value = inventoryDesign;
+    document.getElementById("inventoryDesignLabel").textContent = t("inventoryDesign");
+    document.getElementById("inventoryDesignOld").textContent = t("inventoryOld");
+    const header = document.getElementById("storageHeader");
+    header.src = IMG_URL + t(inventoryDesign === "v19" ? "img_storage_v19" : "img_storage");
+    header.alt = t("inventoryHeader");
+    updateCategoryCounts();
+  }
 
 	function getCategoryFromUrl() {
 		const params = new URLSearchParams(window.location.search);
@@ -251,10 +337,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		if (!selectedCategory) {
 			select.innerHTML = `<option value="">${t("selectCategory")}</option>`;
 		}
-		const headerImg = document.getElementById("storageHeader");
-		if (headerImg && typeof IMG_URL !== "undefined") {
-			headerImg.src = IMG_URL + t("img_storage");
-		}
+    updateInventoryLabels();
 	}
 
 	function renderFilterLabel() {
@@ -305,7 +388,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // Chargement et filtrage des articles de la catégorie sélectionnée.
 function loadCategoryData(category) {
+  const request = ++categoryRequest;
   isLoading = true;
+  updateCategoryCounts();
 
   // Masquer les filtres pendant le chargement évite d'agir sur l'ancienne catégorie.
   document.querySelector(".filter").style.display = "none";
@@ -317,7 +402,10 @@ function loadCategoryData(category) {
   FRJ_API.fetch("?category=" + encodeURIComponent(category))
     .then(res => res.json())
     .then(response => {
+      if (request !== categoryRequest || selectedCategory !== category) return;
       data = response;
+      loadedCategory = category;
+      categoryCounts[category] = countDistinctItems(data.filter(item => item.STORAGE === category));
 
       isLoading = false;
 
@@ -332,14 +420,17 @@ function loadCategoryData(category) {
       }
     })
     .catch(err => {
+      if (request !== categoryRequest) return;
       console.error("Erreur chargement data:", err);
       isLoading = false;
+      loadedCategory = null;
+      updateCategoryCounts();
     });
 }
 	function updateCategoryImages() {
 		document.querySelectorAll(".rayon-img").forEach(img => {
 			const cat = img.dataset.category;
-			const config = CATEGORY_IMAGES[cat];
+			const config = getCategoryImages(cat);
 
 			if (cat === selectedCategory) {
 				img.src = IMG_URL + config.selected;
@@ -347,13 +438,11 @@ function loadCategoryData(category) {
 				img.src = IMG_URL + config.normal;
 			}
 		});
+    updateCategoryCounts();
 	}
 
 	function resetCategories() {
-		document.querySelectorAll(".rayon-img").forEach(img => {
-			const cat = img.dataset.category;
-			img.src = IMG_URL + CATEGORY_IMAGES[cat].normal;
-		});
+    updateCategoryImages();
 	}
 
 	function updateRayonFilter() {
@@ -418,6 +507,7 @@ function loadCategoryData(category) {
 		filtered = filtered.filter(item => item.QUANTITE && item.QUANTITE > 0);
 
 		renderCards(filtered);
+    updateCategoryCounts();
 		scrollToTop();
 	}
 

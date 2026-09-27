@@ -359,18 +359,89 @@ html[data-frj-backend="d1"] .backend-status-dot {
 
 .rayon-img {
   width: 60px;
-  height: 60px;
+  height: auto;
   cursor: pointer;
+  display: block;
+  flex: none;
+}
+
+/* Cases historiques de 60x60 conservées, avec les mêmes espacements.
+   PNG V19 52x38 => 60x43,846 centrés ; anciens PNG 44x44 => 60x60. */
+.category-button {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex: 0 0 60px;
+  width: 60px;
+  height: 60px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.category-button:focus-visible {
+  outline: 2px solid #a6d889;
+  outline-offset: 3px;
+}
+
+.category-count {
+  position: absolute;
+  bottom: 11px;
+  right: 5px;
+  color: #a6d889;
+  font: bold 9px/1 Arial, sans-serif;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.category-count[hidden] {
+  display: none;
+}
+
+.inventory-design-control {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  color: #555;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.inventory-design-control select {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid #b7bcc5;
+  border-radius: 4px;
+  padding: 2px 4px;
 }
 
 .rayon-header-container {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: min(400px, 100%);
+  aspect-ratio: 453 / 35;
+  margin-inline: auto;
   text-align: center;
   margin-bottom: 10px;
 }
 
 .rayon-header {
-  max-width: 400px;
-  width: 100%;
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  display: block;
 }
 
 /* =========================

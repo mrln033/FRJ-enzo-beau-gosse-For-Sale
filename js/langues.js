@@ -8,6 +8,18 @@ const TRANSLATIONS = {
 		copyPlayerCommand: "/w enzo beau gosse PM from FRJ - For Sale",
 		
 		img_storage: "storage/00_EnTete-Storage-EN.png",
+    img_storage_v19: "storage/V19_00_EnTete-Storage-EN.png",
+    inventoryDesign: "Design",
+    inventoryOld: "Old",
+    inventoryHeader: "Inventory",
+    inventoryItems: "different items",
+    inventoryCountUnavailable: "count unavailable",
+    inventoryCategories: {
+      "MONEY AND DEEDS": "Money And Deeds", CLOTHES: "Clothes", ARMORS: "Armors",
+      WEAPONS: "Weapons", TOOLS: "Tools", MINDFORCE: "Mindforce",
+      MATERIALS: "Materials", RESOURCES: "Resources", BLUEPRINTS: "Blueprints",
+      VEHICLES: "Vehicles", MISCELLANEOUS: "Miscellaneous"
+    },
 			
 		loadingState: "Loading in progress...",
 
@@ -98,6 +110,18 @@ const TRANSLATIONS = {
 		copyPlayerCommand: "/w enzo beau gosse Msg depuis FRJ - For Sale",
 		
 		img_storage: "storage/00_EnTete-Storage-FR.png",
+    img_storage_v19: "storage/V19_00_EnTete-Storage-FR.png",
+    inventoryDesign: "Design",
+    inventoryOld: "Ancien",
+    inventoryHeader: "Inventaire",
+    inventoryItems: "articles différents",
+    inventoryCountUnavailable: "compteur indisponible",
+    inventoryCategories: {
+      "MONEY AND DEEDS": "Argent Et Titres", CLOTHES: "Vêtements", ARMORS: "Armures",
+      WEAPONS: "Armes", TOOLS: "Outils", MINDFORCE: "Force Mentale",
+      MATERIALS: "Matériaux", RESOURCES: "Ressources", BLUEPRINTS: "Plans",
+      VEHICLES: "Véhicules", MISCELLANEOUS: "Divers"
+    },
 			
 		loadingState: "Chargement en cours...",
 

@@ -1,5 +1,7 @@
 # FRJ For Sale
 
+T-026 (27/09/2026) : inventaire **V19 par défaut**, choix **Ancien / Old** mémorisé, ordre propre à chaque design et PNG proportionnels dans les cases historiques de 60 × 60 px. Compteurs verts V19 par référence distincte, filtrés uniquement sur la catégorie active. Voir [le guide des designs, compteurs et retour arrière](docs/INVENTAIRE-DESIGNS.md).
+
 T-025 (23/09/2026) : bouton **Actualiser les MU** sur les Devis Admin, profil Public/FRJ hors promotions. MU absent/invalide/périmé : valeur conservée et signalée en rouge ; dernier bilan historisé. Mise à jour ciblée, sans modification de quantité ou TT. Tests, fonctionnement et retour arrière dans [le guide Devis Admin](docs/DEVIS-ADMIN.md).
 
 T-022 (13/09/2026) : l'origine visible dans la liste Admin et Discord est **Client** (d1 ou gas-fallback) ou **Admin** (d1-admin, saisie manuelle et duplication). Le backend technique reste conservé dans source_backend/sourceBackend pour l'historique et la synchronisation. Aucun changement de données ou de statut ; convertir une demande en Devis Admin conserve l'origine de sa saisie initiale.

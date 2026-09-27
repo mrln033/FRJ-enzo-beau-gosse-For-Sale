@@ -362,6 +362,11 @@
   }
 
   function buildUrl(backend, query) {
+    // La nouvelle synthèse est portée par l'application GAS maintenue dans ce
+    // dépôt, sans changer les routes du catalogue historique ou des imports.
+    if (backend === "gas" && new URLSearchParams(String(query).replace(/^\?/, "")).get("action") === "categorySummary") {
+      return buildBaseUrl(GAS_APP_URL, query);
+    }
     return buildBaseUrl(backends[backend], query);
   }
 

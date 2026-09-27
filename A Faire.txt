@@ -20,6 +20,8 @@ Convention d'identification à compter du 31/08/2026 :
 ----------------------------------------
 POINT DE REPRISE — 27/09/2026
 
+T-026 réalisée : V19 par défaut / Ancien, ordres propres, proportions conservées dans les cases historiques 60 × 60, compteurs distincts par catégorie et filtre actif. Backend Worker/GAS publiés ; frontend livré avec le commit T-026. Validation utilisateur en production attendue. Guide et retour ciblé : docs/INVENTAIRE-DESIGNS.md. Prochain identifiant : T-027 ; d.4 reste en attente de cadrage.
+
 T-022 terminée et validée par l'utilisateur en production le 27/09/2026 : origine affichée Client / Admin dans la liste Admin et Discord. Validation consignée sans modification applicative ni redéploiement. Prochain identifiant : T-026 ; d.4 reste en attente de cadrage.
 
 T-025 terminée et validée par l'utilisateur en production le 23/09/2026 : actualisation manuelle des MU des Devis Admin selon profil, hors promotions ; MU absent/invalide/périmé conservé et signalé en rouge. 275 tests réussis. Prochain identifiant : T-026 ; d.4 reste en attente de cadrage.
@@ -42,13 +44,40 @@ T-017 terminée : liens courts des titres Discord publiés et anciens messages a
 -------------------------------
 DEMANDES  => CE QUI EST A FAIRE
 
->>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-026 <<<
+>>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-027 <<<
+
 
 [EN ATTENTE DE CADRAGE]
 d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> ajouter un bouton 'Supprimer' à chaque demande avec message de confirmation. Celà supprimerais l'enregistrement complet dans D1. Propagation Discord avec modification du statut en 'SUPPRIMEE' pour archivage.
 
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
+
+27/09/2026 — T-026 [ÉVOLUTION] [RÉALISÉE — VALIDATION PRODUCTION ATTENDUE] — En-tête et boutons V19 / Ancien.
+Demande originale :
+T-026  ==> [EVOLUTION] [A FAIRE] Entête et Boutons d'inventaire.
+	A la VU 19.0, le design de l'inventaire a changé : nouveau look, nouveau bouton, nouvel ordre, modiifcation de la casse des intitulés.
+	A cet effet, j'ai préparé une série de visuels pour le nouveau design, dans la même convention de nommage que les précédent, mais iedentifiés "V19_" :
+	- V19_00_EnTete-Storage-EN.png
+	- V19_00_EnTete-Storage-FR.png
+	- V19_01_Money-and-Deeds.png
+	- V19_01_Money-and-Deeds_Hover.png
+	- V19_01_Money-and-Deeds_Select.png
+	- etc pour chaque bouton
+	Le numéro (##) correspond au numéro d'ordre à respecter dans le visuel.
+	Le texte alternatif au survol a également changé : en fait les nom sont les memes que précédemment, mais en minuscules capitalisées.
+	Les filtres/tris doivent rester les memes.
+	Ce pendant, dans ce nouveau désign, le nombre total d'items présents dans chaque onglet est écrit en vert sur l'icone (tu trouveras un fichier V19_Visuel_Compteurs_d_Items.png à prendre en exemple pour la taille, la couleur et le positionnement des compteurs, à respecter au plus proche).
+	Ce que je voudrais : conserver les 2 désigns/présentations, en pouvant switcher de l'un à l'autre via un sélecteur discret (liste ou bouton radio, à toi de me proposer la meilleure solution la plus discrète). Ces présentations comprennent : l'en-tête et les boutons en 3 états, comme c'est déjà le cas, plus le texte en FR/EN au survol (voir ci-dessus), en respectant l'ordre de numérotation.
+	La hauteur des nouveaux élément doit rester la meme qu'actuellement ! Je ne veux pas d'effet de 'redimensionnement' au changement de design.
+	Je voudrais également que le compteur d'items soit total (nombre d'items différents uniquement) sur une catégorie non sélectionnée, mais corresponde au filtre actif sur un onglet sélectionné.
+	Comme habituellement, fais-moi un résumé/cadrage pour finaisation avant de commencer le développment ; ne casse pas l'existant qui est fonctionnel et opérationnel ; maintiens toutes les documentations à jour.
+
+Précisions utilisateur validées en conversation : V19 par défaut, ancien design nommé Ancien / Old ; chaque design garde son propre ordre. Précision finale des dimensions : conserver les emplacements historiques en hauteur ET largeur, donc cases de 60 × 60 px ; nouveaux PNG proportionnels à environ 60 × 43,85 px centrés, sans étirement ni élargissement du bandeau. Compteurs uniquement V19.
+Réalisation : sélecteur discret extérieur au bandeau, choix local mémorisé, en-têtes FR/EN et 3 états des 11 boutons ; Mindforce en dernier en V19, après Tools en Ancien. Catégorie, filtre, langue, profil, panier et URL conservés au changement de design. Traductions dans le mécanisme existant. Compteurs verts distincts : total hors sélection, résultat du rayon actif sur la sélection, jamais une somme de quantités ; un même article dans plusieurs rayons ne compte qu'une fois. Catégories vides masquées. Réponses réseau tardives ignorées.
+API : categorySummary agrégé côté D1 et GAS, remplace l'appel initial aux catégories, sans chargement séparé des articles de chaque onglet. Une requête SQL D1 en lecture seule, cache public habituel ; GAS lit les colonnes utiles de BDD_APP avec cache 300 secondes. Seule cette nouvelle action GAS vise GAS_APP_URL ; autres routes/imports inchangés. Secours D1/GAS et compatibilité avec anciennes catégories préservés ; compteur inconnu affiché —. Aucun polling, aucune Queue, aucune migration, aucune écriture métier ni nouveau trigger.
+Contrôles : 283 tests réussis et Chromium à 1280/768/375 px, dimensions et hauteur stable entre designs, ordres propres, filtres/compteurs/traductions/préférence et rechargement. Déploiement à blanc réussi. Synthèses D1/GAS identiques sur les dix catégories disponibles en production. Worker bfd78af1-20f5-456a-9acc-dfaa803f5369 et GAS 47 publiés ; 17 fichiers GAS relus, seuls Catalog/Code modifiés. Frontend livré sur GitHub Pages avec le commit T-026 ; validation utilisateur attendue.
+Documentation README, ARCHITECTURE, GAS, Worker et guide docs/INVENTAIRE-DESIGNS.md actualisée. Retour visuel immédiat via Ancien / Old ; retour ciblé frontend depuis 5e63d65. Si nécessaire, Worker 6c85c57b-3dbf-4df8-8d9d-53843b8887ff, GAS Web App 46 et anciennes sources HEAD Catalog/Code, sans restauration de données. ZIP et capture utilisateur de référence conservés localement, seuls les 35 PNG utilisés sont publiés. Prochain identifiant : T-027 ; d.4 reste en attente de cadrage.
 
 23/09/2026 — T-025 [ÉVOLUTION] [TERMINÉE — VALIDÉE EN PRODUCTION] — Actualisation des MU des Devis Admin.
 Validation finale utilisateur reçue le 23/09/2026 : « T-025 validé ». Commit b19161d publié sur GitHub Pages ; contrôleur et styles servis vérifiés identiques. Worker 6c85c57b-3dbf-4df8-8d9d-53843b8887ff publié.

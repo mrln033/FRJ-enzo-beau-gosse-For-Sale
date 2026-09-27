@@ -41,6 +41,18 @@ function loadClient(search, fetchImpl, promptImpl = () => "", localValues = new 
   return { api: window.FRJ_API, events, localValues, values };
 }
 
+test("T-026 : synthèse GAS sur application maintenue, catégories historiques inchangées", async () => {
+  const urls = [];
+  const { api } = loadClient("?backend=gas", async url => {
+    urls.push(url);
+    return new Response("{}", { status: 200 });
+  });
+  await api.fetch("?action=categorySummary");
+  await api.fetch("?action=categories");
+  assert.match(urls[0], /AKfycbxa0B_4R6/);
+  assert.match(urls[1], /AKfycbxD_sOP/);
+});
+
 test("D1 est le backend de lecture par défaut sans paramètre", async () => {
   const urls = [];
   const { api, events } = loadClient("", async (url) => {

@@ -2,6 +2,11 @@
 function doGet(e) {
   const action = e.parameter.action;
 
+  if (action === "categorySummary") {
+    return ContentService.createTextOutput(JSON.stringify(getCategorySummary()))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   if (action === "categories") {
     const cats = getAvailableCategories();
     return ContentService
