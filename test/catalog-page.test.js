@@ -331,6 +331,17 @@ test("T-026 : alignement sur les boutons ou groupe centré côte à côte sans d
   assert.deepEqual(place(1000, 0, 0, 400, 90), { left: 249, width: 502, mode: "centered" });
 });
 
+test("T-026 Ancien : image centrée seule, sélecteur à droite ou repli côte à côte", () => {
+  const { context } = loadCatalogController();
+  const place = (...args) => JSON.parse(JSON.stringify(context.getInventoryHeaderPlacement(...args)));
+  assert.deepEqual(place(1000, 150, 850, 400, 90, "old"), { left: 300, width: 550, mode: "header-centered" });
+  // La largeur totale suffit mais pas l'espace à droite de l'image centrée.
+  assert.deepEqual(place(1000, 250, 750, 400, 90, "old"), { left: 249, width: 502, mode: "centered" });
+  assert.deepEqual(place(1000, 470, 530, 400, 90, "old"), { left: 249, width: 502, mode: "centered" });
+  assert.deepEqual(place(289, 0, 270, 400, 90, "old"), { left: 0, width: 289, mode: "centered" });
+  assert.deepEqual(place(1000, 150, 850, 233, 90, "v19"), { left: 150, width: 700, mode: "aligned" });
+});
+
 test("T-026 : réponse tardive d'une catégorie ne remplace pas la sélection courante", async () => {
   const { context } = loadCatalogController();
   const pending = [];

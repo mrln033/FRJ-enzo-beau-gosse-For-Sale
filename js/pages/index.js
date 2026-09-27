@@ -243,10 +243,19 @@ document.addEventListener("DOMContentLoaded", () => {
     positionInventoryHeader();
   }
 
-  function getInventoryHeaderPlacement(availableWidth, buttonLeft, buttonRight, headerWidth, selectorWidth) {
+  function getInventoryHeaderPlacement(availableWidth, buttonLeft, buttonRight, headerWidth, selectorWidth, design = "v19") {
     const needed = headerWidth + selectorWidth + 12;
     const span = Math.max(0, buttonRight - buttonLeft);
-    if (span >= needed) return { left: buttonLeft, width: span, mode: "aligned" };
+    if (design === "old") {
+      // Centrer l'image seule sur tout le bandeau, si le sélecteur peut rester
+      // au bord droit des boutons sans empiéter sur l'image ou son espacement.
+      const left = (availableWidth - headerWidth) / 2;
+      if (left >= 0 && buttonRight - left >= needed) {
+        return { left, width: buttonRight - left, mode: "header-centered" };
+      }
+    } else if (span >= needed) {
+      return { left: buttonLeft, width: span, mode: "aligned" };
+    }
     const width = Math.min(availableWidth, needed);
     return { left: (availableWidth - width) / 2, width, mode: "centered" };
   }
@@ -262,7 +271,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const right = buttons.length ? Math.max(...buttons.map(button => button.right)) - bounds.left : 0;
     const selector = controls.querySelector(".inventory-design-control").getBoundingClientRect();
     const placement = getInventoryHeaderPlacement(bounds.width, left, right,
-      inventoryDesign === "v19" ? 350 * 40 / 60 : 400, selector.width);
+      inventoryDesign === "v19" ? 350 * 40 / 60 : 400, selector.width, inventoryDesign);
     controls.style.left = placement.left + "px";
     controls.style.width = placement.width + "px";
     controls.dataset.placement = placement.mode;

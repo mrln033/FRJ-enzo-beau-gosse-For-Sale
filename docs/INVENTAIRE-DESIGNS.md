@@ -20,7 +20,8 @@ La hauteur réservée à l'en-tête reste celle de la boîte historique de ratio
 
 Règle finale d'alignement demandée le 27/09/2026 :
 
-- si la largeur des boutons suffit, l'en-tête commence sur le bord gauche du premier bouton et le sélecteur se termine sur le bord droit du dernier ;
+- **V19 (validé visuellement, inchangé)** : si la largeur des boutons suffit, l'en-tête commence sur le bord gauche du premier bouton et le sélecteur se termine sur le bord droit du dernier ;
+- **Ancien / Old** : l'image seule est centrée sur la totalité du bandeau ; le sélecteur reste aligné sur le bord droit du dernier bouton. Si ce placement ne laisse pas 12 px entre image et sélecteur, les deux sont centrés côte à côte ;
 - sur plusieurs lignes, les bords extérieurs de l'ensemble des boutons servent de référence ;
 - avec trop peu de boutons, l'ensemble en-tête + sélecteur est **centré côte à côte**, avec 12 px d'écart ;
 - sur écran étroit, seule l'image est réduite proportionnellement, le sélecteur reste lisible et sur la même ligne ;
@@ -65,6 +66,8 @@ Publication backend du 27/09/2026 :
 Frontend : commit `c7be91c` publié sur GitHub Pages le 27/09/2026 (build terminé). Les cinq fichiers frontend et les 35 PNG servis ont été vérifiés identiques. Contrôles Chromium sur le site public avec D1 puis `backend=gas` : dix catégories, compteurs concordants, sélection directe, FR/EN et V19/Ancien, aucune erreur JavaScript. Les appels de statistiques ont été neutralisés pendant ces contrôles pour ne pas gonfler les visites. 283 tests automatisés réussis. Validation finale utilisateur attendue en production.
 
 ## Retour arrière ciblé
+
+Dernière précision Ancien / Old : 286 tests automatisés, vérifications des deux designs avec 1/2/3/11 boutons à 1280/768/375 px. Seul le calcul de placement Ancien est modifié, sans changement de CSS, PNG, boutons ou backend. Retour ciblé de ce calcul depuis `38fc7ee` si nécessaire ; la V19 validée reste identique.
 
 Publication finale des ajustements d'en-tête : commit `b3e5eb6`, build GitHub Pages terminé. Trois fichiers frontend et les deux nouveaux PNG servis vérifiés identiques. 285 tests réussis, contrôles Chromium avec 1/2/3/11 boutons à 1280/768/375 px, puis contrôle réel sur D1 et GAS : en-tête à gauche et sélecteur à droite des boutons (295/985 px sur la vue 1280 px), image entière de 233,33 × 40 px, aucune erreur JavaScript. Validation utilisateur en production attendue.
 
