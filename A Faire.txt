@@ -18,7 +18,9 @@ Convention d'identification à compter du 31/08/2026 :
 - les anciennes références d.N restent inchangées dans l'historique afin de préserver la trace des échanges passés.
 
 ----------------------------------------
-POINT DE REPRISE — 23/09/2026
+POINT DE REPRISE — 27/09/2026
+
+T-022 terminée et validée par l'utilisateur en production le 27/09/2026 : origine affichée Client / Admin dans la liste Admin et Discord. Validation consignée sans modification applicative ni redéploiement. Prochain identifiant : T-026 ; d.4 reste en attente de cadrage.
 
 T-025 terminée et validée par l'utilisateur en production le 23/09/2026 : actualisation manuelle des MU des Devis Admin selon profil, hors promotions ; MU absent/invalide/périmé conservé et signalé en rouge. 275 tests réussis. Prochain identifiant : T-026 ; d.4 reste en attente de cadrage.
 
@@ -26,7 +28,7 @@ T-024 terminée et validée par l'utilisateur en production le 23/09/2026 : D1 p
 
 T-023 terminée et validée par l'utilisateur en production le 19/09/2026 : images du catalogue recherchées à la racine puis dans le dossier de catégorie, sinon No image. 263 tests réussis. Publication frontend uniquement, aucun déploiement GAS/D1 nécessaire. Prochain identifiant : T-024.
 
-T-019 à T-022 réalisées et publiées : Devis Admin explicite, verrouillage des demandes avancées/Terminées, suppression manuelle des modèles et origine simplifiée Client/Admin dans la console et Discord. Validation utilisateur en production attendue. Retours ciblés et limites de récupération documentés. Prochain identifiant : T-023 ; d.4 reste en attente de cadrage.
+T-019 à T-022 réalisées et publiées : Devis Admin explicite, verrouillage des demandes avancées/Terminées, suppression manuelle des modèles et origine simplifiée Client/Admin dans la console et Discord. T-022 validée en production le 27/09/2026 ; validation utilisateur en production toujours attendue pour T-019 à T-021. Retours ciblés et limites de récupération documentés.
 
 Ordre recommandé déjà réalisé et validé : d.1 -> d.2 -> d.3 -> d.7 -> d.8 -> d.6 -> d.10 -> d.11 -> d.5 -> d.13 -> d.12.
 Les demandes d.13, d.12 et d.9 sont terminées. D.9 fournit les promotions quotidiennes et les soldes communs à GAS et D1.
@@ -41,8 +43,6 @@ T-017 terminée : liens courts des titres Discord publiés et anciens messages a
 DEMANDES  => CE QUI EST A FAIRE
 
 >>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-026 <<<
-
-T-022 réalisée ci-dessous ; validation utilisateur en production attendue.
 
 [EN ATTENTE DE CADRAGE]
 d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> ajouter un bouton 'Supprimer' à chaque demande avec message de confirmation. Celà supprimerais l'enregistrement complet dans D1. Propagation Discord avec modification du statut en 'SUPPRIMEE' pour archivage.
@@ -89,7 +89,8 @@ Réalisation : tentative img/nom, puis img/CATEGORIE/nom avec la catégorie STOR
 Contrôles : 263 tests réussis, dont six nouveaux tests de priorité, repli, erreur, noms absents et compatibilité. Les 624 images retirées de la racine sont retrouvées à contenu identique dans les nouveaux dossiers ; un fichier supplémentaire Rifle BLP (7).png accompagne le classement utilisateur. Renommage utilisateur conservé : Aclarias.png -> MISCELLANEOUS/Asclarias.png ; la base doit employer ce nouveau nom. Documentation README et ARCHITECTURE actualisée. Livraison par GitHub Pages, sans migration ni trigger, aucune consommation D1 supplémentaire.
 Retour ciblé : revenir sur le contrôleur et ses tests depuis 388283a ; avant cela, recopier les images déplacées vers leurs anciens chemins publics, sans effacer les dossiers classés, pour préserver la compatibilité avec l'ancien code. Ne pas restaurer les bases ni annuler les évolutions métier antérieures.
 
-13/09/2026 — T-022 [CORRECTIF] [RÉALISÉE — VALIDATION PRODUCTION ATTENDUE] — Origine affichée Client / Admin.
+13/09/2026 — T-022 [CORRECTIF] [TERMINÉE — VALIDÉE EN PRODUCTION] — Origine affichée Client / Admin.
+Validation finale utilisateur reçue le 27/09/2026 : « T-022 validé en production ». Aucun changement applicatif ni redéploiement pour cette clôture documentaire.
 Demande originale : « seules 2 origines sont pertinentes : soit la saisie vient du Client, soit elle vient de l'Admin. Et peu importe le backend finalement. Pour historisation ou raison technique, tu peux garder un trace de l'origine technique si tu veux, mais l'affichage tant sur la listing admin que sur le post discord doit etre clair et simplifié : Client ou Admin »
 Réalisation : liste Admin « Origine : Client » / « Origine : Admin », champ Discord « Origine » limité à Client / Admin, côté D1 comme GAS. d1 et gas-fallback => Client ; d1-admin => Admin (saisie manuelle, modèles créés et duplications). Conversion en Devis Admin sans réécriture de l'origine de saisie. Valeurs techniques source_backend/sourceBackend inchangées pour l'historique et la synchronisation.
 Contrôles : 257 tests réussis, cohérence GAS/D1 et interface, profils/statuts indépendants de l'origine. Worker a4453730-787a-483c-81ed-3b3fe84c25ba et GAS 46 (Web App + HEAD) publiés. 32 messages Discord existants mis à jour et relus : seul le champ Origine modifié ; 3 anciens messages introuvables, non recréés. Aucun changement des données, statuts ou inventaires, aucune migration ni nouveau trigger.
