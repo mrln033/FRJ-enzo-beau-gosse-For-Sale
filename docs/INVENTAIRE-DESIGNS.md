@@ -52,7 +52,7 @@ Publication backend du 27/09/2026 :
 - GAS **47**, même URL Web App, sources HEAD relues et vérifiées (17 fichiers) ;
 - synthèses publiques D1 et GAS vérifiées identiques sur les dix catégories disponibles.
 
-Frontend : livraison GitHub Pages avec le commit T-026. Validation finale utilisateur attendue en production.
+Frontend : commit `c7be91c` publié sur GitHub Pages le 27/09/2026 (build terminé). Les cinq fichiers frontend et les 35 PNG servis ont été vérifiés identiques. Contrôles Chromium sur le site public avec D1 puis `backend=gas` : dix catégories, compteurs concordants, sélection directe, FR/EN et V19/Ancien, aucune erreur JavaScript. Les appels de statistiques ont été neutralisés pendant ces contrôles pour ne pas gonfler les visites. 283 tests automatisés réussis. Validation finale utilisateur attendue en production.
 
 ## Retour arrière ciblé
 

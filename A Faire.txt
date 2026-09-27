@@ -54,6 +54,7 @@ d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> a
 REALISATIONS ==> CE QUI A ETE FAIT :
 
 27/09/2026 — T-026 [ÉVOLUTION] [RÉALISÉE — VALIDATION PRODUCTION ATTENDUE] — En-tête et boutons V19 / Ancien.
+Publication vérifiée : commit c7be91c poussé, build GitHub Pages terminé ; cinq fichiers frontend et 35 PNG servis identiques. Contrôles navigateur sur le site de production avec D1 puis GAS : compteurs concordants, deux designs/ordres, sélection directe et langues opérationnels, aucune erreur JavaScript. Visites de test neutralisées. Validation finale utilisateur toujours attendue.
 Demande originale :
 T-026  ==> [EVOLUTION] [A FAIRE] Entête et Boutons d'inventaire.
 	A la VU 19.0, le design de l'inventaire a changé : nouveau look, nouveau bouton, nouvel ordre, modiifcation de la casse des intitulés.
