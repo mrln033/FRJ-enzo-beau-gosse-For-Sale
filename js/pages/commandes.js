@@ -20,17 +20,12 @@
   let duplicateSourceId = null;
   let directOrderListSequence = 0;
 
-  function hasAtMostDecimals(value, decimals) {
-    const factor = 10 ** decimals;
-    return Math.abs(Number(value) - (Math.round(Number(value) * factor) / factor)) <= 1e-9;
-  }
-
   function editableMarkupAmount(item) {
     if (item.markupKind === "none") return "";
     const amount = item.markupKind === "percent"
-      ? Number(item.markupValue || 0) * 100
+      ? ui.math.multiply(Number(item.markupValue || 0), 100)
       : Number(item.markupValue || 0);
-    return amount.toFixed(6).replace(/\.?0+$/, "");
+    return ui.formatUnitPed(amount, "EN");
   }
 
   function compareCatalogItems(left, right) {
@@ -271,7 +266,7 @@
       quantityCell.appendChild(quantity);
 
       const priceCell = document.createElement("td");
-      priceCell.textContent = `${ui.formatPed(item.unitTtPed)} PED`;
+      priceCell.textContent = `${ui.formatUnitPed(item.unitTtPed)} PED`;
       const markupCell = document.createElement("td");
       markupCell.className = "line-editor";
       const kind = document.createElement("select");
@@ -290,7 +285,7 @@
       amount.type = "number";
       amount.min = "0";
       amount.max = "1000000";
-      amount.step = "0.000001";
+      amount.step = "any";
       amount.value = editableMarkupAmount(item);
       amount.disabled = !proposalEditable || item.markupKind === "none";
       amount.setAttribute("aria-label", `Valeur du MU ${item.itemName}`);
@@ -378,21 +373,20 @@
       const valid = Number.isInteger(quantity) && quantity > 0 && quantity <= 1_000_000
         && (markupKind === "none" || (
           Number.isFinite(markupAmount) && markupAmount >= 0 && markupAmount <= 1_000_000
-          && hasAtMostDecimals(markupAmount, 6)
         ));
       let unitSale = unitTt;
-      if (valid && markupKind === "percent") unitSale = unitTt * (markupAmount / 100);
-      if (valid && markupKind === "ped") unitSale = unitTt + markupAmount;
-      const lineSale = valid ? ui.roundPed(unitSale * quantity) : null;
+      if (valid && markupKind === "percent") unitSale = ui.math.multiply(unitTt, ui.math.multiply(markupAmount, 0.01));
+      if (valid && markupKind === "ped") unitSale = ui.math.add(unitTt, markupAmount);
+      const lineSale = valid ? ui.math.multiply(unitSale, quantity) : null;
       const originalAmount = editor.item.markupKind === "percent"
-        ? Number(editor.item.markupValue || 0) * 100
+        ? ui.math.multiply(Number(editor.item.markupValue || 0), 100)
         : (editor.item.markupKind === "ped" ? Number(editor.item.markupValue || 0) : null);
       const dirty = valid && (
         quantity !== Number(editor.item.quantity)
         || markupKind !== editor.item.markupKind
-        || (markupKind !== "none" && Math.abs(markupAmount - originalAmount) > 1e-7)
+        || (markupKind !== "none" && markupAmount !== originalAmount)
       );
-      return { lineNo: editor.item.lineNo, quantity, markupKind, markupAmount, lineTt: valid ? ui.roundPed(unitTt * quantity) : null, lineSale, valid, dirty };
+      return { lineNo: editor.item.lineNo, quantity, markupKind, markupAmount, lineTt: valid ? ui.math.multiply(unitTt, quantity) : null, lineSale, valid, dirty };
     };
 
     const recalculate = () => {
@@ -405,8 +399,8 @@
       });
       const valid = values.every((value) => value.valid);
       const dirtyCount = values.filter((value) => value.dirty).length;
-      const totalTtValue = valid ? ui.roundPed(values.reduce((sum, value) => sum + value.lineTt, 0)) : null;
-      const totalValue = valid ? ui.roundPed(values.reduce((sum, value) => sum + value.lineSale, 0)) : null;
+      const totalTtValue = valid ? ui.roundPed(ui.math.sum(values.map(value => value.lineTt))) : null;
+      const totalValue = valid ? ui.roundPed(ui.math.sum(values.map(value => value.lineSale))) : null;
       if (valid) renderTotals(totalTtValue, totalValue); else totalTt.textContent = totalMarkup.textContent = total.textContent = "—";
       if (proposalEditable) dirtyLabel.textContent = dirtyCount ? `${dirtyCount} ligne(s) modifiée(s)` : "";
       save.disabled = !proposalEditable || !valid || dirtyCount === 0;
@@ -514,7 +508,7 @@
     amount.type = "number";
     amount.min = "0";
     amount.max = "1000000";
-    amount.step = "0.01";
+    amount.step = "any";
     amount.value = "";
     amount.required = true;
     amount.setAttribute("aria-label", "Valeur de MU de la demande directe");
@@ -554,18 +548,16 @@
       const storedValue = Number(item?.markupValue);
       let displayedAmount = itemKind === "percent" ? 100 : 0;
       if (item?.markupValue !== null && item?.markupValue !== "" && Number.isFinite(storedValue)) {
-        const profileFactor = frjMember ? 0.5 : 1;
         const rate = Number(item?.discountRate);
-        const campaignFactor = Number.isFinite(rate) && rate > 0 && rate <= 1 ? 1 - rate : 1;
-        displayedAmount = itemKind === "percent"
-          ? (1 + ((storedValue - 1) * profileFactor * campaignFactor)) * 100
-          : storedValue * profileFactor * campaignFactor;
+        const discountRate = Number.isFinite(rate) && rate > 0 && rate <= 1 ? rate : 0;
+        const effective = ui.math.markup(itemKind, storedValue, frjMember, discountRate);
+        displayedAmount = itemKind === "percent" ? ui.math.multiply(effective.value, 100) : effective.value;
       }
       kind.value = itemKind;
       const missingMarkup = !["percent", "ped"].includes(item.markupKind)
         || item.markupValue == null || !Number.isFinite(storedValue) || storedValue < 0;
       amount.value = options.requireCatalogMarkup && missingMarkup
-        ? "" : ui.roundPed(displayedAmount).toFixed(2);
+        ? "" : ui.formatUnitPed(displayedAmount, "EN");
     };
 
     const read = () => {
@@ -580,15 +572,15 @@
         && Number.isFinite(markupAmount)
         && markupAmount >= 0
         && markupAmount <= 1_000_000
-        && hasAtMostDecimals(markupAmount, 2);
+        ;
       let unitSale = Number(item?.unitTtPed || 0);
-      if (valid && kind.value === "percent") unitSale *= markupAmount / 100;
-      if (valid && kind.value === "ped") unitSale += markupAmount;
-      const lineSale = valid ? ui.roundPed(unitSale * itemQuantity) : null;
+      if (valid && kind.value === "percent") unitSale = ui.math.multiply(unitSale, ui.math.multiply(markupAmount, 0.01));
+      if (valid && kind.value === "ped") unitSale = ui.math.add(unitSale, markupAmount);
+      const lineSale = valid ? ui.math.multiply(unitSale, itemQuantity) : null;
       return {
         valid,
         lineSale,
-        lineTt: valid ? ui.roundPed(Number(item.unitTtPed || 0) * itemQuantity) : null,
+        lineTt: valid ? ui.math.multiply(Number(item.unitTtPed || 0), itemQuantity) : null,
         key: item ? `${item.itemName}\u001f${item.storage}\u001f${item.aisle}`.toLocaleLowerCase("en-US") : "",
         payload: item ? {
           itemName: item.itemName,
@@ -616,7 +608,7 @@
       const discountLabel = item ? ui.discountMarker(item) : "";
       discountEmphasis.textContent = discountLabel ? `(${discountLabel})` : "";
       discount.hidden = !discountLabel;
-      displayedPrice.textContent = item ? `Prix affiché : ${ui.formatPed(item.unitTtPed)} PED` : "Prix affiché : —";
+      displayedPrice.textContent = item ? `Prix affiché : ${ui.formatUnitPed(item.unitTtPed)} PED` : "Prix affiché : —";
       estimate.textContent = value.valid ? `Estimation : ${ui.formatPed(value.lineSale)} PED` : "Estimation : —";
       if (options.requireCatalogMarkup) {
         warning.textContent = !item ? "Article indisponible : retirez ou remplacez cette ligne."
@@ -855,8 +847,8 @@
     const duplicates = new Set(keys).size !== keys.length;
     const valid = values.length > 0 && values.every((value) => value.valid) && !duplicates;
     const totals = valid ? ui.orderMarkupTotals(
-      values.reduce((sum, value) => sum + value.lineTt, 0),
-      values.reduce((sum, value) => sum + value.lineSale, 0)
+      ui.math.sum(values.map(value => value.lineTt)),
+      ui.math.sum(values.map(value => value.lineSale))
     ) : null;
     const totalTt = document.getElementById("newOrderTotalTt");
     const totalMarkup = document.getElementById("newOrderTotalMarkup");
@@ -865,7 +857,7 @@
       ? `MU Total (%) : ${ui.formatPed(totals.markupPed)} PED (${ui.formatPed(totals.markupPercent)} %)`
       : "MU Total (%) : —";
     total.textContent = valid
-      ? `Estimation totale : ${ui.formatPed(values.reduce((sum, value) => sum + value.lineSale, 0))} PED`
+      ? `Estimation totale : ${ui.formatPed(ui.math.sum(values.map(value => value.lineSale)))} PED`
       : (duplicates ? "Un même article ne peut pas être ajouté deux fois." : "Estimation totale : —");
     save.disabled = !valid;
     add.disabled = newOrderEditors.length >= 10;

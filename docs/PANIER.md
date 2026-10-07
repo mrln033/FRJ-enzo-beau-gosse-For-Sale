@@ -1,5 +1,7 @@
 # Panier d'achat — fonctionnement et retour arrière
 
+T-027 : les prix unitaires et MU ne sont plus tronqués. Les calculs précèdent l'arrondi final ; seuls les totaux sont affichés à deux décimales. Cette règle remplace les anciennes limites de saisie à deux/six décimales décrites historiquement ci-dessous. Voir [Précision des prix](PRECISION-PRIX.md).
+
 T-025 : actualisation manuelle des MU réservée aux Devis Admin, hors promotions. Les demandes normales et copies restent intactes. Quantités/TT préservés ; dernier bilan visible dans la console, valeurs antérieures dans l'historique. Voir [Devis Admin](DEVIS-ADMIN.md) pour les règles et le retour ciblé.
 
 T-024 (23/09/2026) : catalogue D1 par défaut avec secours GAS automatique des lectures. Les liens du panier, de la console et du suivi n'ajoutent plus de paramètre backend hors choix manuel explicite. Les anciens liens restent valides ; une ancienne demande reçue par GAS ne force plus le catalogue à GAS. Transmission D1 puis secours GAS, imports doubles, suivi D1 et messages d'attente conservent leurs règles. Retour arrière limité au commit frontend T-024 puis GitHub Pages, sans restauration de données (référence préalable 13d5bff).

@@ -1,5 +1,7 @@
 # FRJ For Sale
 
+T-027 (07/10/2026) : précision des prix unitaires et MU préservée dans les calculs, saisies et synchronisations ; totaux affichés à deux décimales, sans recalcul des anciennes demandes. Voir [règles, contrôles et retour arrière](docs/PRECISION-PRIX.md).
+
 T-026 (27/09/2026) : inventaire **V19 par défaut**, choix **Ancien / Old** mémorisé, ordre propre à chaque design et PNG proportionnels dans les cases historiques de 60 × 60 px. Compteurs verts V19 par référence distincte, filtrés uniquement sur la catégorie active. Voir [le guide des designs, compteurs et retour arrière](docs/INVENTAIRE-DESIGNS.md).
 
 T-025 (23/09/2026) : bouton **Actualiser les MU** sur les Devis Admin, profil Public/FRJ hors promotions. MU absent/invalide/périmé : valeur conservée et signalée en rouge ; dernier bilan historisé. Mise à jour ciblée, sans modification de quantité ou TT. Tests, fonctionnement et retour arrière dans [le guide Devis Admin](docs/DEVIS-ADMIN.md).

@@ -277,7 +277,7 @@
       row.appendChild(itemCell);
       [
         ui.formatQuantity(item.quantity, lang),
-        `${ui.formatPed(item.unitTtPed, lang)} PED`,
+        `${ui.formatUnitPed(item.unitTtPed, lang)} PED`,
         `${markupLabel} : ${item.markupDisplay || text("pending")}`,
         `${ui.formatPed(item.lineSalePed, lang)} PED`
       ].forEach((value) => {

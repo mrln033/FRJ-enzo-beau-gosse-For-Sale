@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
 
+const awaitedCommonSource = await readFile(new URL("../js/common/order-ui.js", import.meta.url), "utf8");
 const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
 const source = await readFile(new URL("../js/pages/index.js", import.meta.url), "utf8");
 const cartSource = await readFile(new URL("../js/cart.js", import.meta.url), "utf8");
@@ -47,6 +48,7 @@ function loadCatalogController(search = "", storedDesign = null) {
     URL,
     URLSearchParams
   });
+  vm.runInContext(awaitedCommonSource, context);
   vm.runInContext(source, context);
   return { context, documentListeners };
 }
@@ -251,6 +253,7 @@ test("le catalogue démarre avec les traductions et les catégories disponibles"
     URLSearchParams
   });
   vm.runInContext(languagesSource, context);
+  vm.runInContext(awaitedCommonSource, context);
   vm.runInContext(source, context);
   documentListeners.get("DOMContentLoaded")();
   await new Promise((resolve) => setImmediate(resolve));

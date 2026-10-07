@@ -1,3 +1,4 @@
+import { pedMath } from "./ped-math.js";
 import { ApiError, sha256 } from "./http.js";
 import { requireQuoteTransition } from "./admin-quotes.js";
 import { canReviseOrder, confirmsOrderPricing, validateOrderStatus, orderItemKey, reviseOrderLine, priceOrderLine, formatMarkup } from "./orders.js";
@@ -37,8 +38,7 @@ export function editableSheetDraft(snapshot) {
     items: snapshot.items.map(item => ({
       lineNo: Number(item.lineNo), itemName: item.itemName, storage: item.storage, aisle: item.aisle,
       quantity: Number(item.quantity), markupKind: item.markupKind || "none",
-      markupAmount: item.markupValue == null ? null : Number(
-        (item.markupKind === "percent" ? Number(item.markupValue) * 100 : Number(item.markupValue)).toFixed(6))
+      markupAmount: item.markupValue == null ? null : (item.markupKind === "percent" ? pedMath.multiply(item.markupValue, 100) : Number(item.markupValue))
     }))
   };
 }
@@ -126,7 +126,7 @@ export async function applySheetOrder(env, payload, helpers) {
           frjMember: draft.frjMember, discountRate: now.discountRate || 0 });
         kind = computed.kind;
         if (kind === "none") throw new ApiError(409, "MU catalogue invalide : " + item.itemName);
-        amount = Number((kind === "percent" ? computed.value * 100 : computed.value).toFixed(6));
+        amount = (kind === "percent" ? pedMath.multiply(computed.value, 100) : computed.value);
       }
       let revised;
       try { revised = reviseOrderLine(now, { quantity: item.quantity, markupKind: kind, markupAmount: amount }, now.availableStock); }
@@ -167,9 +167,9 @@ export async function applySheetOrder(env, payload, helpers) {
     }
     priced.forEach(item => { item.price_status = "confirmed"; });
   }
-  const round = n => Math.round(n * 100) / 100;
-  const totalTt = round(priced.reduce((n,item) => n + Number(item.line_tt_ped), 0));
-  const totalSale = round(priced.reduce((n,item) => n + Number(item.line_sale_ped), 0));
+  const round = pedMath.round;
+  const totalTt = round(pedMath.sum(priced.map(item => Number(item.line_tt_ped))));
+  const totalSale = round(pedMath.sum(priced.map(item => Number(item.line_sale_ped))));
   const status = adminQuote || termsChanged || draft.status === "awaiting_approval" ? "submitted" : draft.status;
   const approval = adminQuote ? 0 : termsChanged || draft.status === "awaiting_approval" ? 1 : statusChanged ? 0 : current.row.approval_required;
   const pricing = confirming ? "confirmed" : termsChanged

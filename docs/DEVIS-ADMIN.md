@@ -1,5 +1,7 @@
 # Devis Admin — T-019 / T-020 / T-021 / T-025
 
+T-027 : création, ajout, révision et duplication conservent la précision des prix/MU ; saisie sans plafond de décimales, totaux à deux décimales. Pas de réévaluation automatique des anciens devis ou demandes. Voir [Précision des prix](PRECISION-PRIX.md).
+
 ## T-025 : actualiser les MU d'un modèle (23/09/2026)
 
 Le bouton **Actualiser les MU** est réservé aux Devis Admin. Enregistrer d'abord les modifications locales. La confirmation précise le profil enregistré (Public ou FRJ), l'absence de promotion et le remplacement des MU manuels par ceux de la base.

@@ -1,3 +1,4 @@
+import { pedMath } from "./ped-math.js";
 const ORDER_STATUSES = new Set([
   "submitted", "viewed", "preparing", "ready", "completed", "cancelled", "expired", "admin_quote"
 ]);
@@ -111,9 +112,7 @@ export function normalizeAdminOrderLine(payload) {
   if (!Number.isFinite(markupAmount) || markupAmount < 0 || markupAmount > 1_000_000) {
     throw new Error(`MU invalide pour ${itemName}`);
   }
-  if (!hasAtMostDecimals(markupAmount, 2)) {
-    throw new Error(`La MU de ${itemName} est limitée à 2 décimales`);
-  }
+
   return { itemName, storage, aisle, quantity, markupKind, markupAmount };
 }
 
@@ -152,8 +151,7 @@ export function priceOrderLines(requestedItems, catalogRows, options = {}) {
 
     const unitTt = Math.max(0, Number(current.unitTtPed) || 0);
     const currentMarkupKind = normalizeMarkupKind(current.markupKind);
-    // Le catalogue affiche le MU avec 2 décimales. Le panier et le serveur
-    // utilisent exactement cette valeur visible, pas la précision interne D1.
+    // T-027 : conserver la précision numérique du MU catalogue.
     const currentMarkupValue = displayedMarkupValue(currentMarkupKind, current.markupValue);
     if (
       !sameOptionalNumber(requested.observedUnitTtPed, unitTt)
@@ -170,7 +168,7 @@ export function priceOrderLines(requestedItems, catalogRows, options = {}) {
         reason: "price-changed",
         requestedQuantity: requested.quantity,
         availableQuantity: stock,
-        unitTtPed: roundPed(unitTt),
+        unitTtPed: unitTt,
         markupKind: currentMarkupKind,
         markupValue: currentMarkupValue,
         markupDisplay: formatMarkup(currentMarkupKind, currentMarkupValue),
@@ -192,7 +190,7 @@ export function priceOrderLines(requestedItems, catalogRows, options = {}) {
       aisle: String(current.aisle || requested.aisle).toUpperCase(),
       quantity: requested.quantity,
       stockAtSubmission: stock,
-      unitTtPed: roundPed(unitTt),
+      unitTtPed: unitTt,
       markupKind: effectiveMarkup.kind,
       markupValue: effectiveMarkup.value,
       markupDisplay: formatMarkup(effectiveMarkup.kind, effectiveMarkup.value),
@@ -211,8 +209,8 @@ export function priceOrderLines(requestedItems, catalogRows, options = {}) {
   return {
     lines,
     discrepancies,
-    totalTtPed: roundPed(lines.reduce((sum, line) => sum + line.lineTtPed, 0)),
-    totalSalePed: roundPed(lines.reduce((sum, line) => sum + line.lineSalePed, 0)),
+    totalTtPed: roundPed(pedMath.sum(lines.map(line => line.lineTtPed))),
+    totalSalePed: roundPed(pedMath.sum(lines.map(line => line.lineSalePed))),
     pricingStatus: lines.some((line) => line.priceStatus === "to-confirm") ? "to-confirm" : "estimated"
   };
 }
@@ -237,14 +235,11 @@ export function reviseOrderLine(existingLine, payload, availableStock) {
   if (markupKind !== "none" && (!Number.isFinite(rawAmount) || rawAmount < 0 || rawAmount > 1_000_000)) {
     throw new Error(`MU invalide pour ${itemName}`);
   }
-  if (markupKind !== "none" && !hasAtMostDecimals(rawAmount, 6)) {
-    throw new Error(`La MU de ${itemName} est limitée à 6 décimales`);
-  }
-  // Une saisie en pourcentage à 6 décimales nécessite 8 décimales une fois
-  // convertie en coefficient (115,123456 % devient 1,15123456).
+
+  // Conversion décimale du pourcentage sans plafond de décimales.
   const markupValue = markupKind === "percent"
-    ? roundPed(rawAmount / 100, 8)
-    : (markupKind === "ped" ? roundPed(rawAmount, 6) : null);
+    ? pedMath.multiply(rawAmount, 0.01)
+    : (markupKind === "ped" ? rawAmount : null);
   const unitTtPed = Math.max(0, Number(existingLine?.unitTtPed ?? existingLine?.unit_tt_ped) || 0);
   const prices = priceOrderLine(unitTtPed, quantity, markupKind, markupValue);
 
@@ -267,7 +262,7 @@ export function hasSameOrderTerms(existingLine, revisedLine) {
   const sameMarkupValue = revisedMarkup === null || revisedMarkup === undefined
     ? existingMarkup === null || existingMarkup === undefined
     : existingMarkup !== null && existingMarkup !== undefined
-      && Math.abs(Number(existingMarkup) - Number(revisedMarkup)) <= 1e-9;
+      && sameOptionalNumber(Number(existingMarkup), Number(revisedMarkup));
   return Number(existingLine?.quantity) === Number(revisedLine?.quantity)
     && String(existingLine?.markup_kind ?? existingLine?.markupKind ?? "none")
       === String(revisedLine?.markupKind ?? revisedLine?.markup_kind ?? "none")
@@ -285,17 +280,13 @@ function applyMemberDiscount(kind, rawValue, member) {
   const value = Number(rawValue);
   if (normalizedKind === "none" || !Number.isFinite(value)) return { kind: "none", value: null };
   if (!member) return { kind: normalizedKind, value };
-  return normalizedKind === "percent"
-    ? { kind: "percent", value: 1 + ((value - 1) / 2) }
-    : { kind: "ped", value: value / 2 };
+  return pedMath.markup(normalizedKind, value, true);
 }
 
 function applyCampaignDiscount(markup, rawRate) {
   const rate = optionalNumber(rawRate);
   if (rate === null || rate <= 0 || rate > 1 || markup.kind === "none") return markup;
-  return markup.kind === "percent"
-    ? { kind: "percent", value: 1 + ((markup.value - 1) * (1 - rate)) }
-    : { kind: "ped", value: markup.value * (1 - rate) };
+  return pedMath.markup(markup.kind, markup.value, false, rate);
 }
 
 function normalizeMarkupKind(kind) {
@@ -310,30 +301,17 @@ function optionalNumber(value) {
 
 function sameOptionalNumber(left, right) {
   if (left === null || right === null) return left === right;
-  return Math.abs(left - right) <= 0.0001;
+  return left === right || Math.abs(left - right) <= Number.EPSILON * Math.max(Math.abs(left), Math.abs(right));
 }
 
 function displayedMarkupValue(kind, value) {
   const number = optionalNumber(value);
   if (number === null || kind === "none") return null;
-  return kind === "percent" ? roundPed(number, 4) : roundPed(number, 2);
-}
-
-function saleUnitPrice(unitTt, kind, value) {
-  if (kind === "percent") return unitTt * value;
-  if (kind === "ped") return unitTt + value;
-  return unitTt;
+  return number;
 }
 
 export function priceOrderLine(unitTt, quantity, markupKind, markupValue) {
-  const unitSale = saleUnitPrice(unitTt, markupKind, markupValue);
-  return {
-    // La précision de travail est conservée en base pour les petits prix.
-    // Les montants de ligne restent des montants monétaires à 2 décimales.
-    unitSalePed: roundPed(unitSale, 6),
-    lineTtPed: roundPed(unitTt * quantity),
-    lineSalePed: roundPed(unitSale * quantity)
-  };
+  return pedMath.price(unitTt, quantity, markupKind, markupValue);
 }
 
 function validateOrderQuantity(quantity, itemName) {
@@ -342,14 +320,10 @@ function validateOrderQuantity(quantity, itemName) {
   }
 }
 
-function hasAtMostDecimals(value, decimals) {
-  return Math.abs(Number(value) - roundPed(value, decimals)) <= 1e-9;
-}
-
 export function formatMarkup(kind, value) {
   if (!Number.isFinite(value)) return null;
-  if (kind === "percent") return `${(value * 100).toFixed(2).replace(".", ",")} %`;
-  if (kind === "ped") return `${value.toFixed(2).replace(".", ",")} PED`;
+  if (kind === "percent") return `${pedMath.format(pedMath.multiply(value, 100), "FR")} %`;
+  if (kind === "ped") return `${pedMath.format(value, "FR")} PED`;
   return null;
 }
 
@@ -367,6 +341,5 @@ function normalizeOptionalDate(value) {
 }
 
 function roundPed(value, decimals = 2) {
-  const factor = 10 ** decimals;
-  return Math.round((Number(value) + Number.EPSILON) * factor) / factor;
+  return pedMath.round(value, decimals === undefined ? 2 : decimals);
 }

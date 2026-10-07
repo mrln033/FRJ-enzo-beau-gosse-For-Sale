@@ -118,14 +118,12 @@ export function validateSaleChange({ sale, sales = [] }) {
   return { ...normalized, enabled: true };
 }
 
+import { pedMath } from "./ped-math.js";
+
 export function computeDiscountedMarkup({ kind, value, frjMember = false, discountRate = 0 }) {
   if (!isValidPromotionMarkup(kind, value)) return { kind: "none", value: null };
   const rate = normalizeDiscountRate(discountRate, true);
-  const profileFactor = frjMember === true ? 0.5 : 1;
-  const campaignFactor = 1 - rate;
-  return kind === "percent"
-    ? { kind, value: 1 + ((Number(value) - 1) * profileFactor * campaignFactor) }
-    : { kind, value: Number(value) * profileFactor * campaignFactor };
+  return pedMath.markup(kind, Number(value), frjMember === true, rate);
 }
 
 export function planDailyPromotion({

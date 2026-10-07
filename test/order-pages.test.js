@@ -233,9 +233,9 @@ test("les deux pages ne chargent plus que des scripts externes", () => {
 test("la Console Admin applique les contraintes de saisie d.7", () => {
   assert.match(adminSource, /quantity\.min = "1"/);
   assert.match(adminSource, /quantity\.step = "1"/);
-  assert.match(adminSource, /amount\.step = "0\.000001"/);
+  assert.match(adminSource, /amount\.step = "any"/);
   assert.match(adminSource, /Number\.isInteger\(quantity\)/);
-  assert.match(adminSource, /hasAtMostDecimals\(markupAmount, 6\)/);
+  assert.doesNotMatch(adminSource, /hasAtMostDecimals\(markupAmount,/);
   assert.match(adminSource, /await loadOrders\(\)/);
   assert.match(adminSource, /method: "DELETE"/);
   assert.match(adminSource, /removeOrderItem\(order, item, remove\)/);
@@ -331,7 +331,7 @@ test("la Console Admin enregistre la précision autorisée puis recharge D1", as
   const amount = created.find((element) => element.attributes.get("aria-label") === "Valeur du MU Item A");
   const save = created.find((element) => element.textContent === "Enregistrer les modifications");
   assert.equal(quantity.step, "1");
-  assert.equal(amount.step, "0.000001");
+  assert.equal(amount.step, "any");
   assert.equal(amount.value, "115.123456");
   const pricing = created.find((element) => element.className === "order-price-status estimated");
   assert.equal(pricing.textContent, "Prix estimés");
@@ -594,7 +594,7 @@ test("d.12 crée une demande directe et propose son lien de suivi", async () => 
   assert.equal(amount.value, "");
   article.value = datalist.children[0].value;
   article.listeners.get("input")();
-  assert.equal(amount.step, "0.01");
+  assert.equal(amount.step, "any");
   assert.equal(amount.value, "110.00");
   assert.match(elements.get("newOrderTotalTt").textContent, /10,00 PED/);
   assert.match(elements.get("newOrderTotalMarkup").textContent, /1,00 PED \(10,00 %\)/);

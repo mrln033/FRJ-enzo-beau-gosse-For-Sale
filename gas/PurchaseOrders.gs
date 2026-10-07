@@ -1,3 +1,52 @@
+// T-027: decimal operations on the decimal representation of finite Numbers.
+// BigInts stay internal: APIs, SQLite and Sheets continue receiving Numbers.
+function createPedMath() {
+  const parts = value => {
+    const number = Number(value);
+    if (!Number.isFinite(number)) throw new Error("Montant non fini");
+    const [mantissa, exponent = "0"] = String(number).split("e");
+    const scale = (mantissa.split(".")[1] || "").length - Number(exponent);
+    return { n: BigInt(mantissa.replace(".", "")), scale };
+  };
+  const number = (n, scale) => Number(String(n) + "e" + (-scale));
+  const add = (a, b) => {
+    const x = parts(a), y = parts(b), scale = Math.max(x.scale, y.scale);
+    return number(x.n * BigInt(10) ** BigInt(scale - x.scale) + y.n * BigInt(10) ** BigInt(scale - y.scale), scale);
+  };
+  const multiply = (a, b) => {
+    const x = parts(a), y = parts(b);
+    return number(x.n * y.n, x.scale + y.scale);
+  };
+  const round = (value, decimals = 2) => {
+    const x = parts(value);
+    if (x.scale <= decimals) return Number(value);
+    const divisor = BigInt(10) ** BigInt(x.scale - decimals);
+    const sign = x.n < BigInt(0) ? -BigInt(1) : BigInt(1), abs = x.n * sign;
+    return number(sign * ((abs + divisor / BigInt(2)) / divisor), decimals);
+  };
+  const format = (value, language = "EN") => {
+    const x = parts(value || 0), negative = x.n < BigInt(0);
+    let digits = String(negative ? -x.n : x.n);
+    if (x.scale < 0) digits += "0".repeat(-x.scale);
+    else digits = digits.padStart(x.scale + 1, "0");
+    const split = x.scale > 0 ? digits.length - x.scale : digits.length;
+    const integer = digits.slice(0, split);
+    const fraction = digits.slice(split).replace(/0+$/, "").padEnd(2, "0");
+    return (negative ? "-" : "") + integer + (language === "FR" ? "," : ".") + fraction;
+  };
+  const markup = (kind, value, member = false, rate = 0) => {
+    if (!["percent", "ped"].includes(kind) || value == null || !Number.isFinite(Number(value))) return {kind:"none",value:null};
+    const factor = multiply(member ? 0.5 : 1, add(1, -Number(rate || 0)));
+    return {kind, value: kind === "percent" ? add(1, multiply(add(value, -1), factor)) : multiply(value, factor)};
+  };
+  const price = (unit, quantity, kind, value) => {
+    const sale = kind === "percent" ? multiply(unit, value) : kind === "ped" ? add(unit, value) : Number(unit);
+    return {unitSalePed:sale, lineTtPed:multiply(unit, quantity), lineSalePed:multiply(sale, quantity)};
+  };
+  return Object.freeze({add, multiply, round, format, markup, price, sum: values => values.reduce(add, 0)});
+}
+var FRJ_PED_MATH = createPedMath();
+
 function processPurchaseOrderRequest(rawBody) {
   var featureValue = PropertiesService.getScriptProperties().getProperty("FRJ_CART_ENABLED");
   if (String(featureValue || "true").toLowerCase() === "false") {
@@ -241,22 +290,21 @@ function pricePurchaseOrderFromSheet_(submission) {
         reason: "price-changed",
         requestedQuantity: requested.quantity,
         availableQuantity: stock,
-        unitTtPed: purchaseRound_(unitTt),
+        unitTtPed: unitTt,
         markupKind: markup.kind,
         markupValue: markup.value,
         discountKind: discountKind,
         discountCampaignId: discountCampaignId,
         discountRate: discountRate,
         markupDisplay: markup.kind === "percent"
-          ? (markup.value * 100).toFixed(2).replace(".", ",") + " %"
-          : (markup.kind === "ped" ? markup.value.toFixed(2).replace(".", ",") + " PED" : null)
+          ? FRJ_PED_MATH.format(FRJ_PED_MATH.multiply(markup.value, 100), "FR") + " %"
+          : (markup.kind === "ped" ? FRJ_PED_MATH.format(markup.value, "FR") + " PED" : null)
       });
       return;
     }
     var baseMarkupKind = markup.kind;
     var baseMarkupValue = markup.value;
-    if (submission.frjMember && markup.kind === "percent") markup.value = 1 + ((markup.value - 1) / 2);
-    if (submission.frjMember && markup.kind === "ped") markup.value = markup.value / 2;
+    markup = FRJ_PED_MATH.markup(markup.kind, markup.value, submission.frjMember);
     markup = purchaseApplyCampaignDiscount_(markup, discountRate);
     var prices = purchasePriceOrderLine_(unitTt, requested.quantity, markup.kind, markup.value);
     lines.push({
@@ -266,7 +314,7 @@ function pricePurchaseOrderFromSheet_(submission) {
       aisle: String(current.RAYON).toUpperCase(),
       quantity: requested.quantity,
       stockAtSubmission: stock,
-      unitTtPed: purchaseRound_(unitTt),
+      unitTtPed: unitTt,
       markupKind: markup.kind,
       markupValue: markup.value,
       baseMarkupKind: baseMarkupKind,
@@ -275,8 +323,8 @@ function pricePurchaseOrderFromSheet_(submission) {
       discountCampaignId: discountCampaignId,
       discountRate: discountRate,
       markupDisplay: markup.kind === "percent"
-        ? (markup.value * 100).toFixed(2).replace(".", ",") + " %"
-        : (markup.kind === "ped" ? markup.value.toFixed(2).replace(".", ",") + " PED" : null),
+        ? FRJ_PED_MATH.format(FRJ_PED_MATH.multiply(markup.value, 100), "FR") + " %"
+        : (markup.kind === "ped" ? FRJ_PED_MATH.format(markup.value, "FR") + " PED" : null),
       unitSalePed: prices.unitSalePed,
       lineTtPed: prices.lineTtPed,
       lineSalePed: prices.lineSalePed,
@@ -286,8 +334,8 @@ function pricePurchaseOrderFromSheet_(submission) {
   return {
     lines: lines,
     discrepancies: discrepancies,
-    totalTtPed: purchaseRound_(lines.reduce(function(sum, line) { return sum + line.lineTtPed; }, 0)),
-    totalSalePed: purchaseRound_(lines.reduce(function(sum, line) { return sum + line.lineSalePed; }, 0)),
+    totalTtPed: purchaseRound_(FRJ_PED_MATH.sum(lines.map(line => line.lineTtPed))),
+    totalSalePed: purchaseRound_(FRJ_PED_MATH.sum(lines.map(line => line.lineSalePed))),
     pricingStatus: lines.some(function(line) { return line.priceStatus === "to-confirm"; }) ? "to-confirm" : "estimated"
   };
 }
@@ -532,14 +580,14 @@ function purchaseDiscordText_(value, maxLength) {
 
 function purchaseDiscordNumber_(value, decimals) {
   var number = Number(value || 0);
-  return number.toFixed(decimals).replace(".", ",").replace(/,?0+$/, "");
+  return number.toFixed(decimals).replace(".", ",");
 }
 
 function purchaseParseMarkup_(raw) {
   var text = String(raw || "").trim();
   if (/%$/.test(text)) {
     var percent = Number(text.replace("%", "").replace(",", "."));
-    return isFinite(percent) ? { kind: "percent", value: percent / 100 } : { kind: "none", value: null };
+    return isFinite(percent) ? { kind: "percent", value: FRJ_PED_MATH.multiply(percent, 0.01) } : { kind: "none", value: null };
   }
   if (/PED$/i.test(text)) {
     var ped = Number(text.replace(/PED$/i, "").trim().replace(",", "."));
@@ -556,27 +604,17 @@ function purchaseOptionalNumber_(value) {
 
 function purchaseSameNumber_(left, right) {
   if (left === null || right === null) return left === right;
-  return Math.abs(left - right) <= 0.0001;
+  return left === right || Math.abs(left - right) <= Number.EPSILON * Math.max(Math.abs(left), Math.abs(right));
 }
 
 function purchaseApplyCampaignDiscount_(markup, discountRate) {
   var rate = Number(discountRate);
   if (!(rate > 0 && rate <= 1) || markup.kind === "none") return markup;
-  if (markup.kind === "percent") {
-    return { kind: "percent", value: 1 + ((markup.value - 1) * (1 - rate)) };
-  }
-  return { kind: "ped", value: markup.value * (1 - rate) };
+  return FRJ_PED_MATH.markup(markup.kind, markup.value, false, rate);
 }
 
 function purchasePriceOrderLine_(unitTt, quantity, markupKind, markupValue) {
-  var unitSale = unitTt;
-  if (markupKind === "percent") unitSale = unitTt * markupValue;
-  if (markupKind === "ped") unitSale = unitTt + markupValue;
-  return {
-    unitSalePed: purchaseRound_(unitSale, 6),
-    lineTtPed: purchaseRound_(unitTt * quantity),
-    lineSalePed: purchaseRound_(unitSale * quantity)
-  };
+  return FRJ_PED_MATH.price(unitTt, quantity, markupKind, markupValue);
 }
 
 function purchaseItemKey_(item, storage, aisle) {
@@ -598,9 +636,7 @@ function purchaseIsoDate_(value) {
 }
 
 function purchaseRound_(value, decimals) {
-  var precision = decimals === undefined ? 2 : decimals;
-  var factor = Math.pow(10, precision);
-  return Math.round((Number(value) + Number.EPSILON) * factor) / factor;
+  return FRJ_PED_MATH.round(value, decimals === undefined ? 2 : decimals);
 }
 
 function purchaseJsonOutput_(data) {

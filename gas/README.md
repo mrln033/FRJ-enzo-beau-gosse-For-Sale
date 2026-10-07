@@ -1,5 +1,7 @@
 # Backend Google Apps Script
 
+T-027 : PurchaseOrders conserve prix unitaires, MU et montants de ligne précis ; OrderEditing conserve la précision du miroir et applique seulement les formats de présentation (totaux à deux décimales). Pas de changement des inventaires, des formules ou des triggers ; aucun recalcul historique. Voir [Précision des prix et retour à GAS 47](../docs/PRECISION-PRIX.md).
+
 T-026 (27/09/2026) : GAS **47** publié sur la même Web App et HEAD. Nouvelle lecture publique `?action=categorySummary` : total distinct par catégorie depuis BDD_APP, stock positif, lecture groupée et cache de 300 secondes. Aucune écriture, aucun changement des inventaires/formules/triggers ; seuls Catalog.gs et Code.gs modifiés. Sources distantes comparées avant publication et 17 fichiers relus identiques après. Voir [fonctionnement et retour à la version 46](../docs/INVENTAIRE-DESIGNS.md).
 
 T-025 (23/09/2026) : aucun changement GAS (version 46). Les actualisations de MU des Devis Admin sont reçues par le miroir existant des demandes/lignes et leur événement proposal-changed (commentaire + DETAILS_JSON). Aucun onglet ni trigger ajouté, inventaires inchangés. Le contrôle est exécuté uniquement au clic dans la console Admin côté D1 ; aucune modification automatique depuis GAS.

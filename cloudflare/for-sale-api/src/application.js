@@ -1,3 +1,4 @@
+import { pedMath } from "./ped-math.js";
 import { computeWeightedMarkup, normalizeInventoryRows, normalizeMarketRows } from "./domain.js";
 import {
   catalogContentHash,
@@ -170,6 +171,7 @@ export async function handleGet(url, env) {
       c.wiki_url AS LIEN_WIKI,
       mo.observed_at AS DATE_MU_ISO,
       mo.weighted_display AS MU,
+      mo.weighted_kind AS MU_KIND, mo.weighted_value AS MU_VALUE,
       COALESCE(s.discount_rate, p.discount_rate, '') AS Remise_Promo,
       COALESCE(s.campaign_type, p.campaign_type, '') AS REMISE_TYPE,
       COALESCE(s.id, p.id, '') AS REMISE_ID,
@@ -204,6 +206,7 @@ export async function handleGet(url, env) {
 
   const rows = result.results.map(({ DATE_MU_ISO, ...row }) => ({
     ...row,
+    MU: row.MU_KIND && row.MU_VALUE != null ? formatMarkup(row.MU_KIND, Number(row.MU_VALUE)) : row.MU,
     DATE_MU: DATE_MU_ISO ? formatFrenchDateTime(DATE_MU_ISO) : "",
     TOTAL: Number(row.QUANTITE || 0) * Number(row.PRIX_UNITAIRE || 0)
   }));
@@ -2967,8 +2970,8 @@ function deriveBaseMarkup(kind, effectiveValue, frjMember, discountRate) {
 
 function orderLineTotals(lines) {
   return {
-    totalTtPed: roundOrderPed(lines.reduce((sum, line) => sum + line.lineTtPed, 0)),
-    totalSalePed: roundOrderPed(lines.reduce((sum, line) => sum + line.lineSalePed, 0)),
+    totalTtPed: roundOrderPed(pedMath.sum(lines.map(line => line.lineTtPed))),
+    totalSalePed: roundOrderPed(pedMath.sum(lines.map(line => line.lineSalePed))),
     pricingStatus: lines.some((line) => line.priceStatus === "to-confirm") ? "to-confirm" : "estimated"
   };
 }
@@ -3104,7 +3107,7 @@ function currentParisDateKey(date = new Date()) {
 }
 
 function roundOrderPed(value) {
-  return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+  return pedMath.round(value);
 }
 
 async function readAdminOrders(env) {

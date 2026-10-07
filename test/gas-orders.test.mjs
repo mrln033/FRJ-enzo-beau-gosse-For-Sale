@@ -144,7 +144,7 @@ test("le secours GAS aligne le calcul membre et l'arrondi final sur D1", () => {
 
   assert.equal(priced.lines[0].markupDisplay, "107,56 %");
   assert.equal(priced.lines[0].unitSalePed, 0.010756);
-  assert.equal(priced.lines[0].lineSalePed, 10.76);
+  assert.equal(priced.lines[0].lineSalePed, 10.756);
   assert.equal(context.purchaseRound_(1.23456789, 6), 1.234568);
 });
 
@@ -194,8 +194,8 @@ test("GAS et D1 produisent la même estimation de demande", () => {
     JSON.parse(JSON.stringify(gasResult)),
     JSON.parse(JSON.stringify(d1Result))
   );
-  assert.equal(gasResult.lines[0].markupDisplay, "107,18 %");
-  assert.equal(gasResult.lines[0].lineSalePed, 10.72);
+  assert.equal(gasResult.lines[0].markupDisplay, "107,182 %");
+  assert.equal(gasResult.lines[0].lineSalePed, 10.7182);
   assert.equal(gasResult.lines[0].baseMarkupValue, 1.1512);
   assert.equal(gasResult.lines[0].discountCampaignId, "daily-promo-2026-08-30");
 });

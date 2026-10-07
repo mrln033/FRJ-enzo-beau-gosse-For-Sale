@@ -146,7 +146,7 @@
     const text = String(raw || "").trim();
     if (/%$/.test(text)) {
       const value = Number(text.replace("%", "").replace(",", "."));
-      return Number.isFinite(value) ? { kind: "percent", value: value / 100 } : { kind: "none", value: null };
+      return Number.isFinite(value) ? { kind: "percent", value: global.FRJ_ORDER_UI.math.multiply(value, 0.01) } : { kind: "none", value: null };
     }
     if (/PED$/i.test(text)) {
       const value = Number(text.replace(/PED$/i, "").trim().replace(",", "."));
@@ -157,37 +157,25 @@
 
   function effectiveMarkup(item) {
     if (!Number.isFinite(item.markupValue)) return { kind: item.markupKind, value: item.markupValue };
-    const profileFactor = isFrjMember() ? 0.5 : 1;
-    const campaignFactor = Number.isFinite(item.discountRate) ? 1 - item.discountRate : 1;
-    return item.markupKind === "percent"
-      ? { kind: "percent", value: 1 + ((item.markupValue - 1) * profileFactor * campaignFactor) }
-      : (item.markupKind === "ped"
-        ? { kind: "ped", value: item.markupValue * profileFactor * campaignFactor }
-        : { kind: "none", value: null });
+    return global.FRJ_ORDER_UI.math.markup(item.markupKind, item.markupValue, isFrjMember(), item.discountRate || 0);
   }
 
   function linePrices(item) {
     const quantity = Number(item.quantity) || 0;
-    const tt = roundPed(item.unitTtPed * quantity);
     const markup = effectiveMarkup(item);
-    let sale = tt;
-    if (markup.kind === "percent") sale = tt * markup.value;
-    if (markup.kind === "ped") sale = tt + (quantity * markup.value);
-    return { tt, sale: roundPed(sale), hasMarkup: markup.kind !== "none" };
+    const prices = global.FRJ_ORDER_UI.math.price(item.unitTtPed, quantity, markup.kind, markup.value);
+    return { tt: prices.lineTtPed, sale: prices.lineSalePed, hasMarkup: markup.kind !== "none" };
   }
 
   function displayedMarkup(item) {
     const markup = effectiveMarkup(item);
     const prefix = isFrjMember() ? "MU FRJ" : "MU";
     if (markup.kind === "percent" && Number.isFinite(markup.value)) {
-      const percent = (markup.value * 100).toLocaleString(language() === "FR" ? "fr-FR" : "en-GB", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      });
+      const percent = global.FRJ_ORDER_UI.formatUnitPed(global.FRJ_ORDER_UI.math.multiply(markup.value, 100), language());
       return `${prefix} : ${percent} %`;
     }
     if (markup.kind === "ped" && Number.isFinite(markup.value)) {
-      return `${prefix} : ${formatPed(markup.value)} PED`;
+      return `${prefix} : ${global.FRJ_ORDER_UI.formatUnitPed(markup.value, language())} PED`;
     }
     return `${prefix} : ${label("markupPending")}`;
   }
@@ -244,7 +232,7 @@
   function render() {
     if (!enabled || !launcher || !drawer) return;
     const count = cart.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
-    const saleTotal = roundPed(cart.items.reduce((sum, item) => sum + linePrices(item).sale, 0));
+    const saleTotal = roundPed(global.FRJ_ORDER_UI.math.sum(cart.items.map(item => linePrices(item).sale)));
     const approvalCount = requests.filter((request) => request.status === "awaiting_approval").length;
     const requiresApproval = approvalCount > 0;
     launcher.classList.toggle("action-required", requiresApproval);
@@ -284,7 +272,7 @@
 
     const totals = document.createElement("div");
     totals.className = "cart-totals";
-    const ttTotal = roundPed(cart.items.reduce((sum, item) => sum + linePrices(item).tt, 0));
+    const ttTotal = roundPed(global.FRJ_ORDER_UI.math.sum(cart.items.map(item => linePrices(item).tt)));
     totals.innerHTML = `
       <p><span>${escapeHtml(label("tt"))}</span><strong>${formatPed(ttTotal)} PED</strong></p>
       <p class="cart-sale-total"><span>${escapeHtml(label("sale"))}</span><strong>${formatPed(saleTotal)} PED</strong></p>
@@ -317,7 +305,7 @@
       </label>
       <div class="cart-line-prices">
         <span class="cart-line-price-detail">
-          <span>${escapeHtml(label("unitTt"))}: ${formatPed(item.unitTtPed)} PED</span>
+          <span>${escapeHtml(label("unitTt"))}: ${global.FRJ_ORDER_UI.formatUnitPed(item.unitTtPed, language())} PED</span>
           <small>${escapeHtml(displayedMarkup(item))}</small>
         </span>
         <strong>${formatPed(prices.sale)} PED</strong>
@@ -533,9 +521,9 @@
   async function copyCart() {
     const lines = cart.items.map((item) => {
       const prices = linePrices(item);
-      return `- ${formatQuantity(item.quantity)} × ${item.itemName} — ${formatPed(item.unitTtPed)} PED/u — ${displayedMarkup(item)} — ${formatPed(prices.sale)} PED`;
+      return `- ${formatQuantity(item.quantity)} × ${item.itemName} — ${global.FRJ_ORDER_UI.formatUnitPed(item.unitTtPed, language())} PED/u — ${displayedMarkup(item)} — ${formatPed(prices.sale)} PED`;
     });
-    const total = roundPed(cart.items.reduce((sum, item) => sum + linePrices(item).sale, 0));
+    const total = roundPed(global.FRJ_ORDER_UI.math.sum(cart.items.map(item => linePrices(item).sale)));
     const heading = language() === "FR" ? "Bonjour, je suis intéressé par :" : "Hello, I am interested in:";
     const footer = `${label("sale")} : ${formatPed(total)} PED\n${label("estimated")}`;
     await navigator.clipboard.writeText([heading, "", ...lines, "", footer].join("\n"));
@@ -756,15 +744,15 @@
   }
 
   function formatPed(value) {
-    return Number(value || 0).toLocaleString(language() === "FR" ? "fr-FR" : "en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return roundPed(value || 0).toLocaleString(language() === "FR" ? "fr-FR" : "en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
   function formatQuantity(value) {
-    return Number(value || 0).toLocaleString(language() === "FR" ? "fr-FR" : "en-GB", { maximumFractionDigits: 0 });
+    return roundPed(value || 0).toLocaleString(language() === "FR" ? "fr-FR" : "en-GB", { maximumFractionDigits: 0 });
   }
 
   function roundPed(value) {
-    return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+    return global.FRJ_ORDER_UI.math.round(value);
   }
 
   function button(text, className, handler) {

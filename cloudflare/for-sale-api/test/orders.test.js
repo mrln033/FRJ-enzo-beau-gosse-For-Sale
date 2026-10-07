@@ -94,13 +94,14 @@ test("demande une nouvelle confirmation si le prix affiché a changé", () => {
   assert.equal(result.discrepancies[0].unitTtPed, 11);
 });
 
-test("calcule avec le MU arrondi exactement comme sur la tuile", () => {
-  const result = priceOrderLines(normalizedItems(), [{
-    itemName: "Item A", storage: "ARMORS", aisle: "PARTS", stock: 5,
-    unitTtPed: 10, markupKind: "percent", markupValue: 1.200049
-  }]);
-  assert.equal(result.discrepancies.length, 0);
-  assert.equal(result.totalSalePed, 24);
+test("T-027 exige confirmation si le MU précis diffère du MU arrondi", () => {
+  const catalog = [{itemName:"Item A",storage:"ARMORS",aisle:"PARTS",stock:5,unitTtPed:10,markupKind:"percent",markupValue:1.200049}];
+  const result = priceOrderLines(normalizedItems(), catalog);
+  assert.equal(result.discrepancies[0].markupValue, 1.200049);
+  const accepted = priceOrderLines(normalizedItems().map(item=>({...item,observedMarkupValue:1.200049})), catalog);
+  assert.equal(accepted.discrepancies.length,0);
+  assert.equal(accepted.lines[0].lineSalePed,24.00098);
+  assert.equal(accepted.totalSalePed,24);
 });
 
 test("valide uniquement les statuts connus", () => {
@@ -209,15 +210,13 @@ test("conserve une MU saisie avec jusqu'à six décimales", () => {
     markupAmount: 115.123456
   }, 1000);
   assert.equal(revised.markupValue, 1.15123456);
-  assert.equal(revised.markupDisplay, "115,12 %");
-  assert.equal(revised.unitSalePed, 0.011512);
-  assert.equal(revised.lineSalePed, 11.51);
+  assert.equal(revised.markupDisplay, "115,123456 %");
+  assert.equal(revised.unitSalePed, 0.0115123456);
+  assert.equal(revised.lineSalePed, 11.5123456);
 
-  assert.throws(() => reviseOrderLine({ itemName: "Item A", unitTtPed: 1 }, {
-    quantity: 1,
-    markupKind: "ped",
-    markupAmount: 0.1234567
-  }, 1), /6 décimales/);
+  assert.equal(reviseOrderLine({ itemName: "Item A", unitTtPed: 1 }, {
+    quantity: 1, markupKind: "ped", markupAmount: 0.1234567
+  }, 1).unitSalePed, 1.1234567);
 });
 
 test("détecte une modification portant sur la sixième décimale de MU", () => {

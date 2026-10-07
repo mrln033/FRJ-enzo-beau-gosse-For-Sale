@@ -656,7 +656,7 @@ function getMUColor(dateStr) {
 }
 
 function formatMUValue(value) {
-  return value.toFixed(2).replace(".", ",");
+  return window.FRJ_ORDER_UI.formatUnitPed(value, "FR");
 }
 
 function getEffectiveMU(muStr) {
@@ -667,11 +667,11 @@ function getEffectiveMU(muStr) {
   }
 
   if (mu.type === "ped") {
-    return `${formatMUValue(mu.value / 2)} PED`;
+    return `${formatMUValue(window.FRJ_ORDER_UI.math.multiply(mu.value, 0.5))} PED`;
   }
 
   if (mu.type === "percent") {
-    const adjustedPercent = (1 + ((mu.value - 1) / 2)) * 100;
+    const adjustedPercent = window.FRJ_ORDER_UI.math.multiply(window.FRJ_ORDER_UI.math.markup("percent", mu.value, true).value, 100);
     return `${formatMUValue(adjustedPercent)} %`;
   }
 
@@ -688,8 +688,8 @@ function applyItemDiscountToMU(muStr, item) {
   const rate = getItemDiscountRate(item);
   if (!rate) return muStr;
   const mu = parseMU(muStr);
-  if (mu.type === "percent") return `${formatMUValue((1 + ((mu.value - 1) * (1 - rate))) * 100)} %`;
-  if (mu.type === "ped") return `${formatMUValue(mu.value * (1 - rate))} PED`;
+  if (mu.type === "percent") return `${formatMUValue(window.FRJ_ORDER_UI.math.multiply(window.FRJ_ORDER_UI.math.markup("percent", mu.value, false, rate).value, 100))} %`;
+  if (mu.type === "ped") return `${formatMUValue(window.FRJ_ORDER_UI.math.markup("ped", mu.value, false, rate).value)} PED`;
   return muStr;
 }
 
@@ -903,11 +903,7 @@ function renderCatalogImage(container, item) {
 	
 	function formatNumber(value) {
         if (value === "" || value == null) return "";
-        const str = value.toString();
-        if (!str.includes(".")) return str + ".00";
-        const decimals = str.split(".")[1].length;
-        if (decimals === 1) return str + "0";
-        return str; // 2 décimales ou + → on garde tel quel
+        return window.FRJ_ORDER_UI.formatUnitPed(value, "EN");
 	}
 	  
 	function scrollToTop() {
@@ -967,7 +963,7 @@ function openCalculator(event, iconEl, item) {
         <input type="number" id="calcQty" value="${defaultQty}" min="1" max="${availableQuantity}" step="1">
       </div>
 
-      <p>${t("unitPrice")}: ${prix.toFixed(2)} peds</p>
+      <p>${t("unitPrice")}: ${formatNumber(prix)} peds</p>
       <p>${t("total")}: <span id="calcTT"></span> peds</p>
       <p id="muLine"></p>
       <p><strong>${t("calcSell")}: <span id="calcSell"></span> peds</strong></p>
@@ -1016,7 +1012,7 @@ function openCalculator(event, iconEl, item) {
 function updateCalc(card, prix, muStr, muLabel = "MU", normalMuStr = muStr) {
   const qty = Math.max(0, Math.floor(Number(card.querySelector("#calcQty").value) || 0));
 
-  const tt = qty * prix;
+  const tt = window.FRJ_ORDER_UI.math.multiply(qty, prix);
   card.querySelector("#calcTT").innerText = tt.toFixed(2);
 
   const mu = parseMU(muStr);
@@ -1026,16 +1022,16 @@ function updateCalc(card, prix, muStr, muLabel = "MU", normalMuStr = muStr) {
 
   // Un MU en pourcentage s'applique à la valeur TT totale.
   if (mu.type === "percent") {
-    sell = tt * mu.value;
+    sell = window.FRJ_ORDER_UI.math.price(prix, qty, "percent", mu.value).lineSalePed;
     muDisplay = `${muLabel}: ${muStr}`;
   }
 
   // Un MU en PED s'applique par unité avant multiplication par la quantité.
   else if (mu.type === "ped") {
     const muTotal = qty * mu.value;
-    sell = tt + muTotal;
+    sell = window.FRJ_ORDER_UI.math.price(prix, qty, "ped", mu.value).lineSalePed;
 
-    muDisplay = `Total ${muLabel}: ${formatMUValue(muTotal)} peds`;
+    muDisplay = `Total ${muLabel}: ${window.FRJ_ORDER_UI.formatPed(muTotal)} peds`;
   }
 
   // Sans MU exploitable, le prix de vente reste égal au TT.
@@ -1045,8 +1041,8 @@ function updateCalc(card, prix, muStr, muLabel = "MU", normalMuStr = muStr) {
 
   const normalMu = parseMU(normalMuStr);
   let normalSell = tt;
-  if (normalMu.type === "percent") normalSell = tt * normalMu.value;
-  if (normalMu.type === "ped") normalSell = tt + (qty * normalMu.value);
+  if (normalMu.type === "percent") normalSell = window.FRJ_ORDER_UI.math.price(prix, qty, "percent", normalMu.value).lineSalePed;
+  if (normalMu.type === "ped") normalSell = window.FRJ_ORDER_UI.math.price(prix, qty, "ped", normalMu.value).lineSalePed;
   card.querySelector("#calcSell").innerHTML = normalMuStr !== muStr
     ? `<del>${normalSell.toFixed(2)}</del> ${sell.toFixed(2)}`
     : sell.toFixed(2);
@@ -1074,7 +1070,7 @@ function parseMU(muStr) {
     const val = parseFloat(muStr.replace("%", "").replace(",", "."));
     return {
       type: "percent",
-      value: isNaN(val) ? 0 : val / 100
+      value: isNaN(val) ? 0 : window.FRJ_ORDER_UI.math.multiply(val, 0.01)
     };
   }
 

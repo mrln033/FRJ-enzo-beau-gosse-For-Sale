@@ -1,5 +1,7 @@
 # Architecture du projet
 
+T-027 : noyau décimal commun navigateur/GAS/D1, copies embarquées vérifiées identiques par test. Contrats numériques et schéma inchangés, aucune migration ni nouvelle Queue. Voir [Précision des prix](PRECISION-PRIX.md).
+
 T-026 : navigation V19/Ancien et compteurs distincts, sans modification des identifiants métier. La synthèse `?action=categorySummary` remplace la lecture initiale des catégories ; aucune lecture complète des articles par onglet. Le secours de cette seule action vise GAS_APP_URL, les anciennes routes restent inchangées. Voir [le contrat et le retour ciblé](INVENTAIRE-DESIGNS.md).
 
 ## Principes

@@ -23,7 +23,7 @@ function frjOrderEnsureRows_(sheet, lastRow) {
 function frjOrderLineRows_(snapshot) {
   return (snapshot.items || []).map(function(item) {
     var kind = item.markupKind || "none";
-    var amount = item.markupValue == null ? "" : Number((kind === "percent" ? item.markupValue * 100 : item.markupValue).toFixed(6));
+    var amount = item.markupValue == null ? "" : (kind === "percent" ? FRJ_PED_MATH.multiply(item.markupValue, 100) : item.markupValue);
     return [snapshot.id, item.lineNo, item.itemName, item.storage, item.aisle, item.quantity,
       kind, amount, false, item.unitTtPed, item.lineTtPed, item.lineSalePed];
   });
@@ -66,8 +66,28 @@ function frjOrderSheetState_() {
   return { ss:ss, sheet:sheet, values:values, indexes:frjOrderIndexes_(values[0]),
     linesSheet:linesSheet, lines:lines };
 }
+// Présentation seulement : aucune cellule de données, formule ou inventaire modifiée.
+function frjEnsureOrderPrecisionFormats_(alreadyLocked) {
+  var properties = PropertiesService.getScriptProperties();
+  if (properties.getProperty("FRJ_ORDER_PRECISION_FORMAT") === "1") return;
+  var lock = alreadyLocked ? null : LockService.getScriptLock();
+  if (lock) lock.waitLock(10000);
+  try {
+    if (properties.getProperty("FRJ_ORDER_PRECISION_FORMAT") === "1") return;
+    var ss = frjOrderBook_(), lines = ss.getSheetByName("COMMANDES_LIGNES");
+    if (!lines) return;
+    lines.getRange("H2:H").setNumberFormat("0.00###############");
+    lines.getRange("J2:J").setNumberFormat("0.00###############");
+    lines.getRange("K2:L").setNumberFormat("0.00");
+    var orders = ss.getSheetByName("COMMANDES_APP");
+    if (orders) orders.getRange("I2:J").setNumberFormat("0.00");
+    properties.setProperty("FRJ_ORDER_PRECISION_FORMAT", "1");
+  } finally { if (lock) lock.releaseLock(); }
+}
+
 function frjEnsureOrderEditing_(alreadyLocked) {
   frjEnsureAdminQuoteStatus_();
+  frjEnsureOrderPrecisionFormats_(alreadyLocked);
   if (PropertiesService.getScriptProperties().getProperty("FRJ_ORDER_EDITING_VERSION") === "20260912-2") return;
   if (alreadyLocked) return frjInitializeOrderEditing_();
   var lock = LockService.getScriptLock();
@@ -118,8 +138,9 @@ function frjInitializeOrderEditing_() {
   sheet.getRange("I2:I").setDataValidation(SpreadsheetApp.newDataValidation().requireCheckbox().build());
   sheet.getRange("G2:G").setDataValidation(SpreadsheetApp.newDataValidation()
     .requireValueInList(["percent","ped","none","auto"],true).setAllowInvalid(false).build());
-  sheet.getRange("H2:H").setNumberFormat("0.######");
-  sheet.getRange("J2:L").setNumberFormat("0.######");
+  sheet.getRange("H2:H").setNumberFormat("0.00###############");
+  sheet.getRange("J2:J").setNumberFormat("0.00###############");
+  sheet.getRange("K2:L").setNumberFormat("0.00");
   ["A:B","J:L"].forEach(function(range) {
     sheet.getRange(range).protect().setDescription("FRJ : champs techniques ou calculés").setWarningOnly(true);
   });
@@ -148,6 +169,19 @@ function frjOrderEditableLines_(state,base) {
   return !lines.length && base.order.editRevision == null
     ? frjOrderLineRows_({id:base.order.id,items:base.items}) : lines;
 }
+// T-027 : les miroirs antérieurs arrondissaient MU_SAISI à six décimales.
+// Une différence due uniquement à cet ancien affichage ne déclenche pas une édition.
+function frjOrderUnchangedPrecision_(draft, baseline, order) {
+  if (JSON.stringify(draft) === JSON.stringify(baseline)) return true;
+  var created = new Date(order.createdAt || order.clientCreatedAt || "").getTime();
+  if (!isFinite(created) || created >= Date.parse("2026-10-07T00:00:00Z")) return false;
+  var legacy = JSON.parse(JSON.stringify(baseline));
+  legacy.items.forEach(function(item) {
+    if (item.markupAmount != null) item.markupAmount = Number(item.markupAmount.toFixed(6));
+  });
+  return JSON.stringify(draft) === JSON.stringify(legacy);
+}
+
 function frjScanOrderEdits_(state) {
   var pending = [];
   state.values.slice(1).forEach(function(row,offset) {
@@ -172,7 +206,7 @@ function frjScanOrderEdits_(state) {
         buyerAvatar:base.order.buyerAvatar, buyerContact:base.order.buyerContact, buyerComment:base.order.buyerComment,
         language:base.order.language, frjMember:base.order.frjMember, status:base.order.status });
       var stored = row[i.EDITION_JSON] ? JSON.parse(String(row[i.EDITION_JSON])) : null;
-      if (JSON.stringify(draft) === JSON.stringify(baseline) && !stored) return;
+      if (frjOrderUnchangedPrecision_(draft, baseline, base.order) && !stored) return;
       if (!stored || JSON.stringify(stored.draft) !== JSON.stringify(draft)) {
         stored = { operationId:"sheet-"+Utilities.getUuid().toLowerCase(), orderId:base.order.id,
           baseRevision:base.order.editRevision, draft:draft };
@@ -236,7 +270,7 @@ function frjPreserveLocalOrderEdit_(row,indexes,snapshot,sheet,rowNumber) {
     var base = JSON.parse(String(row[indexes.SYNC_PAYLOAD_JSON]));
     var draft = frjOrderDraft_(row,indexes,frjOrderEditableLines_(state,base));
     var baseline = frjOrderBaseDraft_(Object.assign({},base.order,{items:base.items}));
-    if (!row[indexes.EDITION_JSON] && JSON.stringify(draft) === JSON.stringify(baseline)) return false;
+    if (!row[indexes.EDITION_JSON] && frjOrderUnchangedPrecision_(draft, baseline, base.order)) return false;
     if (row[indexes.EDITION_JSON]) {
       var operation = JSON.parse(String(row[indexes.EDITION_JSON]));
       if (operation.baseRevision === snapshot.editRevision) return true;

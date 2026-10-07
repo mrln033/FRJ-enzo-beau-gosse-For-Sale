@@ -1,4 +1,28 @@
 import test from "node:test";
+
+test("T-027 D1 conserve le prix unitaire dans la création, l'édition et le miroir", async () => {
+ const db=setupDatabase(),env={DB:makeD1(db),CART_ENABLED:"true"};
+ db.exec("UPDATE catalog_items SET unit_price_ped=0.024 WHERE name='Item A'; UPDATE inventory_current SET quantity=3000 WHERE item_name='Item A'");
+ const url=new URL("https://api.example/admin/orders");
+ const created=await (await handleAdminPost(new Request(url,{method:"POST",body:JSON.stringify({
+  buyerAvatar:"Precision test",frjMember:false,items:[{...lineA,quantity:2100,markupAmount:100}]
+ })}),url,env)).json();
+ assert.equal(created.order.items[0].unitTtPed,0.024);
+ assert.equal(created.order.totalTtPed,50.4);
+ const id=created.order.id;
+ const snapshot=async()=> (await (await handleSyncGet(new URL("https://api.example/sync/order-edit?id="+id),env)).json()).snapshot;
+ const before=await snapshot(),draft=editableSheetDraft(before);draft.items[0].quantity=2101;
+ const endpoint=new URL("https://api.example/sync/order-edit");
+ const result=await (await handleSyncPost(new Request(endpoint,{method:"POST",body:JSON.stringify({
+  orderId:id,operationId:"sheet-"+crypto.randomUUID(),baseRevision:before.editRevision,draft
+ })}),endpoint,env)).json();
+ assert.equal(result.ok,true);
+ assert.equal(result.snapshot.items[0].unitTtPed,0.024);
+ assert.equal(result.snapshot.items[0].lineTtPed,50.424);
+ assert.equal(result.snapshot.totalTtPed,50.42);
+ db.close();
+});
+
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -633,9 +657,9 @@ test("T-018 copie indépendante, contact et contrôle du catalogue sans écritur
     error => error.status === 400);
 });
 
-test("d.12 valide les saisies directes et limite la MU à deux décimales", () => {
+test("T-027 valide les saisies directes sans tronquer la MU", () => {
   assert.equal(normalizeAdminOrderDraft({ buyerAvatar: " Enzo ", frjMember: true, items: [lineA] }).buyerAvatar, "Enzo");
-  assert.throws(() => normalizeAdminOrderLine({ ...lineA, markupAmount: 1.234 }), /2 décimales/);
+  assert.equal(normalizeAdminOrderLine({ ...lineA, markupAmount: 1.234 }).markupAmount, 1.234);
   assert.throws(() => normalizeAdminOrderLine({ ...lineA, markupKind: "none" }), /Type de MU/);
   assert.throws(() => normalizeAdminOrderDraft({ buyerAvatar: "Enzo", items: [lineA, lineA] }), /une seule fois/);
 });
