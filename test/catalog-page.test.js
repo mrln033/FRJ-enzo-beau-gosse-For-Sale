@@ -53,6 +53,38 @@ function loadCatalogController(search = "", storedDesign = null) {
   return { context, documentListeners };
 }
 
+test("T-027 : MU des cartes arrondi à deux décimales maximum et utilisé au verso", () => {
+  const { context } = loadCatalogController();
+  context.isFRJMember = () => false;
+  for (const lang of ["FR", "EN"]) {
+    vm.runInContext(`currentLang = "${lang}"`, context);
+    assert.equal(context.getEffectiveMU("115.123456 %"), "115,12 %");
+    assert.equal(context.getEffectiveMU("0.125 PED"), "0,13 PED");
+    assert.equal(context.getEffectiveMU("110.500 %"), "110,5 %");
+    assert.equal(context.getEffectiveMU("100 %"), "100 %");
+  }
+  const fields = { "#calcQty": { value: "2100" }, "#calcTT": {}, "#calcSell": {}, "#muLine": {} };
+  const card = { querySelector: key => fields[key] };
+  const check = (mu, expected) => {
+    context.updateCalc(card, 0.024, mu);
+    assert.equal(fields["#calcTT"].innerText, "50.40");
+    assert.equal(fields["#calcSell"].innerHTML, expected);
+  };
+  check(context.getEffectiveMU("115.123456 %"), "58.02");
+  check(context.getEffectiveMU("0.123456 PED"), "302.40");
+  const promo = context.applyItemDiscountToMU(context.getEffectiveMU("115.123456 %"), { Remise_Promo: 0.05 });
+  assert.equal(promo, "114,36 %");
+  check(promo, "57.64");
+  vm.runInContext('currentLang = "FR"', context);
+  context.isFRJMember = () => true;
+  assert.equal(context.getEffectiveMU("115.123456 %"), "107,56 %");
+  check(context.getEffectiveMU("115.123456 %"), "54.21");
+  assert.equal(context.getEffectiveMU("0.123456 PED"), "0,06 PED");
+  check(context.getEffectiveMU("0.123456 PED"), "176.40");
+  assert.equal(context.formatNumber(0.024), "0.024");
+  assert.equal(context.formatNumber(2), "2.00");
+});
+
 function imageFixture(item) {
   const { context } = loadCatalogController();
   const requests = [];

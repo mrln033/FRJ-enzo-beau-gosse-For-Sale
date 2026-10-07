@@ -656,13 +656,16 @@ function getMUColor(dateStr) {
 }
 
 function formatMUValue(value) {
-  return window.FRJ_ORDER_UI.formatUnitPed(value, "FR");
+  // Le MU affiché est aussi la valeur utilisée par la calculatrice.
+  return String(window.FRJ_ORDER_UI.math.round(value, 2)).replace(".", ",");
 }
 
 function getEffectiveMU(muStr) {
   const mu = parseMU(muStr);
 
   if (currentLang !== "FR" || !isFRJMember()) {
+    if (mu.type === "ped") return `${formatMUValue(mu.value)} PED`;
+    if (mu.type === "percent") return `${formatMUValue(window.FRJ_ORDER_UI.math.multiply(mu.value, 100))} %`;
     return muStr;
   }
 
