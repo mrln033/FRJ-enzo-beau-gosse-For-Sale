@@ -33,6 +33,8 @@ Sources GAS distantes comparées aux 17 fichiers de HEAD avant publication ; seu
 
 ## Retour arrière ciblé
 
+Vérification finale : commit applicatif d5fc5a0 publié, build GitHub Pages terminé. Les trois pages HTML et cinq scripts concernés sont servis identiques au dépôt. Le contrôleur Admin publié a aussi été testé dans Chromium avec une réponse API simulée : une ancienne demande Terminée à 50,40 reste à 50,40 malgré un prix unitaire ancien tronqué, et ses champs restent verrouillés. Aucun accès Admin réel ni écriture de demande pour ce contrôle.
+
 Référence Git préalable : d9ef406. Rétablir uniquement les fichiers du lot T-027, en préservant tout changement ultérieur, puis republier le frontend GitHub Pages. Pour les backends : Worker bfd78af1-20f5-456a-9acc-dfaa803f5369 et Web App GAS version 47 (même déploiement). Rétablir aussi les sources HEAD GAS des deux modules, car les triggers utilisent HEAD.
 
 Aucune restauration de base ni de classeur. Les demandes enregistrées entre-temps doivent être conservées. Attention : revenir à l'ancien code réintroduit les arrondis unitaires lors de créations/modifications ; ne pas recalculer en masse les demandes pendant un retour arrière. Les formats visuels Sheets à deux décimales/variables peuvent rester sans risque, car ils ne changent aucune valeur.
