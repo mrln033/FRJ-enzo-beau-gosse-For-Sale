@@ -580,7 +580,7 @@ function purchaseDiscordText_(value, maxLength) {
 
 function purchaseDiscordNumber_(value, decimals) {
   var number = Number(value || 0);
-  return number.toFixed(decimals).replace(".", ",");
+  return (decimals === 2 ? number.toFixed(2) : String(Number(number.toFixed(decimals)))).replace(".", ",");
 }
 
 function purchaseParseMarkup_(raw) {

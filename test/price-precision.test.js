@@ -32,6 +32,8 @@ test("T-027 prix unitaires variables, zéros inutiles, FR/EN et notation scienti
  }
  assert.equal(ui.formatPed(0.024,"FR"),"0,02");
  assert.equal(ui.formatPed(1.005,"EN"),"1.01");
+ assert.equal(gas.purchaseDiscordNumber_(2100,4),"2100");
+ assert.equal(gas.purchaseDiscordNumber_(50.4,2),"50,40");
 });
 test("T-027 2100 câbles à 0.024 PED, reprise et MU très précis",()=>{
  for(const math of [pedMath,gas.FRJ_PED_MATH,ui.math]){
@@ -67,4 +69,3 @@ test("T-027 saisie et synchronisation ne plafonnent plus les décimales du MU",(
  assert.equal(formatMarkup("ped",0.000000123),"0,000000123 PED");
  assert.equal(formatMarkup("percent",1.15123456789),"115,123456789 %");
 });
-

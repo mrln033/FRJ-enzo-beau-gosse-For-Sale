@@ -47,4 +47,3 @@ function createPedMath() {
 }
 
 export const pedMath = createPedMath();
-

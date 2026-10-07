@@ -29,11 +29,10 @@ Les inventaires MindArk (six colonnes, valeurs texte à quatre décimales et dat
 
 293 tests automatisés : précision, petites valeurs, scientifique, MU PED/%, Public/FRJ, promotions, saisie, miroir, conservation historique, non-régression. Test d'intégration SQLite/D1 : création à 0,024 × 2 100, édition Sheets à 2 101, maintien de 0,024 et total 50,42. Contrôle Chromium du catalogue, de la calculette et du panier : 50,40 PED, aucune erreur JavaScript.
 
-Sources GAS distantes comparées aux 17 fichiers de HEAD avant publication ; seuls PurchaseOrders et OrderEditing sont modifiés. Les 17 fichiers ont été relus identiques après publication. Worker 66cd4039-09b4-4a80-a46d-9091e3aa9e10 et GAS 48 publiés le 07/10/2026, même Web App. Contrôles réels D1/GAS avec Basic Auxiliary Socket à 0,0136 PED : calcul exécuté, puis refus volontaire grâce à une seconde ligne inexistante, avant toute écriture de demande ou notification Discord. Frontend livré par le commit T-027 ; validation utilisateur en production attendue.
+Sources GAS distantes comparées aux 17 fichiers de HEAD avant publication ; seuls PurchaseOrders et OrderEditing sont modifiés. Les 17 fichiers ont été relus identiques après publication. Worker 66cd4039-09b4-4a80-a46d-9091e3aa9e10 et GAS 49 publiés le 07/10/2026, même Web App (49 conserve aussi les quantités Discord entières). Contrôles réels D1/GAS avec Basic Auxiliary Socket à 0,0136 PED : calcul exécuté, puis refus volontaire grâce à une seconde ligne inexistante, avant toute écriture de demande ou notification Discord. Frontend poussé avec 1e225f8 puis complément ; compilation Pages réussie, déploiement en attente côté GitHub. Validation utilisateur en production attendue.
 
 ## Retour arrière ciblé
 
 Référence Git préalable : d9ef406. Rétablir uniquement les fichiers du lot T-027, en préservant tout changement ultérieur, puis republier le frontend GitHub Pages. Pour les backends : Worker bfd78af1-20f5-456a-9acc-dfaa803f5369 et Web App GAS version 47 (même déploiement). Rétablir aussi les sources HEAD GAS des deux modules, car les triggers utilisent HEAD.
 
 Aucune restauration de base ni de classeur. Les demandes enregistrées entre-temps doivent être conservées. Attention : revenir à l'ancien code réintroduit les arrondis unitaires lors de créations/modifications ; ne pas recalculer en masse les demandes pendant un retour arrière. Les formats visuels Sheets à deux décimales/variables peuvent rester sans risque, car ils ne changent aucune valeur.
-

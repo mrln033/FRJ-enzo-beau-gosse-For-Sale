@@ -748,7 +748,7 @@
   }
 
   function formatQuantity(value) {
-    return roundPed(value || 0).toLocaleString(language() === "FR" ? "fr-FR" : "en-GB", { maximumFractionDigits: 0 });
+    return Number(value || 0).toLocaleString(language() === "FR" ? "fr-FR" : "en-GB", { maximumFractionDigits: 0 });
   }
 
   function roundPed(value) {
