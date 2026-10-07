@@ -19,7 +19,7 @@ GAS utilise BigInt(...) plutôt que les littéraux BigInt, refusés par son anal
 
 ## Préservation de l'existant
 
-Aucune migration D1, aucune reconstruction des demandes anciennes, aucun recalcul automatique des commandes terminées, aucune republication en masse des messages Discord. Les montants et prix mémorisés restent conservés. Modifier explicitement une demande encore éditable suit son circuit normal ; une ancienne valeur unitaire déjà tronquée n'est pas remplacée silencieusement par celle du catalogue actuel.
+Aucune migration D1, aucune reconstruction des demandes anciennes, aucun recalcul automatique des commandes terminées, aucune republication en masse des messages Discord. Les montants et prix mémorisés restent conservés, y compris dans l'aperçu Admin à l'ouverture et après annulation d'une saisie locale. Modifier explicitement une demande encore éditable suit son circuit normal ; une ancienne valeur unitaire déjà tronquée n'est pas remplacée silencieusement par celle du catalogue actuel.
 
 Un ancien miroir Sheets dont seule la représentation MU_SAISI était arrondie à six décimales n'est pas interprété comme une édition automatique. Les conflits, confirmations client et verrouillages des demandes restent actifs.
 
@@ -27,9 +27,9 @@ Les inventaires MindArk (six colonnes, valeurs texte à quatre décimales et dat
 
 ## Contrôles et publication
 
-293 tests automatisés : précision, petites valeurs, scientifique, MU PED/%, Public/FRJ, promotions, saisie, miroir, conservation historique, non-régression. Test d'intégration SQLite/D1 : création à 0,024 × 2 100, édition Sheets à 2 101, maintien de 0,024 et total 50,42. Contrôle Chromium du catalogue, de la calculette et du panier : 50,40 PED, aucune erreur JavaScript.
+294 tests automatisés (dont affichage Admin des anciennes demandes, sans recalcul à l'ouverture) : précision, petites valeurs, scientifique, MU PED/%, Public/FRJ, promotions, saisie, miroir, conservation historique, non-régression. Test d'intégration SQLite/D1 : création à 0,024 × 2 100, édition Sheets à 2 101, maintien de 0,024 et total 50,42. Contrôle Chromium du catalogue, de la calculette et du panier : 50,40 PED, aucune erreur JavaScript.
 
-Sources GAS distantes comparées aux 17 fichiers de HEAD avant publication ; seuls PurchaseOrders et OrderEditing sont modifiés. Les 17 fichiers ont été relus identiques après publication. Worker 66cd4039-09b4-4a80-a46d-9091e3aa9e10 et GAS 49 publiés le 07/10/2026, même Web App (49 conserve aussi les quantités Discord entières). Contrôles réels D1/GAS avec Basic Auxiliary Socket à 0,0136 PED : calcul exécuté, puis refus volontaire grâce à une seconde ligne inexistante, avant toute écriture de demande ou notification Discord. Frontend poussé avec 1e225f8 puis complément ; compilation Pages réussie, déploiement en attente côté GitHub. Validation utilisateur en production attendue.
+Sources GAS distantes comparées aux 17 fichiers de HEAD avant publication ; seuls PurchaseOrders et OrderEditing sont modifiés. Les 17 fichiers ont été relus identiques après publication. Worker 66cd4039-09b4-4a80-a46d-9091e3aa9e10 et GAS 49 publiés le 07/10/2026, même Web App (49 conserve aussi les quantités Discord entières). Contrôles réels D1/GAS avec Basic Auxiliary Socket à 0,0136 PED : calcul exécuté, puis refus volontaire grâce à une seconde ligne inexistante, avant toute écriture de demande ou notification Discord. Frontend publié avec 1e225f8 puis 4d52730 et complément de préservation de l'affichage historique. GitHub Pages vérifié après son attente initiale. Contrôles Chromium en production avec D1 et GAS : prix 0,0136 visible dans catalogue/panier, aucune erreur JavaScript ; statistiques neutralisées. Validation utilisateur en production attendue.
 
 ## Retour arrière ciblé
 

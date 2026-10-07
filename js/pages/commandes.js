@@ -278,6 +278,7 @@
         option.selected = item.markupKind === value;
         kind.appendChild(option);
       });
+      kind.value = item.markupKind || "none";
       kind.disabled = !proposalEditable;
 
       const amount = document.createElement("input");
@@ -386,7 +387,16 @@
         || markupKind !== editor.item.markupKind
         || (markupKind !== "none" && markupAmount !== originalAmount)
       );
-      return { lineNo: editor.item.lineNo, quantity, markupKind, markupAmount, lineTt: valid ? ui.math.multiply(unitTt, quantity) : null, lineSale, valid, dirty };
+      // Une ancienne demande peut contenir un TT unitaire historiquement tronqué.
+      // Sans saisie, afficher ses montants mémorisés, même si un recalcul diffère.
+      const storedTt = editor.item.lineTtPed;
+      const storedSale = editor.item.lineSalePed;
+      return { lineNo: editor.item.lineNo, quantity, markupKind, markupAmount,
+        lineTt: !dirty && storedTt != null && Number.isFinite(Number(storedTt))
+          ? Number(storedTt) : valid ? ui.math.multiply(unitTt, quantity) : null,
+        lineSale: !dirty && storedSale != null && Number.isFinite(Number(storedSale))
+          ? Number(storedSale) : lineSale,
+        valid, dirty };
     };
 
     const recalculate = () => {
@@ -401,7 +411,10 @@
       const dirtyCount = values.filter((value) => value.dirty).length;
       const totalTtValue = valid ? ui.roundPed(ui.math.sum(values.map(value => value.lineTt))) : null;
       const totalValue = valid ? ui.roundPed(ui.math.sum(values.map(value => value.lineSale))) : null;
-      if (valid) renderTotals(totalTtValue, totalValue); else totalTt.textContent = totalMarkup.textContent = total.textContent = "—";
+      const storedTotals = dirtyCount === 0 && order.totalTtPed != null && order.totalSalePed != null;
+      if (storedTotals) renderTotals(order.totalTtPed, order.totalSalePed);
+      else if (valid) renderTotals(totalTtValue, totalValue);
+      else totalTt.textContent = totalMarkup.textContent = total.textContent = "—";
       if (proposalEditable) dirtyLabel.textContent = dirtyCount ? `${dirtyCount} ligne(s) modifiée(s)` : "";
       save.disabled = !proposalEditable || !valid || dirtyCount === 0;
       return values;

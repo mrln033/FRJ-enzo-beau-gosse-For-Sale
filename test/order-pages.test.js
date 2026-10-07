@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+
+
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
@@ -69,6 +71,33 @@ function createStorage(initial = {}) {
 async function settle() {
   await new Promise((resolve) => setImmediate(resolve));
 }
+
+test("T-027 la lecture d'une demande historique conserve ses totaux, même avec un prix unitaire tronqué", async () => {
+ for(const status of ["submitted","completed"]){
+  const ids=["ordersList","ordersSummary","ordersError","ordersFilters","refreshOrders"];
+  const elements=new Map(ids.map(id=>[id,new FakeElement(id)])),created=[];
+  const order={id:"123e4567-e89b-42d3-a456-426614174000",publicReference:"FRJ-20260820-ABC123",buyerAvatar:"Historical",
+   status,pricingStatus:status==="completed"?"confirmed":"estimated",totalTtPed:50.4,totalSalePed:50.4,
+   createdAt:"2026-08-20T10:00:00Z",updatedAt:"2026-08-20T10:00:00Z",
+   items:[{lineNo:1,itemName:"Cable",storage:"MATERIALS",aisle:"ROBOT",quantity:2100,unitTtPed:0.02,
+    markupKind:"percent",markupValue:1,lineTtPed:50.4,lineSalePed:50.4}]};
+  const before=JSON.stringify(order),requests=[];
+  const document={getElementById:id=>elements.get(id),createTextNode:value=>({textContent:String(value)}),
+   createElement:()=>{const el=new FakeElement();created.push(el);return el;}};
+  const window={FRJ_ADMIN:{require:()=>true},localStorage:createStorage(),FRJ_API:{
+   fetchD1Admin:async(path,options)=>{requests.push({path,options});return {json:async()=>({orders:[order],enabled:true,generatedAt:order.updatedAt})};}},alert:()=>{}};
+  const context=vm.createContext({window,document,console});
+  vm.runInContext(commonSource,context);vm.runInContext(adminSource,context);await settle();
+  const total=created.find(el=>el.className==="order-total");
+  assert.match(total.textContent,/50,40 PED/);
+  const quantity=created.find(el=>el.attributes.get("aria-label")==="Quantité Cable");
+  assert.equal(quantity.disabled,status==="completed");
+  if(status==="submitted"){quantity.value="2101";quantity.listeners.get("input")();assert.match(total.textContent,/42,02 PED/);
+   quantity.value="2100";quantity.listeners.get("input")();assert.match(total.textContent,/50,40 PED/);}
+  assert.equal(JSON.stringify(order),before);
+  assert.equal(requests.some(r=>r.options?.method==="POST"),false);
+ }
+});
 
 test("T-025 : bouton réservé au devis, confirmation, édition non enregistrée et alerte rouge persistante", async () => {
   const ids=["ordersList","ordersSummary","ordersError","ordersFilters","refreshOrders"];
