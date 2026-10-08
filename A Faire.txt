@@ -18,9 +18,9 @@ Convention d'identification à compter du 31/08/2026 :
 - les anciennes références d.N restent inchangées dans l'historique afin de préserver la trace des échanges passés.
 
 ----------------------------------------
-POINT DE REPRISE — 07/10/2026
+POINT DE REPRISE — 08/10/2026
 
-T-027 réalisée : précision des prix et MU, totaux à deux décimales, historique préservé. Worker et GAS 49 publiés ; frontend GitHub Pages publié, validation utilisateur en production attendue. Guide et retour : docs/PRECISION-PRIX.md. Prochain identifiant : T-028 ; d.4 reste en attente de cadrage.
+T-027 terminée et validée par l'utilisateur en production le 08/10/2026 : précision TT conservée, MU des cartes normaux/FRJ/promotions/soldes affichés avec exactement deux décimales et utilisés arrondis au verso ; historique préservé. Dernier correctif frontend publié : d7fd366. Worker et GAS 49 inchangés. Guide et retour : docs/PRECISION-PRIX.md. Prochain identifiant : T-028 ; d.4 reste en attente de cadrage.
 
 T-026 terminée et validée par l'utilisateur en production le 27/09/2026 pour les deux designs V19 et Ancien / Old : ordres propres, proportions conservées dans les cases historiques 60 × 60, compteurs distincts par catégorie et filtre actif. Backend Worker/GAS publiés ; derniers ajustements frontend publiés avec 699c0f4. Guide et retour ciblé : docs/INVENTAIRE-DESIGNS.md. Prochain identifiant : T-027 ; d.4 reste en attente de cadrage.
 
@@ -55,7 +55,8 @@ d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> a
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
 
-07/10/2026 — T-027 [CORRECTIF] [RÉALISÉE — VALIDATION PRODUCTION ATTENDUE] — Précision des prix.
+07/10/2026 — T-027 [CORRECTIF] [TERMINÉE — VALIDÉE EN PRODUCTION LE 08/10/2026] — Précision des prix.
+Validation finale utilisateur reçue le 08/10/2026 : « T-027 validé en production ». Toutes les attentes de validation des étapes historiques T-027 ci-dessous sont levées. Version finale frontend d7fd366 vérifiée en ligne ; 295 tests réussis. Clôture documentaire uniquement, sans modification applicative ; retour ciblé conservé.
 08/10/2026 — Clarification finale de l'affichage MU : exactement deux décimales obligatoires, zéros finaux inclus (1,00 / 1,10), pour MU normal, FRJ, promotion et solde. Remplace la consigne précédente « sans zéros finaux inutiles » pour les MU uniquement. Valeurs de calcul arrondies inchangées ; précision et affichage TT inchangés. Tests de non-régression complétés. Validation production toujours attendue.
 Correction après non-validation : conserver les prix unitaires TT précis et les totaux TT conformes ; rétablir les MU/MU FRJ des cartes à deux décimales maximum, arrondies et sans zéros finaux inutiles. La calculatrice du verso utilise exactement ce MU affiché, pour Public/FRJ, PED/% et promotions. Aucun changement des données ou backends. 295 tests réussis. Validation utilisateur toujours attendue. Retour ciblé possible en annulant uniquement ce correctif frontend (référence préalable fc78591), sans revenir sur la précision TT.
 Publication finale vérifiée : d5fc5a0, build Pages terminé ; huit fichiers frontend relus identiques. Contrôle Chromium du contrôleur Admin publié avec données simulées : montants historiques conservés à l'ouverture, demandes Terminées verrouillées. Worker et GAS 49 opérationnels ; aucune donnée métier créée par les contrôles. Validation utilisateur en production attendue.

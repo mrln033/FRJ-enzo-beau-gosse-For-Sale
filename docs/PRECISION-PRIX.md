@@ -1,6 +1,8 @@
 # Précision des prix — T-027
 
-## Règles (07/10/2026)
+T-027 terminée et validée par l'utilisateur en production le 08/10/2026. La validation clôt les attentes mentionnées dans l'historique de publication ci-dessous.
+
+## Règles (clarifiées le 08/10/2026)
 
 - Prix TT unitaires et prix de vente unitaires : conserver la précision numérique disponible ; au moins deux décimales à l'affichage, sans zéros inutiles au-delà. Exemple : 0,024 PED, 2,00 PED, 1,20 PED.
 - Règle clarifiée le 08/10 : sur les cartes, MU et MU FRJ en PED/% sont arrondis et affichés avec exactement deux décimales, zéros finaux inclus (1,00 ; 1,10), pour les MU normaux, promotions et soldes. Le verso calcule avec cette même valeur arrondie. La précision TT reste inchangée. Cette correction du catalogue ne modifie ni les MU enregistrés ni les règles des demandes d'achat.
@@ -27,6 +29,8 @@ Un ancien miroir Sheets dont seule la représentation MU_SAISI était arrondie �
 Les inventaires MindArk (six colonnes, valeurs texte à quatre décimales et date en B1), leurs imports et leurs formules externes ne changent pas. Aucun nouveau trigger, aucune Queue et aucun polling ajouté.
 
 ## Contrôles et publication
+
+Version finale frontend d7fd366 publiée et vérifiée sur GitHub Pages : MU normaux/FRJ/promotions/soldes avec exactement deux décimales ; précision TT et calculs inchangés par ce dernier ajustement. Suite complète : 295 tests réussis. Validation utilisateur reçue le 08/10/2026 ; clôture documentaire sans modification applicative ou des backends.
 
 294 tests automatisés (dont affichage Admin des anciennes demandes, sans recalcul à l'ouverture) : précision, petites valeurs, scientifique, MU PED/%, Public/FRJ, promotions, saisie, miroir, conservation historique, non-régression. Test d'intégration SQLite/D1 : création à 0,024 × 2 100, édition Sheets à 2 101, maintien de 0,024 et total 50,42. Contrôle Chromium du catalogue, de la calculette et du panier : 50,40 PED, aucune erreur JavaScript.
 
