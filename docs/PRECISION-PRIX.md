@@ -3,7 +3,7 @@
 ## Règles (07/10/2026)
 
 - Prix TT unitaires et prix de vente unitaires : conserver la précision numérique disponible ; au moins deux décimales à l'affichage, sans zéros inutiles au-delà. Exemple : 0,024 PED, 2,00 PED, 1,20 PED.
-- Correction après refus de validation du 07/10 : sur les cartes, MU et MU FRJ en PED/% sont arrondis à deux décimales maximum, sans zéros finaux inutiles. Le verso calcule avec cette même valeur arrondie, y compris après promotion. La précision TT reste inchangée. Cette correction du catalogue ne modifie ni les MU enregistrés ni les règles des demandes d'achat.
+- Règle clarifiée le 08/10 : sur les cartes, MU et MU FRJ en PED/% sont arrondis et affichés avec exactement deux décimales, zéros finaux inclus (1,00 ; 1,10), pour les MU normaux, promotions et soldes. Le verso calcule avec cette même valeur arrondie. La précision TT reste inchangée. Cette correction du catalogue ne modifie ni les MU enregistrés ni les règles des demandes d'achat.
 - Quantité entière ; saisie de MU en PED ou en pourcentage sans plafond arbitraire de deux ou six décimales. Les bornes métier et contrôles de nombres finis restent actifs.
 - Calculer quantité, profil et promotion sans arrondi monétaire intermédiaire. Conserver aussi les montants de ligne précis, puis arrondir le total de la demande à deux décimales.
 - Afficher les totaux TT, MU et vente à deux décimales (ligne, demande, suivi, Discord). La somme des lignes affichées peut donc différer d'un centime du total : celui-ci additionne les valeurs non arrondies.

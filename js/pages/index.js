@@ -657,7 +657,7 @@ function getMUColor(dateStr) {
 
 function formatMUValue(value) {
   // Le MU affiché est aussi la valeur utilisée par la calculatrice.
-  return String(window.FRJ_ORDER_UI.math.round(value, 2)).replace(".", ",");
+  return window.FRJ_ORDER_UI.math.round(value, 2).toFixed(2).replace(".", ",");
 }
 
 function getEffectiveMU(muStr) {
