@@ -125,8 +125,8 @@ document.addEventListener("DOMContentLoaded", () => {
 	};
 
   const V19_CATEGORY_ORDER = [
-    "MONEY AND DEEDS", "CLOTHES", "ARMORS", "WEAPONS", "TOOLS",
-    "MATERIALS", "RESOURCES", "BLUEPRINTS", "VEHICLES", "MISCELLANEOUS", "MINDFORCE"
+    "MONEY AND DEEDS", "CLOTHES", "ARMORS", "WEAPONS", "TOOLS", "MINDFORCE",
+    "MATERIALS", "RESOURCES", "BLUEPRINTS", "VEHICLES", "MISCELLANEOUS"
   ];
 
   async function loadCategorySummary() {
