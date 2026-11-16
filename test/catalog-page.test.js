@@ -316,7 +316,8 @@ test("T-026 : V19 par défaut, ordre propre et trois images de chaque design", a
   const { context } = loadCatalogController();
   assert.equal(vm.runInContext("inventoryDesign", context), "v19");
   const categories = vm.runInContext("V19_CATEGORY_ORDER", context);
-  assert.equal(categories.at(-1), "MINDFORCE");
+  assert.equal(categories[5], "MINDFORCE");
+  assert.equal(categories.at(-1), "MISCELLANEOUS");
   for (const design of ["v19", "old"]) {
     vm.runInContext('inventoryDesign = "' + design + '"', context);
     for (const category of categories) {

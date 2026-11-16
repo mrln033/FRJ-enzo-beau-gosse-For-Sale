@@ -18,7 +18,9 @@ Convention d'identification à compter du 31/08/2026 :
 - les anciennes références d.N restent inchangées dans l'historique afin de préserver la trace des échanges passés.
 
 ----------------------------------------
-POINT DE REPRISE — 08/10/2026
+POINT DE REPRISE — 16/11/2026
+
+T-028 terminée et validée par l'utilisateur le 16/11/2026 : ordre des catégories V19 aligné sur la numérotation des fichiers visuels V19_01 à V19_11. MINDFORCE est repositionné en 6ᵉ position (entre Tools et Materials), rétablissant un ordre identique entre les deux designs V19 et Ancien / Old. Documentation (docs/INVENTAIRE-DESIGNS.md) et tests automatisés (test/catalog-page.test.js) alignés ; 295 tests réussis. Prochain identifiant : T-029 ; d.4 reste en attente de cadrage.
 
 T-027 terminée et validée par l'utilisateur en production le 08/10/2026 : précision TT conservée, MU des cartes normaux/FRJ/promotions/soldes affichés avec exactement deux décimales et utilisés arrondis au verso ; historique préservé. Dernier correctif frontend publié : d7fd366. Worker et GAS 49 inchangés. Guide et retour : docs/PRECISION-PRIX.md. Prochain identifiant : T-028 ; d.4 reste en attente de cadrage.
 
@@ -46,7 +48,7 @@ T-017 terminée : liens courts des titres Discord publiés et anciens messages a
 -------------------------------
 DEMANDES  => CE QUI EST A FAIRE
 
->>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-028 <<<
+>>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-029 <<<
 
 
 [EN ATTENTE DE CADRAGE]
@@ -54,6 +56,13 @@ d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> a
 
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
+
+16/11/2026 — T-028 [CORRECTIF] [TERMINÉE — VALIDÉE LE 16/11/2026] — Ordre des icônes d'inventaire V19 (MINDFORCE en 6ᵉ position).
+Validation utilisateur reçue le 16/11/2026 suite à l'ajustement manuel dans js/pages/index.js : « effectivement, l'ordre des icones a changé, et j'ai appliqué ces changement manuellement : MINDFORCE est maintenant bien placé en 6ème position. »
+- Constat : V19_CATEGORY_ORDER dans js/pages/index.js place MINDFORCE en 6ᵉ position (entre TOOLS et MATERIALS), ce qui concorde avec la numérotation des visuels V19_06_Mindforce*.png et avec l'ordre de la vue Ancien.
+- Documentation mise à jour : docs/INVENTAIRE-DESIGNS.md reflète le nouvel ordre pour V19 (Money And Deeds, Clothes, Armors, Weapons, Tools, Mindforce, Materials, Resources, Blueprints, Vehicles, Miscellaneous).
+- Suite de tests : test/catalog-page.test.js mis à jour pour vérifier categories[5] === "MINDFORCE" et categories.at(-1) === "MISCELLANEOUS", ainsi que le chargement et les dimensions des 3 visuels V19 pour chaque catégorie.
+- 295 tests réussis avec succès (node --test).
 
 07/10/2026 — T-027 [CORRECTIF] [TERMINÉE — VALIDÉE EN PRODUCTION LE 08/10/2026] — Précision des prix.
 Validation finale utilisateur reçue le 08/10/2026 : « T-027 validé en production ». Toutes les attentes de validation des étapes historiques T-027 ci-dessous sont levées. Version finale frontend d7fd366 vérifiée en ligne ; 295 tests réussis. Clôture documentaire uniquement, sans modification applicative ; retour ciblé conservé.

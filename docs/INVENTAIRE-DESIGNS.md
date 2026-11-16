@@ -1,4 +1,6 @@
-# Inventaire : designs V19 et Ancien (T-026)
+# Inventaire : designs V19 et Ancien (T-026 / T-028)
+
+T-028 (16/11/2026) : alignement de l'ordre d'affichage V19 sur les visuels de boutons `V19_01` à `V19_11` ; `MINDFORCE` est positionné en 6ᵉ place (entre Tools et Materials), `MISCELLANEOUS` en 11ᵉ place. Suite de tests (295 tests) et documentation alignées.
 
 T-026 terminée : **les deux designs V19 et Ancien / Old ont été validés par l'utilisateur en production le 27/09/2026**, après publication des derniers alignements avec le commit `699c0f4`. Cette validation lève les attentes des publications intermédiaires ci-dessous. Les procédures de retour restent disponibles.
 
@@ -8,8 +10,8 @@ Depuis le 27/09/2026, **V19** est le choix par défaut. La petite liste sombre *
 
 Changer de design ne recharge pas les données, ne modifie pas l'URL, la catégorie, le rayon, le panier ou le profil et n'enregistre pas une nouvelle visite de catégorie.
 
-Chaque design possède son ordre :
-- V19 : Money And Deeds, Clothes, Armors, Weapons, Tools, Materials, Resources, Blueprints, Vehicles, Miscellaneous, Mindforce.
+Ordre d'affichage des catégories (identique entre V19 et Ancien, correspondant aux fichiers numérotés 01 à 11) :
+- V19 : Money And Deeds, Clothes, Armors, Weapons, Tools, Mindforce, Materials, Resources, Blueprints, Vehicles, Miscellaneous.
 - Ancien : Money And Deeds, Clothes, Armors, Weapons, Tools, Mindforce, Materials, Resources, Blueprints, Vehicles, Miscellaneous.
 
 Les catégories sans stock publiable restent masquées. Les noms internes STORAGE et les tris du catalogue ne changent pas. Les infobulles FR/EN utilisent `js/langues.js`, capitalisées en V19, en majuscules pour Ancien. Les trois états des images restent distincts ; la navigation est également accessible au clavier.
