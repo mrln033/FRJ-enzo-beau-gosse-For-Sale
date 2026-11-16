@@ -28,7 +28,8 @@ function loadCatalogController(search = "", storedDesign = null) {
   const document = {
     addEventListener: (type, listener) => documentListeners.set(type, listener),
     getElementById: (id) => id === "logoLink" ? logo : null,
-    querySelector: () => null
+    querySelector: () => null,
+    querySelectorAll: () => []
   };
   const window = {
     addEventListener: (type, listener) => windowListeners.set(type, listener),
@@ -296,7 +297,7 @@ test("le catalogue démarre avec les traductions et les catégories disponibles"
   documentListeners.get("DOMContentLoaded")();
   await new Promise((resolve) => setImmediate(resolve));
 
-  assert.deepEqual(apiCalls.sort(), ["?action=categorySummary", "?action=inventoryDate"]);
+  assert.deepEqual(apiCalls.sort(), ["?action=categorySummary&avatar=enzo", "?action=inventoryDate&avatar=enzo"]);
   assert.equal(getElement("rayonImages").children.length, 1);
   assert.equal(getElement("rayonFilter").listeners.has("change"), true);
   assert.equal(getElement("btnFR").listeners.has("click"), true);
@@ -416,5 +417,30 @@ test("T-026 : ancien backend sans synthèse conserve les onglets sans inventer d
   const result = await context.loadCategorySummary();
   assert.deepEqual(Array.from(result.categories), ["ARMORS"]);
   assert.deepEqual(Object.keys(result.counts), []);
-  assert.deepEqual(calls, ["?action=categorySummary", "?action=categories"]);
+  assert.deepEqual(calls, ["?action=categorySummary&avatar=enzo", "?action=categories&avatar=enzo"]);
+});
+
+test("T-029.1 : avatar par défaut enzo, support de nocturnal et mise à jour du whisper/titre", async () => {
+  const { context } = loadCatalogController();
+  context.FRJ_API = {
+    fetch: async (query) => ({
+      json: async () => query.includes("Summary") ? { categories: [], counts: {} } : { inventoryDate: "15/11/2026" }
+    })
+  };
+  assert.equal(vm.runInContext("activeAvatar", context), "enzo");
+  assert.equal(context.getActivePlayerName(), "enzo beau gosse");
+  assert.match(context.getActiveWhisperCommand(), /enzo beau gosse/);
+  assert.match(context.getActiveTitle(), /enzo beau gosse/);
+
+  // Bascule vers nocturnal
+  await context.switchAvatar("nocturnal");
+  assert.equal(vm.runInContext("activeAvatar", context), "nocturnal");
+  assert.equal(context.getActivePlayerName(), "Nocturnal enzo FRJ");
+  assert.match(context.getActiveWhisperCommand(), /Nocturnal enzo FRJ/);
+  assert.match(context.getActiveTitle(), /Nocturnal enzo FRJ/);
+
+  // Repli enzo sur avatar inconnu
+  await context.switchAvatar("inconnu");
+  assert.equal(vm.runInContext("activeAvatar", context), "enzo");
+  assert.equal(context.getActivePlayerName(), "enzo beau gosse");
 });

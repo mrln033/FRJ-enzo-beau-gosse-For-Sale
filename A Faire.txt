@@ -20,6 +20,8 @@ Convention d'identification à compter du 31/08/2026 :
 ----------------------------------------
 POINT DE REPRISE — 16/11/2026
 
+T-029.1 réalisée le 16/11/2026 : Multi-catalogue & Sélecteur d'Avatar (Enzo / Nocturnal). Le backend D1 prend en compte l'avatar pour les catégories, la synthèse, les stocks et la date d'inventaire, avec repli enzo sur avatar inconnu ; la table purchase_orders trace seller_avatar (migration 0027_seller_avatar.sql). Le frontend intègre un sélecteur d'avatar discret dans l'en-tête (#avatarSelect), synchronise le titre de la boutique, le bouton whisper in-game (/w) et le panier lors de la soumission de commande. Documentation complète dans docs/MULTI-AVATAR.md ; 298 tests automatisés réussis. Validation en production attendue (après déploiement Pages et Worker/D1), avant d'enchaîner sur T-029.2 (upload images via GitHub API) et T-029.3 (formulaire d'ajout d'articles en ligne). Prochain identifiant : T-029.2 ; d.4 reste en attente de cadrage.
+
 T-028 terminée et validée par l'utilisateur le 16/11/2026 : ordre des catégories V19 aligné sur la numérotation des fichiers visuels V19_01 à V19_11. MINDFORCE est repositionné en 6ᵉ position (entre Tools et Materials), rétablissant un ordre identique entre les deux designs V19 et Ancien / Old. Documentation (docs/INVENTAIRE-DESIGNS.md) et tests automatisés (test/catalog-page.test.js) alignés ; 295 tests réussis. Prochain identifiant : T-029 ; d.4 reste en attente de cadrage.
 
 T-027 terminée et validée par l'utilisateur en production le 08/10/2026 : précision TT conservée, MU des cartes normaux/FRJ/promotions/soldes affichés avec exactement deux décimales et utilisés arrondis au verso ; historique préservé. Dernier correctif frontend publié : d7fd366. Worker et GAS 49 inchangés. Guide et retour : docs/PRECISION-PRIX.md. Prochain identifiant : T-028 ; d.4 reste en attente de cadrage.
@@ -48,21 +50,41 @@ T-017 terminée : liens courts des titres Discord publiés et anciens messages a
 -------------------------------
 DEMANDES  => CE QUI EST A FAIRE
 
->>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-029 <<<
+>>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-030 <<<
 
-T-029  ==> Catalogue 
-	Actuellement, la mise à jour du catalogue et de son référentiel est 'semie-manuelle'...
-	Je m'explique : l'ajout au catalogue se fait manuellement sur la feuille GoogleSheet BDD_APP et est ensuite synchronisé vers D1... De même, l'ajout d'image est fait manuellement localement et pushé manuellement sur github.
-	Ce que je voudrais : pouvoir faire tout ça en ligne directement via le site créé. Celà passerais par un formulaire de saisie d'un nouvel article du catalogue, avec toutes ses infos, et l'envoi automatique de l'image associée.
-	Bien entendu, il faut conserver la co-existence des 2 systèmes GS et D1.
-	Prévoir également une gestion 'multi-inventaire'... En effet, Nocturnal enoz FRJ va prochainement être réactivé, et j'aimerais qu'il possède également son propre catalogue sur le même modèle et fonctionnement. Pourquoi pas une sélection via liste déroulante ?
-	Propose moi tes solutions envisagées. Dis -moi également i il est possible de stocker les image directement dans D1 et GS.
+T-029.2 [ÉVOLUTION] [À FAIRE] Téléversement et gestion des images via l'API GitHub.
+	Intégrer le téléversement direct des images d'articles du catalogue vers le dépôt GitHub via l'API GitHub (Option A gratuite et automatique retenue par l'utilisateur).
+
+T-029.3 [ÉVOLUTION] [À FAIRE] Formulaire d'administration en ligne pour ajouter de nouveaux articles.
+	Interface d'administration permettant de saisir un nouvel article avec ses métadonnées (nom, prix unitaire TT, stockage, rayon, wiki URL, etc.), d'associer son image téléversée, et de répercuter l'enregistrement dans Cloudflare D1 et Google Sheets (BDD_APP).
 
 [EN ATTENTE DE CADRAGE]
 d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> ajouter un bouton 'Supprimer' à chaque demande avec message de confirmation. Celà supprimerais l'enregistrement complet dans D1. Propagation Discord avec modification du statut en 'SUPPRIMEE' pour archivage.
 
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
+
+16/11/2026 — T-029.1 [ÉVOLUTION] [TERMINÉE — VALIDATION EN PRODUCTION ATTENDUE] — Multi-catalogue & Sélecteur d'Avatar (Enzo / Nocturnal).
+Cadrage validé par l'utilisateur le 16/11/2026 : catalogue commun dans un premier temps avec stocks distincts par avatar, sélecteur d'avatar discret dans le frontend, traçabilité de sellerAvatar dans les commandes et validation en production.
+- Backend Cloudflare D1 :
+  - Helper normalizeCatalogAvatar(requested) dans cloudflare/for-sale-api/src/application.js : valide contre AVATAR_SHEETS avec repli systématique sur "enzo".
+  - Routes publiques paramétrées avec avatar : categorySummary, categories, inventoryDate (?action=inventoryDate&avatar=...), et détail de catégorie (?category=...&avatar=...).
+  - Vérification de stock des commandes (readOrderCatalogRows) filtrée sur l'avatar du vendeur.
+  - Migration SQL 0027_seller_avatar.sql : ajout de la colonne seller_avatar TEXT NOT NULL DEFAULT 'enzo' sur purchase_orders.
+  - Normalisation de sellerAvatar dans normalizeOrderSubmission (orders.js) et stockage dans storePurchaseOrder.
+- Frontend :
+  - index.html : ajout du sélecteur <select id="avatarSelect"> dans #inventoryHeaderControls avec les options "enzo beau gosse" et "Nocturnal enzo FRJ".
+  - css/site.css : styles unifiés avec .inventory-avatar-control reprenant la charte graphique sombre et sobre du sélecteur Design.
+  - js/pages/index.js : persistance dans localStorage ("FRJ_ACTIVE_AVATAR"), synchronisation globale window.FRJ_ACTIVE_AVATAR, adaptation dynamique du titre de la boutique ([FRJ] - ... = A VENDRE / FOR SALE) et de la commande whisper in-game (/w ...). Bascule dynamique switchAvatar(newAvatar) avec réinitialisation et rechargement des catégories et de la date d'inventaire.
+  - js/cart.js : transmission automatique de sellerAvatar lors de la soumission de commande.
+  - js/langues.js : traductions FR/EN du label "Vendeur" / "Seller".
+- Tests automatisés :
+  - test/d1-public-catalog-optimization.test.js : couverture des routes D1 multi-avatar (synthèse nocturnal, stocks ciblés, date d'inventaire par avatar, repli enzo).
+  - test/catalog-page.test.js : couverture du contrôleur frontend, sélecteur d'avatar, mise à jour du whisper et du titre, bascule et repli.
+  - cloudflare/for-sale-api/test/orders.test.js : validation de la normalisation de sellerAvatar.
+  - cloudflare/for-sale-api/test/admin-orders.test.js : application de la migration 0027.
+- Documentation : création de docs/MULTI-AVATAR.md détaillant l'architecture, le frontend, le backend et la procédure de déploiement en production.
+- 298 tests réussis avec succès (node --test).
 
 16/11/2026 — T-028 [CORRECTIF] [TERMINÉE — VALIDÉE LE 16/11/2026] — Ordre des icônes d'inventaire V19 (MINDFORCE en 6ᵉ position).
 Validation utilisateur reçue le 16/11/2026 suite à l'ajustement manuel dans js/pages/index.js : « effectivement, l'ordre des icones a changé, et j'ai appliqué ces changement manuellement : MINDFORCE est maintenant bien placé en 6ème position. »

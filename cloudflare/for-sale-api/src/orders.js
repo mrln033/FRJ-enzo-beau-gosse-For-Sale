@@ -31,6 +31,7 @@ export function normalizeOrderSubmission(payload) {
   const publicReference = String(payload.publicReference || "").trim().toUpperCase();
   const accessToken = String(payload.accessToken || "").trim();
   const buyerAvatar = cleanText(payload.buyerAvatar, 80);
+  const sellerAvatar = cleanText(payload.sellerAvatar || payload.avatar, 30).toLowerCase() || "enzo";
   const buyerContact = cleanOptionalText(payload.buyerContact, 160);
   const buyerComment = cleanOptionalText(payload.buyerComment, 800);
   const language = String(payload.language || "EN").trim().toUpperCase() === "FR" ? "FR" : "EN";
@@ -72,6 +73,7 @@ export function normalizeOrderSubmission(payload) {
 
   return {
     id, publicReference, accessToken, buyerAvatar, buyerContact, buyerComment,
+    sellerAvatar,
     language, frjMember, clientCreatedAt, items
   };
 }

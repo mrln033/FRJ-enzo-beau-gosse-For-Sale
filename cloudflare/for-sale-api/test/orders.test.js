@@ -232,3 +232,11 @@ test("refuse une quantité décimale dans une proposition Admin", () => {
     markupKind: "none"
   }, 5), /entière/);
 });
+
+test("T-029.1 : normalise sellerAvatar dans les commandes publiques", () => {
+  assert.equal(normalizeOrderSubmission({ ...validPayload, sellerAvatar: "nocturnal" }).sellerAvatar, "nocturnal");
+  assert.equal(normalizeOrderSubmission({ ...validPayload, sellerAvatar: "NOCTURNAL" }).sellerAvatar, "nocturnal");
+  assert.equal(normalizeOrderSubmission({ ...validPayload, sellerAvatar: "  enzo  " }).sellerAvatar, "enzo");
+  assert.equal(normalizeOrderSubmission({ ...validPayload, sellerAvatar: "" }).sellerAvatar, "enzo");
+  assert.equal(normalizeOrderSubmission(validPayload).sellerAvatar, "enzo");
+});

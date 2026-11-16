@@ -439,6 +439,7 @@
       publicReference,
       accessToken: `${crypto.randomUUID()}-${crypto.randomUUID()}`,
       buyerAvatar: data.get("buyerAvatar"),
+      sellerAvatar: typeof global.FRJ_ACTIVE_AVATAR === "string" ? global.FRJ_ACTIVE_AVATAR : (global.localStorage?.getItem("FRJ_ACTIVE_AVATAR") || "enzo"),
       buyerContact: data.get("buyerContact"),
       buyerComment: data.get("buyerComment"),
       website: data.get("website"),

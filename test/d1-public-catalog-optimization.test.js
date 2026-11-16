@@ -118,7 +118,10 @@ test("T-026 : synthèse D1 distincte, conteneurs et visibilité, une seule lectu
   const env = { DB: { prepare(sql) {
     reads++;
     assert.match(sql, /^\s*SELECT/);
-    return { all: async () => ({ results: database.prepare(sql).all() }) };
+    return {
+      bind: (...args) => ({ all: async () => ({ results: database.prepare(sql).all(...args) }) }),
+      all: async () => ({ results: database.prepare(sql).all() })
+    };
   }}};
   const response = await handleGet(new URL("https://example.test/?action=categorySummary"), env);
   const result = await response.json();
@@ -217,5 +220,66 @@ test("d.6.3 conserve toutes les colonnes du détail d'une catégorie", () => {
   assert.deepEqual(optimized.map((row) => ({ item: row.ITEM, quantity: row.QUANTITE })), [
     { item: "Item A", quantity: 5 }
   ]);
+  database.close();
+});
+
+test("T-029.1 : D1 public supporte le paramètre avatar (nocturnal, enzo, repli par défaut)", async () => {
+  const database = createDatabase();
+  database.exec(`
+    INSERT INTO container_config VALUES ('nocturnal', 'carried', 1);
+    INSERT INTO inventory_current VALUES
+      ('nocturnal', 'n-1', 'Item C', 8, 'CARRIED');
+    CREATE TABLE IF NOT EXISTS sync_state (
+      dataset_key TEXT PRIMARY KEY,
+      source_updated_at TEXT NOT NULL
+    );
+    INSERT INTO sync_state VALUES
+      ('inventory:enzo', '2026-11-15T10:00:00Z'),
+      ('inventory:nocturnal', '2026-11-16T12:00:00Z');
+  `);
+
+  const env = { DB: { prepare(sql) {
+    return {
+      bind: (...args) => ({
+        all: async () => ({ results: database.prepare(sql).all(...args) }),
+        first: async () => database.prepare(sql).get(...args) || null
+      }),
+      all: async () => ({ results: database.prepare(sql).all() }),
+      first: async () => database.prepare(sql).get() || null
+    };
+  }}};
+
+  // 1. Synthèse nocturnal : Item C est dans WEAPONS, pas d'armure
+  const resNocturnal = await handleGet(new URL("https://example.test/?action=categorySummary&avatar=nocturnal"), env);
+  const dataNocturnal = await resNocturnal.json();
+  assert.equal(dataNocturnal.avatar, "nocturnal");
+  assert.equal(dataNocturnal.counts.WEAPONS, 1);
+  assert.equal(dataNocturnal.counts.ARMORS, undefined);
+  assert.deepEqual(dataNocturnal.categories, ["WEAPONS"]);
+
+  // 2. Synthèse enzo : Item A est dans ARMORS
+  const resEnzo = await handleGet(new URL("https://example.test/?action=categorySummary&avatar=enzo"), env);
+  const dataEnzo = await resEnzo.json();
+  assert.equal(dataEnzo.avatar, "enzo");
+  assert.equal(dataEnzo.counts.ARMORS, 1);
+  assert.equal(dataEnzo.counts.WEAPONS, 1);
+
+  // 3. Repli enzo sur avatar inconnu
+  const resUnknown = await handleGet(new URL("https://example.test/?action=categorySummary&avatar=inconnu"), env);
+  const dataUnknown = await resUnknown.json();
+  assert.equal(dataUnknown.avatar, "enzo");
+  assert.equal(dataUnknown.counts.ARMORS, 1);
+
+  // 4. Date d'inventaire nocturnal
+  const resDateNocturnal = await handleGet(new URL("https://example.test/?action=inventoryDate&avatar=nocturnal"), env);
+  const dateNocturnal = await resDateNocturnal.json();
+  assert.equal(dateNocturnal.avatar, "nocturnal");
+  assert.ok(dateNocturnal.inventoryDate.length > 0);
+
+  // 5. Date d'inventaire enzo
+  const resDateEnzo = await handleGet(new URL("https://example.test/?action=inventoryDate&avatar=enzo"), env);
+  const dateEnzo = await resDateEnzo.json();
+  assert.equal(dateEnzo.avatar, "enzo");
+
   database.close();
 });

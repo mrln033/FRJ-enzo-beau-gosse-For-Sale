@@ -9,6 +9,13 @@ document.addEventListener("DOMContentLoaded", () => {
   } else {
     window.addEventListener("resize", positionInventoryHeader);
   }
+  const avatarSelect = document.getElementById("avatarSelect");
+  if (avatarSelect) {
+    avatarSelect.value = activeAvatar;
+    avatarSelect.addEventListener("change", event => {
+      switchAvatar(event.target.value);
+    });
+  }
   document.getElementById("inventoryDesign").addEventListener("change", event => {
     inventoryDesign = event.target.value === "old" ? "old" : "v19";
     try { localStorage.setItem(INVENTORY_DESIGN_KEY, inventoryDesign); } catch {}
@@ -55,7 +62,51 @@ document.addEventListener("DOMContentLoaded", () => {
 	let lastRenderedItems = [];
 	let inventoryDate = "";
 	const FRJ_MEMBER_SESSION_KEY = "FRJ";
-	const PLAYER_NAME = "enzo beau gosse";
+	const AVATARS = {
+		enzo: {
+			id: "enzo",
+			name: "enzo beau gosse",
+			whisper: {
+				FR: "/w enzo beau gosse Msg depuis FRJ - For Sale",
+				EN: "/w enzo beau gosse PM from FRJ - For Sale"
+			}
+		},
+		nocturnal: {
+			id: "nocturnal",
+			name: "Nocturnal enzo FRJ",
+			whisper: {
+				FR: "/w Nocturnal enzo FRJ Msg depuis FRJ - For Sale",
+				EN: "/w Nocturnal enzo FRJ PM from FRJ - For Sale"
+			}
+		}
+	};
+	const ACTIVE_AVATAR_KEY = "FRJ_ACTIVE_AVATAR";
+	let activeAvatar = "enzo";
+	try {
+		const storedAvatar = (localStorage.getItem(ACTIVE_AVATAR_KEY) || "").toLowerCase().trim();
+		if (storedAvatar === "nocturnal") activeAvatar = "nocturnal";
+	} catch {}
+	window.FRJ_ACTIVE_AVATAR = activeAvatar;
+
+	function getActivePlayerName() {
+		return AVATARS[activeAvatar]?.name || "enzo beau gosse";
+	}
+
+	function getActiveLanguage() {
+		return typeof currentLang !== "undefined" && currentLang === "FR" ? "FR" : "EN";
+	}
+
+	function getActiveTitle() {
+		if (activeAvatar === "nocturnal") {
+			return getActiveLanguage() === "FR" ? "[FRJ] - Nocturnal enzo FRJ = A VENDRE" : "[FRJ] - Nocturnal enzo FRJ = FOR SALE";
+		}
+		return typeof t === "function" ? t("title") : "[FRJ] - enzo beau gosse = FOR SALE";
+	}
+
+	function getActiveWhisperCommand() {
+		const config = AVATARS[activeAvatar] || AVATARS.enzo;
+		return config.whisper[getActiveLanguage()];
+	}
 
   const INVENTORY_DESIGN_KEY = "FRJ_INVENTORY_DESIGN";
   let inventoryDesign = "v19";
@@ -131,7 +182,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function loadCategorySummary() {
     try {
-      const response = await FRJ_API.fetch("?action=categorySummary");
+      const response = await FRJ_API.fetch("?action=categorySummary&avatar=" + encodeURIComponent(activeAvatar));
       const summary = await response.json();
       if (!Array.isArray(summary.categories) || !summary.counts || typeof summary.counts !== "object") {
         throw new Error("Synthèse catalogue indisponible");
@@ -140,7 +191,7 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (error) {
       // Un ancien backend / retour arrière ne doit pas rendre le catalogue inutilisable.
       console.warn("Compteurs indisponibles, catégories seules.", error);
-      const response = await FRJ_API.fetch("?action=categories");
+      const response = await FRJ_API.fetch("?action=categories&avatar=" + encodeURIComponent(activeAvatar));
       return { categories: await response.json(), counts: {} };
     }
   }
@@ -183,6 +234,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function renderInventoryNavigation() {
     const container = document.getElementById("rayonImages");
+    if (!container) return;
     container.dataset.design = inventoryDesign;
     container.innerHTML = "";
     const order = inventoryDesign === "v19" ? V19_CATEGORY_ORDER : Object.keys(CATEGORY_IMAGES);
@@ -228,6 +280,12 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function updateInventoryLabels() {
+    const avatarSelect = document.getElementById("avatarSelect");
+    if (avatarSelect) {
+      avatarSelect.value = activeAvatar;
+      const avatarLabel = document.getElementById("avatarSelectLabel");
+      if (avatarLabel) avatarLabel.textContent = t("avatarLabel");
+    }
     const select = document.getElementById("inventoryDesign");
     select.value = inventoryDesign;
     document.getElementById("inventoryDesignLabel").textContent = t("inventoryDesign");
@@ -302,15 +360,53 @@ document.addEventListener("DOMContentLoaded", () => {
 	}
 	
 	
+	async function switchAvatar(newAvatar) {
+		const normalized = newAvatar === "nocturnal" ? "nocturnal" : "enzo";
+		if (normalized === activeAvatar) return;
+		activeAvatar = normalized;
+		try { localStorage.setItem(ACTIVE_AVATAR_KEY, activeAvatar); } catch {}
+		window.FRJ_ACTIVE_AVATAR = activeAvatar;
+		const title = document.getElementById("title");
+		if (title) title.innerText = getActiveTitle();
+		inventoryDate = "";
+		renderSubtitle();
+		selectedCategory = null;
+		loadedCategory = null;
+		categoryRequest++;
+		updateCategoryUrl("");
+		if (typeof resetCategories === "function") resetCategories();
+		if (typeof resetRayonFilter === "function") resetRayonFilter();
+		if (typeof updateFilterVisibility === "function") updateFilterVisibility();
+		if (typeof renderCards === "function") renderCards([]);
+		const loadingState = document.getElementById("loadingState");
+		if (loadingState) loadingState.style.display = "block";
+		isLoading = true;
+		try {
+			if (typeof loadCategorySummary === "function") {
+				const summary = await loadCategorySummary();
+				availableCategories = summary.categories || [];
+				categoryCounts = summary.counts || {};
+				if (typeof renderInventoryNavigation === "function") renderInventoryNavigation();
+			}
+		} catch (error) {
+			console.error("Erreur chargement synthèse avatar:", error);
+		} finally {
+			isLoading = false;
+			if (loadingState) loadingState.style.display = "none";
+		}
+		if (typeof loadInventoryDate === "function") loadInventoryDate();
+	}
+
 	// En-tête et préférences visibles du catalogue.
 	function renderSubtitle() {
 		const subtitle = document.getElementById("subtitle");
+		if (!subtitle) return;
 		subtitle.innerHTML = "";
 
 		const playerButton = document.createElement("button");
 		playerButton.type = "button";
 		playerButton.className = "copy-player-name";
-		playerButton.innerHTML = `${PLAYER_NAME} <span class="copy-player-icon" aria-hidden="true">⧉</span>`;
+		playerButton.innerHTML = `${getActivePlayerName()} <span class="copy-player-icon" aria-hidden="true">⧉</span>`;
 		playerButton.title = t("copyPlayerTooltip");
 		playerButton.setAttribute("aria-label", t("copyPlayerTooltip"));
 		playerButton.addEventListener("click", () => copyWhisperCommand(playerButton));
@@ -332,21 +428,22 @@ document.addEventListener("DOMContentLoaded", () => {
 			}, 1500);
 		};
 
+		const command = getActiveWhisperCommand();
 		if (navigator.clipboard && window.isSecureContext) {
-			navigator.clipboard.writeText(t("copyPlayerCommand")).then(markCopied).catch(() => {
-				copyWhisperCommandFallback();
+			navigator.clipboard.writeText(command).then(markCopied).catch(() => {
+				copyWhisperCommandFallback(command);
 				markCopied();
 			});
 			return;
 		}
 
-		copyWhisperCommandFallback();
+		copyWhisperCommandFallback(command);
 		markCopied();
 	}
 
-	function copyWhisperCommandFallback() {
+	function copyWhisperCommandFallback(command) {
 		const input = document.createElement("textarea");
-		input.value = t("copyPlayerCommand");
+		input.value = command || getActiveWhisperCommand();
 		input.setAttribute("readonly", "");
 		input.style.position = "fixed";
 		input.style.opacity = "0";
@@ -357,7 +454,8 @@ document.addEventListener("DOMContentLoaded", () => {
 	}
 
 	function loadInventoryDate() {
-		FRJ_API.fetch("?action=inventoryDate")
+		if (typeof FRJ_API === "undefined") return;
+		FRJ_API.fetch("?action=inventoryDate&avatar=" + encodeURIComponent(activeAvatar))
 			.then(res => res.json())
 			.then(response => {
 				inventoryDate = response.inventoryDate || "";
@@ -369,7 +467,7 @@ document.addEventListener("DOMContentLoaded", () => {
 	}
 
 	function applyTranslations() {
-		document.getElementById("title").innerText = t("title");
+		document.getElementById("title").innerText = getActiveTitle();
 		renderSubtitle();
 		document.getElementById("loadingState").innerText = t("loadingState");
 
@@ -443,7 +541,7 @@ function loadCategoryData(category) {
 
   renderCards([]);
 
-  FRJ_API.fetch("?category=" + encodeURIComponent(category))
+  FRJ_API.fetch("?category=" + encodeURIComponent(category) + "&avatar=" + encodeURIComponent(activeAvatar))
     .then(res => res.json())
     .then(response => {
       if (request !== categoryRequest || selectedCategory !== category) return;
@@ -520,8 +618,8 @@ function loadCategoryData(category) {
 
 	function resetRayonFilter() {
 		const select = document.getElementById('rayonFilter');
-
-		select.innerHTML = '<option value="">${t("selectCategory")}</option>';
+		if (!select) return;
+		select.innerHTML = '<option value="">' + (typeof t === "function" ? t("selectCategory") : "") + '</option>';
 		select.disabled = true;
 	}
 
@@ -749,6 +847,7 @@ function renderCatalogImage(container, item) {
 		const loadingState = document.getElementById('loadingState');
 
 		lastRenderedItems = items;
+		if (!container) return;
 		container.innerHTML = '';
 		
 		// Pendant le chargement, aucun état vide intermédiaire ne doit apparaître.
@@ -918,6 +1017,7 @@ function renderCatalogImage(container, item) {
 	  
 	function updateFilterVisibility() {
 		const filter = document.querySelector(".filter");
+		if (!filter) return;
 
 		if (selectedCategory) {
 			filter.style.display = "flex";

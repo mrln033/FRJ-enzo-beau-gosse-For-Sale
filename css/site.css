@@ -401,7 +401,8 @@ html[data-frj-backend="d1"] .backend-status-dot {
   display: none;
 }
 
-.inventory-design-control {
+.inventory-design-control,
+.inventory-avatar-control {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
@@ -411,7 +412,8 @@ html[data-frj-backend="d1"] .backend-status-dot {
   white-space: nowrap;
 }
 
-.inventory-design-control select {
+.inventory-design-control select,
+.inventory-avatar-control select {
   color-scheme: dark;
   font: inherit;
   color: #b4c1c8;
@@ -422,7 +424,8 @@ html[data-frj-backend="d1"] .backend-status-dot {
   padding: 0 3px;
 }
 
-.inventory-design-control select:focus-visible {
+.inventory-design-control select:focus-visible,
+.inventory-avatar-control select:focus-visible {
   outline: 1px solid #a6d889;
   outline-offset: 2px;
 }

@@ -83,6 +83,11 @@ import {
   timingSafeEqual
 } from "./http.js";
 
+export function normalizeCatalogAvatar(requested) {
+  const avatar = String(requested || "enzo").trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(AVATAR_SHEETS, avatar) ? avatar : "enzo";
+}
+
 export async function handleGet(url, env) {
   if (url.pathname === "/health") {
     const row = await env.DB.prepare(`
@@ -93,6 +98,7 @@ export async function handleGet(url, env) {
     return json({ ok: true, catalogItems: row?.items || 0, catalogListings: row?.listings || 0 });
   }
 
+  const avatar = normalizeCatalogAvatar(url.searchParams.get("avatar"));
   const action = url.searchParams.get("action");
 
   if (action === "features") {
@@ -102,28 +108,30 @@ export async function handleGet(url, env) {
   if (action === "categorySummary") {
     // Une seule lecture agrégée : un article présent dans plusieurs rayons
     // ne compte qu'une fois, les quantités et conteneurs suivent le catalogue.
-    const result = await env.DB.prepare(`
+    const stmt = env.DB.prepare(`
       SELECT l.storage, COUNT(DISTINCT l.item_name COLLATE NOCASE) AS item_count
       FROM catalog_listings l
       JOIN catalog_items c ON c.name = l.item_name COLLATE NOCASE
       WHERE l.enabled = 1 AND l.storage <> '' AND l.aisle <> ''
         AND EXISTS (
           SELECT 1 FROM saleable_inventory ii
-          WHERE ii.avatar_id = 'enzo'
+          WHERE ii.avatar_id = ?
             AND ii.item_name = l.item_name COLLATE NOCASE
           GROUP BY ii.item_name COLLATE NOCASE
           HAVING SUM(ii.quantity) > 0
         )
       GROUP BY l.storage ORDER BY l.storage
-    `).all();
+    `);
+    const result = await (typeof stmt.bind === "function" ? stmt.bind(avatar) : stmt).all();
     return publicJson({
+      avatar,
       categories: result.results.map(row => row.storage),
       counts: Object.fromEntries(result.results.map(row => [row.storage, row.item_count]))
     });
   }
 
   if (action === "categories") {
-    const result = await env.DB.prepare(`
+    const stmt = env.DB.prepare(`
       SELECT DISTINCT l.storage
       FROM catalog_listings l
       WHERE l.enabled = 1
@@ -132,23 +140,25 @@ export async function handleGet(url, env) {
         AND EXISTS (
           SELECT 1
           FROM saleable_inventory ii
-          WHERE ii.avatar_id = 'enzo'
+          WHERE ii.avatar_id = ?
             AND ii.item_name = l.item_name COLLATE NOCASE
           GROUP BY ii.item_name COLLATE NOCASE
           HAVING SUM(ii.quantity) > 0
         )
       ORDER BY l.storage
-    `).all();
+    `);
+    const result = await (typeof stmt.bind === "function" ? stmt.bind(avatar) : stmt).all();
     return publicJson(result.results.map((row) => row.storage));
   }
 
   if (action === "inventoryDate") {
-    const row = await env.DB.prepare(`
+    const stmt = env.DB.prepare(`
       SELECT source_updated_at AS imported_at
       FROM sync_state
-      WHERE dataset_key = 'inventory:enzo'
-    `).first();
-    return publicJson({ inventoryDate: row ? formatInventoryDate(row.imported_at) : "" });
+      WHERE dataset_key = ?
+    `);
+    const row = await (typeof stmt.bind === "function" ? stmt.bind(`inventory:${avatar}`) : stmt).first();
+    return publicJson({ avatar, inventoryDate: row ? formatInventoryDate(row.imported_at) : "" });
   }
 
   if (action === "inventoryTarget") {
@@ -160,7 +170,7 @@ export async function handleGet(url, env) {
   if (!category) return publicJson([]);
 
   const businessDate = businessDateInParis();
-  const result = await env.DB.prepare(`
+  const stmt = env.DB.prepare(`
     SELECT
       l.storage AS STORAGE,
       l.aisle AS RAYON,
@@ -180,7 +190,7 @@ export async function handleGet(url, env) {
     FROM catalog_listings l
     JOIN catalog_items c ON c.name = l.item_name COLLATE NOCASE
     JOIN saleable_inventory ii
-      ON ii.avatar_id = 'enzo'
+      ON ii.avatar_id = ?
      AND ii.item_name = c.name COLLATE NOCASE
     LEFT JOIN market_current mo
       ON mo.item_name = c.name COLLATE NOCASE
@@ -202,7 +212,8 @@ export async function handleGet(url, env) {
       p.discount_rate, p.campaign_type, p.id, p.starts_on, p.ends_on
     HAVING SUM(ii.quantity) > 0
     ORDER BY c.name COLLATE NOCASE
-  `).bind(businessDate, businessDate, category).all();
+  `);
+  const result = await (typeof stmt.bind === "function" ? stmt.bind(avatar, businessDate, businessDate, category) : stmt).all();
 
   const rows = result.results.map(({ DATE_MU_ISO, ...row }) => ({
     ...row,
@@ -2365,7 +2376,7 @@ export async function handlePublicOrderPost(request, env) {
     throw new ApiError(429, "Trop de demandes récentes. Réessaie dans un moment.");
   }
 
-  const catalogRows = await readOrderCatalogRows(env, submission.items);
+  const catalogRows = await readOrderCatalogRows(env, submission.items, submission.sellerAvatar || "enzo");
   const pricing = priceOrderLines(submission.items, catalogRows, { frjMember: submission.frjMember });
   if (pricing.discrepancies.length) {
     return json({
@@ -2380,6 +2391,7 @@ export async function handlePublicOrderPost(request, env) {
     accessTokenHash,
     status: "submitted",
     buyerAvatar: submission.buyerAvatar,
+    sellerAvatar: normalizeCatalogAvatar(submission.sellerAvatar || "enzo"),
     buyerContact: submission.buyerContact,
     buyerComment: submission.buyerComment,
     language: submission.language,
@@ -2401,10 +2413,11 @@ export async function handlePublicOrderPost(request, env) {
   }, 201);
 }
 
-async function readOrderCatalogRows(env, requestedItems) {
+async function readOrderCatalogRows(env, requestedItems, requestedAvatar = "enzo") {
+  const avatar = normalizeCatalogAvatar(requestedAvatar);
   const requestedJson = JSON.stringify(requestedItems);
   const businessDate = businessDateInParis();
-  const result = await env.DB.prepare(`
+  const stmt = env.DB.prepare(`
     WITH requested AS (
       SELECT
         json_extract(value, '$.itemName') AS item_name,
@@ -2414,7 +2427,7 @@ async function readOrderCatalogRows(env, requestedItems) {
     ), inventory AS (
       SELECT ii.item_name, SUM(ii.quantity) AS stock
       FROM saleable_inventory ii
-      WHERE ii.avatar_id = 'enzo'
+      WHERE ii.avatar_id = ?
       GROUP BY ii.item_name COLLATE NOCASE
     )
     SELECT
@@ -2443,7 +2456,8 @@ async function readOrderCatalogRows(env, requestedItems) {
       ON p.campaign_type = 'daily_promo' AND p.enabled = 1 AND p.starts_on = ?
      AND p.storage = l.storage AND p.aisle = l.aisle
     WHERE inventory.stock > 0
-  `).bind(requestedJson, businessDate, businessDate).all();
+  `);
+  const result = await (typeof stmt.bind === "function" ? stmt.bind(requestedJson, avatar, businessDate, businessDate) : stmt).all();
   return result.results.map((row) => ({
     itemName: row.item_name,
     storage: row.storage,
@@ -2462,14 +2476,14 @@ async function storePurchaseOrder(env, order, items, eventAction, syncedEvent = 
   const statements = [
     env.DB.prepare(`
       INSERT INTO purchase_orders (
-        id, public_reference, access_token_hash, status, buyer_avatar, buyer_contact,
+        id, public_reference, access_token_hash, status, buyer_avatar, seller_avatar, buyer_contact,
         buyer_comment, language, frj_member, source_backend, total_tt_ped,
         total_sale_ped, pricing_status, submitter_hash, client_created_at,
         discord_message_id, approval_required, proposal_version, admin_quote
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       order.id, order.publicReference, order.accessTokenHash, order.status || "submitted",
-      order.buyerAvatar, order.buyerContact || null, order.buyerComment || null,
+      order.buyerAvatar, order.sellerAvatar || "enzo", order.buyerContact || null, order.buyerComment || null,
       order.language || "EN", order.frjMember ? 1 : 0, order.sourceBackend || "d1",
       Number(order.totalTtPed || 0), Number(order.totalSalePed || 0),
       order.pricingStatus || "estimated", order.submitterHash || null, order.clientCreatedAt || null,
@@ -3313,6 +3327,7 @@ function mapPublicOrder(order, items) {
     approvalRequired,
     proposalVersion: Number(order.proposal_version ?? order.proposalVersion ?? 0),
     buyerAvatar: order.buyer_avatar || order.buyerAvatar,
+    sellerAvatar: order.seller_avatar || order.sellerAvatar || "enzo",
     language: order.language || "EN",
     frjMember: Number(order.frj_member ?? order.frjMember ?? 0) === 1 || order.frjMember === true,
     totalTtPed: Number(order.total_tt_ped ?? order.totalTtPed ?? 0),
