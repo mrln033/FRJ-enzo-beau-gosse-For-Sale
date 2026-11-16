@@ -50,6 +50,13 @@ DEMANDES  => CE QUI EST A FAIRE
 
 >>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-029 <<<
 
+T-029  ==> Catalogue 
+	Actuellement, la mise à jour du catalogue et de son référentiel est 'semie-manuelle'...
+	Je m'explique : l'ajout au catalogue se fait manuellement sur la feuille GoogleSheet BDD_APP et est ensuite synchronisé vers D1... De même, l'ajout d'image est fait manuellement localement et pushé manuellement sur github.
+	Ce que je voudrais : pouvoir faire tout ça en ligne directement via le site créé. Celà passerais par un formulaire de saisie d'un nouvel article du catalogue, avec toutes ses infos, et l'envoi automatique de l'image associée.
+	Bien entendu, il faut conserver la co-existence des 2 systèmes GS et D1.
+	Prévoir également une gestion 'multi-inventaire'... En effet, Nocturnal enoz FRJ va prochainement être réactivé, et j'aimerais qu'il possède également son propre catalogue sur le même modèle et fonctionnement. Pourquoi pas une sélection via liste déroulante ?
+	Propose moi tes solutions envisagées. Dis -moi également i il est possible de stocker les image directement dans D1 et GS.
 
 [EN ATTENTE DE CADRAGE]
 d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> ajouter un bouton 'Supprimer' à chaque demande avec message de confirmation. Celà supprimerais l'enregistrement complet dans D1. Propagation Discord avec modification du statut en 'SUPPRIMEE' pour archivage.
