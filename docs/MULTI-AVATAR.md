@@ -12,7 +12,7 @@ Avec la réactivation de l'avatar **Nocturnal enzo FRJ**, le système supporte d
 - Filtrage strict des stocks vendables par avatar (`avatar_id = 'enzo'` ou `'nocturnal'`).
 - Synthèses de catégories et compteurs distincts par avatar.
 - Dates de synchronisation d'inventaire distinctes (`inventory:enzo`, `inventory:nocturnal`).
-- Sélecteur d'avatar discret dans l'en-tête du catalogue (`#avatarSelect`).
+- Sélecteur d'avatar intégré à la phrase du titre du catalogue (`[FRJ] - <vendeur> = A VENDRE / FOR SALE`, `#avatarSelect`), en conservant la typographie du H1.
 - Commande whisper InGame adaptée dynamiquement à l'avatar sélectionné.
 - Traçabilité de l'avatar vendeur (`seller_avatar`) dans les commandes d'achat Cloudflare D1.
 
@@ -44,7 +44,7 @@ Dans `cloudflare/for-sale-api/src/application.js` :
 ## 3. Frontend (`index.html`, `site.css`, `index.js`, `cart.js`)
 
 ### Sélecteur dans l'interface
-- Placé dans `#inventoryHeaderControls`, symétrique au sélecteur de design V19 / Ancien.
+- Placé dans la phrase du titre, entre le préfixe `[FRJ] -` et le suffixe `= A VENDRE / FOR SALE` ; il reprend police, poids et taille du H1. Le sélecteur de design V19 / Ancien reste seul dans son bandeau historique.
 - Élément `<select id="avatarSelect">` avec options :
   - `enzo beau gosse` (`value="enzo"`)
   - `Nocturnal enzo FRJ` (`value="nocturnal"`)

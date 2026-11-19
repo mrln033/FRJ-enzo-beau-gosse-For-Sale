@@ -97,10 +97,25 @@ document.addEventListener("DOMContentLoaded", () => {
 	}
 
 	function getActiveTitle() {
-		if (activeAvatar === "nocturnal") {
-			return getActiveLanguage() === "FR" ? "[FRJ] - Nocturnal enzo FRJ = A VENDRE" : "[FRJ] - Nocturnal enzo FRJ = FOR SALE";
+		const prefix = typeof t === "function" ? t("titlePrefix") : "[FRJ] - ";
+		const suffix = typeof t === "function"
+			? t("titleSuffix")
+			: (getActiveLanguage() === "FR" ? " = A VENDRE" : " = FOR SALE");
+		return `${prefix}${getActivePlayerName()}${suffix}`;
+	}
+
+	function renderTitle() {
+		const prefix = document.getElementById("titlePrefix");
+		const suffix = document.getElementById("titleSuffix");
+		const avatarSelect = document.getElementById("avatarSelect");
+		if (prefix) prefix.textContent = typeof t === "function" ? t("titlePrefix") : "[FRJ] - ";
+		if (suffix) suffix.textContent = typeof t === "function"
+			? t("titleSuffix")
+			: (getActiveLanguage() === "FR" ? " = A VENDRE" : " = FOR SALE");
+		if (avatarSelect) {
+			avatarSelect.value = activeAvatar;
+			avatarSelect.setAttribute("aria-label", typeof t === "function" ? t("avatarLabel") : "Seller");
 		}
-		return typeof t === "function" ? t("title") : "[FRJ] - enzo beau gosse = FOR SALE";
 	}
 
 	function getActiveWhisperCommand() {
@@ -283,8 +298,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const avatarSelect = document.getElementById("avatarSelect");
     if (avatarSelect) {
       avatarSelect.value = activeAvatar;
-      const avatarLabel = document.getElementById("avatarSelectLabel");
-      if (avatarLabel) avatarLabel.textContent = t("avatarLabel");
     }
     const select = document.getElementById("inventoryDesign");
     select.value = inventoryDesign;
@@ -366,8 +379,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		activeAvatar = normalized;
 		try { localStorage.setItem(ACTIVE_AVATAR_KEY, activeAvatar); } catch {}
 		window.FRJ_ACTIVE_AVATAR = activeAvatar;
-		const title = document.getElementById("title");
-		if (title) title.innerText = getActiveTitle();
+		renderTitle();
 		inventoryDate = "";
 		renderSubtitle();
 		selectedCategory = null;
@@ -467,7 +479,7 @@ document.addEventListener("DOMContentLoaded", () => {
 	}
 
 	function applyTranslations() {
-		document.getElementById("title").innerText = getActiveTitle();
+		renderTitle();
 		renderSubtitle();
 		document.getElementById("loadingState").innerText = t("loadingState");
 

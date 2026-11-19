@@ -13,6 +13,31 @@ h1 {
   margin-bottom: 30px;
 }
 
+/* Le vendeur reste dans la phrase du titre : même police et même taille,
+   avec une flèche native pour signaler clairement le changement possible. */
+.catalog-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.2em;
+}
+
+.catalog-title select {
+  color: inherit;
+  background: transparent;
+  border: 0;
+  padding: 0 0.15em;
+  font: inherit;
+  font-weight: inherit;
+  cursor: pointer;
+}
+
+.catalog-title select:focus-visible {
+  outline: 2px solid #1f5fbf;
+  outline-offset: 2px;
+}
+
 #subtitle {
   line-height: 1.5;
 }
@@ -401,8 +426,7 @@ html[data-frj-backend="d1"] .backend-status-dot {
   display: none;
 }
 
-.inventory-design-control,
-.inventory-avatar-control {
+.inventory-design-control {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
@@ -412,8 +436,7 @@ html[data-frj-backend="d1"] .backend-status-dot {
   white-space: nowrap;
 }
 
-.inventory-design-control select,
-.inventory-avatar-control select {
+.inventory-design-control select {
   color-scheme: dark;
   font: inherit;
   color: #b4c1c8;
@@ -424,8 +447,7 @@ html[data-frj-backend="d1"] .backend-status-dot {
   padding: 0 3px;
 }
 
-.inventory-design-control select:focus-visible,
-.inventory-avatar-control select:focus-visible {
+.inventory-design-control select:focus-visible {
   outline: 1px solid #a6d889;
   outline-offset: 2px;
 }

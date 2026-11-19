@@ -21,6 +21,7 @@ Convention d'identification à compter du 31/08/2026 :
 POINT DE REPRISE — 19/11/2026
 
 T-029.1 est techniquement publiée mais sa validation est suspendue : elle implémente les stocks par avatar, alors que le nouveau cadrage impose aussi des catalogues vendables distincts par avatar. Elle est consolidée et corrigée par T-030 puis T-031, avant toute validation fonctionnelle. Les écarts relevés (panier non isolé par vendeur, secours GAS/mirroir des commandes incomplets, vendeur non affiché dans Admin/Discord) sont consignés dans ces deux lots. Le déploiement actuel ne doit pas être étendu à d'autres vendeurs avant cette consolidation.
+Correctif visuel demandé le 19/11/2026 : le sélecteur de vendeur est déplacé dans la phrase du titre (« [FRJ] - <vendeur> = A VENDRE / FOR SALE »), avec la police et la taille du H1 existant. Aucun élargissement fonctionnel de T-029.1 ni des lots T-030 à T-037.
 
 Ordre de priorité : T-030 (modèle Référentiel / Catalogues vendeurs) → T-031 (parité D1/GAS, secours et synchronisations) → T-032 (gestionnaires / vendeurs) → cadrage T-033 (authentification Discord) → T-034 (menu Admin latéral et droits) → T-035, T-036 et T-037 (opérations par vendeur). T-029.2 puis T-029.3 ne reprendront qu'après T-030 et T-031 ; elles devront respecter les droits définis par T-032 à T-034. Prochain identifiant : T-038 ; d.4 reste en attente de cadrage.
 

@@ -3,7 +3,7 @@
   <head>
     <base target="_self">
 	<link rel="icon" href="./favicon.ico">
-	<link rel="stylesheet" href="./css/site.css?v=20260927-3">
+	<link rel="stylesheet" href="./css/site.css?v=20261119-1">
 	<link rel="stylesheet" href="./css/components/cart.css?v=20260820-1">
 	<script src="./js/admin-session.js?v=20260820-1"></script>
 	<script src="./js/langues.js?v=20260927-1"></script>
@@ -11,7 +11,7 @@
 <script src="./js/api-client.js?v=20260927-1"></script>
 	<script src="./js/common/order-ui.js?v=20261007-1"></script>
 	<script defer src="./js/visit-tracking.js?v=20260831-1"></script>
-	<script defer src="./js/pages/index.js?v=20261008-1"></script>
+	<script defer src="./js/pages/index.js?v=20261119-1"></script>
 	<script defer src="./js/cart.js?v=20261007-2"></script>
 	<script defer src="./js/admin-menu.js?v=20260830-1"></script>
 	<title>[FRJ] - enzo beau gosse : Item List</title>
@@ -49,7 +49,7 @@
 	<a href="https://www.frenchjumper.fr" target="_blank" id="logoLink">
 		<img src="./Logo FRJ.png" id="headerLogo" title="Frenchjumper">
 	</a>
-    <div align="center"><h1 id="title"></h1></div>
+    <h1 id="title" class="catalog-title"><span id="titlePrefix">[FRJ] - </span><select id="avatarSelect" aria-label="Seller"><option value="enzo" selected>enzo beau gosse</option><option value="nocturnal">Nocturnal enzo FRJ</option></select><span id="titleSuffix"> = FOR SALE</span></h1>
     <hr>
     <div align="center"><b><p id="subtitle">PM Offer InGame @ enzo beau gosse  |  -=> New Oxford Storage <=-</b></div>
     <hr>
@@ -58,13 +58,6 @@
 		<div id="inventoryHeaderLayout" class="rayon-header-container">
 			<div class="rayon-header-space" aria-hidden="true"></div>
 			<div id="inventoryHeaderControls" class="inventory-header-controls">
-			<div class="inventory-avatar-control">
-				<label id="avatarSelectLabel" for="avatarSelect">Vendeur</label>
-				<select id="avatarSelect">
-					<option value="enzo" selected>enzo beau gosse</option>
-					<option value="nocturnal">Nocturnal enzo FRJ</option>
-				</select>
-			</div>
 			<div id="storageHeaderWindow" class="rayon-header-window">
 				<img id="storageHeader" class="rayon-header" alt="">
 			</div>

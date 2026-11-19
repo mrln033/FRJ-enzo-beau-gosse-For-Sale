@@ -21,6 +21,15 @@ test("index.html charge le contrôleur avant le panier et sans gestionnaire inli
   assert.match(source, /FRJ_VISITS\?\.resetCategoryView\?\.\(\)/);
 });
 
+test("T-029.1 : le sélecteur vendeur est intégré au titre sans changer sa typographie", () => {
+  assert.match(html, /<h1 id="title" class="catalog-title">[\s\S]*?<span id="titlePrefix">\[FRJ\] - <\/span><select id="avatarSelect"/);
+  assert.doesNotMatch(html, /inventory-avatar-control/);
+  assert.match(source, /function renderTitle\(\)/);
+  assert.match(source, /avatarSelect\.setAttribute\("aria-label"/);
+  assert.match(languagesSource, /titlePrefix: "\[FRJ\] - "/);
+  assert.match(languagesSource, /titleSuffix: " = A VENDRE"/);
+});
+
 function loadCatalogController(search = "", storedDesign = null) {
   const documentListeners = new Map();
   const windowListeners = new Map();
