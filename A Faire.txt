@@ -18,9 +18,11 @@ Convention d'identification à compter du 31/08/2026 :
 - les anciennes références d.N restent inchangées dans l'historique afin de préserver la trace des échanges passés.
 
 ----------------------------------------
-POINT DE REPRISE — 16/11/2026
+POINT DE REPRISE — 19/11/2026
 
-T-029.1 réalisée le 16/11/2026 : Multi-catalogue & Sélecteur d'Avatar (Enzo / Nocturnal). Le backend D1 prend en compte l'avatar pour les catégories, la synthèse, les stocks et la date d'inventaire, avec repli enzo sur avatar inconnu ; la table purchase_orders trace seller_avatar (migration 0027_seller_avatar.sql). Le frontend intègre un sélecteur d'avatar discret dans l'en-tête (#avatarSelect), synchronise le titre de la boutique, le bouton whisper in-game (/w) et le panier lors de la soumission de commande. Documentation complète dans docs/MULTI-AVATAR.md ; 298 tests automatisés réussis. Validation en production attendue (après déploiement Pages et Worker/D1), avant d'enchaîner sur T-029.2 (upload images via GitHub API) et T-029.3 (formulaire d'ajout d'articles en ligne). Prochain identifiant : T-029.2 ; d.4 reste en attente de cadrage.
+T-029.1 est techniquement publiée mais sa validation est suspendue : elle implémente les stocks par avatar, alors que le nouveau cadrage impose aussi des catalogues vendables distincts par avatar. Elle est consolidée et corrigée par T-030 puis T-031, avant toute validation fonctionnelle. Les écarts relevés (panier non isolé par vendeur, secours GAS/mirroir des commandes incomplets, vendeur non affiché dans Admin/Discord) sont consignés dans ces deux lots. Le déploiement actuel ne doit pas être étendu à d'autres vendeurs avant cette consolidation.
+
+Ordre de priorité : T-030 (modèle Référentiel / Catalogues vendeurs) → T-031 (parité D1/GAS, secours et synchronisations) → T-032 (gestionnaires / vendeurs) → cadrage T-033 (authentification Discord) → T-034 (menu Admin latéral et droits) → T-035, T-036 et T-037 (opérations par vendeur). T-029.2 puis T-029.3 ne reprendront qu'après T-030 et T-031 ; elles devront respecter les droits définis par T-032 à T-034. Prochain identifiant : T-038 ; d.4 reste en attente de cadrage.
 
 T-028 terminée et validée par l'utilisateur le 16/11/2026 : ordre des catégories V19 aligné sur la numérotation des fichiers visuels V19_01 à V19_11. MINDFORCE est repositionné en 6ᵉ position (entre Tools et Materials), rétablissant un ordre identique entre les deux designs V19 et Ancien / Old. Documentation (docs/INVENTAIRE-DESIGNS.md) et tests automatisés (test/catalog-page.test.js) alignés ; 295 tests réussis. Prochain identifiant : T-029 ; d.4 reste en attente de cadrage.
 
@@ -50,13 +52,43 @@ T-017 terminée : liens courts des titres Discord publiés et anciens messages a
 -------------------------------
 DEMANDES  => CE QUI EST A FAIRE
 
->>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-030 <<<
+>>> PROCHAIN IDENTIFIANT À ATTRIBUER : T-038 <<<
+
+Priorité 1 — fondations métier et continuité de service :
+
+T-030 [ÉVOLUTION] [À FAIRE] Référentiel commun et catalogues vendables distincts par vendeur.
+	Remplacer le modèle transitoire « référentiel commun + stock par avatar » par le modèle cible : un référentiel d'articles unique (identité, nom, métadonnées, image, wiki, etc.) et un catalogue/listing explicitement rattaché à chaque vendeur. Un article peut donc exister dans le référentiel, être vendable par Enzo, mais absent du catalogue Nocturnal — indépendamment de son éventuel stock. Le catalogue public, les catégories, les filtres, les dates et le contrôle de commande devront toujours exiger à la fois l'appartenance au catalogue du vendeur et son stock vendable. Prévoir des migrations non destructives, la reprise explicite des listings Enzo existants, une liste dynamique de vendeurs extensible (sans options codées en dur) et l'isolation/confirmation du panier lors d'un changement de vendeur. Les liens et l'état local devront porter le vendeur choisi afin d'éviter toute ambiguïté.
+
+T-031 [ÉVOLUTION] [À FAIRE] Parité complète D1 ↔ GAS et synchronisation multi-vendeur.
+	Étendre le contrat précédent à Google Sheets / Apps Script : référentiel commun, catalogues par vendeur, inventaires, commandes, historique et traçabilité du vendeur. Les mêmes règles métier doivent s'appliquer en D1 et GAS, y compris pendant le secours GAS, les audits périodiques, les synchronisations bidirectionnelles et les réparations. Toute commande créée, reçue ou modifiée via D1 ou GAS doit conserver son vendeur ; le secours GAS ne devra jamais transformer silencieusement une vente Nocturnal en vente Enzo. Les tables COMMANDES_APP / COMMANDES_LIGNES, les exports D1→GAS, les retours GAS→D1, la Console Admin, le suivi client et les messages Discord devront afficher et préserver le vendeur. Ajouter les jeux de tests de parité, d'indisponibilité D1/GAS et de non-régression historique.
+
+T-032 [ÉVOLUTION] [À FAIRE] Modèle de gestionnaires et affectation des vendeurs.
+	Créer le modèle de données et l'interface de gestion permettant de définir quels gestionnaires pilotent quels vendeurs. Prévoir un gestionnaire pouvant piloter plusieurs vendeurs, un vendeur pouvant éventuellement avoir plusieurs gestionnaires, les droits généraux communs, l'activation/désactivation et un compte propriétaire de secours. Ce modèle doit être exploitable par D1 et GAS, synchronisé et audité comme les autres données de configuration. Il constituera la source de vérité des autorisations de T-033 à T-037 ; il ne doit pas reposer sur les noms d'avatars visibles dans le navigateur.
+
+Priorité 2 — authentification et cadre Admin :
+
+T-033 [ÉVOLUTION] [EN ATTENTE DE CADRAGE] Authentification Discord et résolution des rôles de gestionnaire.
+	Remplacer l'accès Admin discret/jeton côté navigateur par une authentification Discord sécurisée. Après connexion OAuth Discord, récupérer l'identité et les rôles Discord puis les rapprocher de la table Gestionnaires / Vendeurs de T-032 afin de n'afficher et n'autoriser que les vendeurs et actions correspondants. À cadrer avant développement : serveur/guilde de référence, rôles donnant accès, droits du propriétaire de secours, URL de retour, durée et révocation de session, confidentialité des données Discord, comportement hors ligne et coexistence/transfert du jeton Admin actuel. Aucun rôle Discord ne devra être considéré comme un droit sans vérification serveur.
+
+T-034 [ÉVOLUTION] [À FAIRE — DÉPEND DE T-032 ET T-033] Menu Admin latéral et droits par gestionnaire.
+	Créer, une fois connecté, un menu Admin latéral persistant et responsive. Il présentera les actions autorisées pour chaque vendeur piloté : import/ajout d'inventaire, sélection des articles du catalogue, gestion des paniers et demandes du vendeur, etc. Les fonctions de référentiel commun et de gestion des MU resteront des actions générales accessibles à tous les gestionnaires autorisés. Les routes D1, les éventuelles routes GAS et l'interface devront appliquer les mêmes droits côté serveur : masquer un menu ne constitue jamais une autorisation.
+
+Priorité 3 — opérations vendeurs, après fondations et droits :
+
+T-035 [ÉVOLUTION] [À FAIRE — DÉPEND DE T-030 À T-034] Gestion d'inventaire par vendeur.
+	Adapter l'ajout/import, l'affichage, les contrôles et l'audit d'inventaire à un vendeur explicitement sélectionné et autorisé. Garantir le même comportement D1 et GAS, y compris lors d'un secours ou d'une synchronisation différée.
+
+T-036 [ÉVOLUTION] [À FAIRE — DÉPEND DE T-030 À T-034] Sélection et administration du catalogue par vendeur.
+	Fournir l'interface permettant à un gestionnaire autorisé d'ajouter, retirer, activer ou désactiver les articles de son catalogue vendeur à partir du référentiel commun, sans modifier les catalogues des autres vendeurs. Les modifications devront être synchronisées, auditées et immédiatement prises en compte par la boutique publique.
+
+T-037 [ÉVOLUTION] [À FAIRE — DÉPEND DE T-030 À T-034] Gestion des paniers, demandes, devis et Discord par vendeur.
+	Finaliser l'isolation des paniers et le cycle des demandes/devis par vendeur : choix verrouillé ou panier séparé, stock du bon vendeur, traçabilité visible dans Admin, Sheets, suivi et Discord, et actions limitées aux gestionnaires affectés. Couvrir les demandes historiques Enzo, les annulations, duplications, devis Admin et le secours GAS.
 
 T-029.2 [ÉVOLUTION] [À FAIRE] Téléversement et gestion des images via l'API GitHub.
-	Intégrer le téléversement direct des images d'articles du catalogue vers le dépôt GitHub via l'API GitHub (Option A gratuite et automatique retenue par l'utilisateur).
+	Intégrer le téléversement direct des images d'articles du catalogue vers le dépôt GitHub via l'API GitHub (Option A gratuite et automatique retenue par l'utilisateur). À reprendre après T-030/T-031 ; son autorisation devra respecter T-032 à T-034 et l'image restera une propriété du référentiel commun, pas d'un catalogue vendeur.
 
 T-029.3 [ÉVOLUTION] [À FAIRE] Formulaire d'administration en ligne pour ajouter de nouveaux articles.
-	Interface d'administration permettant de saisir un nouvel article avec ses métadonnées (nom, prix unitaire TT, stockage, rayon, wiki URL, etc.), d'associer son image téléversée, et de répercuter l'enregistrement dans Cloudflare D1 et Google Sheets (BDD_APP).
+	Interface d'administration permettant de saisir un nouvel article dans le référentiel commun avec ses métadonnées (nom, prix unitaire TT, stockage, rayon, wiki URL, etc.), d'associer son image téléversée, puis de choisir explicitement les catalogues vendeurs concernés. Répercuter l'enregistrement dans Cloudflare D1 et Google Sheets (BDD_APP) selon le contrat T-030/T-031, avec les autorisations T-032 à T-034.
 
 [EN ATTENTE DE CADRAGE]
 d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> ajouter un bouton 'Supprimer' à chaque demande avec message de confirmation. Celà supprimerais l'enregistrement complet dans D1. Propagation Discord avec modification du statut en 'SUPPRIMEE' pour archivage.
@@ -64,7 +96,8 @@ d.4 [ANCIENNE RÉFÉRENCE] [EN ATTENTE] / Console Admin "Demandes d'Achat" ==> a
 ------------------------------------
 REALISATIONS ==> CE QUI A ETE FAIT :
 
-16/11/2026 — T-029.1 [ÉVOLUTION] [TERMINÉE — VALIDATION EN PRODUCTION ATTENDUE] — Multi-catalogue & Sélecteur d'Avatar (Enzo / Nocturnal).
+16/11/2026 — T-029.1 [ÉVOLUTION] [RÉALISÉE TECHNIQUEMENT — VALIDATION SUSPENDUE, À CONSOLIDER PAR T-030/T-031] — Multi-catalogue & Sélecteur d'Avatar (Enzo / Nocturnal).
+Revue du 19/11/2026 : le déploiement est constaté sur GitHub Pages et le Worker public ; la migration D1 0027 ne comporte aucune étape distante restante. Les tests locaux passent. Cependant, le modèle réalisé sépare uniquement les stocks, pas les catalogues vendables : il ne répond donc pas au nouveau besoin où un article du référentiel commun peut être vendu par Enzo et absent du catalogue Nocturnal. La validation est suspendue. Écarts à traiter avant reprise : panier commun pouvant changer de vendeur, secours GAS et miroir D1↔GAS ne propageant pas sellerAvatar, vendeur absent des écrans Admin/Discord/Sheets, demandes Admin implicitement Enzo, vendeur absent des liens partagés, et liste frontend limitée à deux vendeurs alors que le backend en reconnaît quatre. Ces éléments sont repris respectivement par T-030 à T-037 ; aucun développement supplémentaire de T-029.1 ne doit être engagé isolément.
 Cadrage validé par l'utilisateur le 16/11/2026 : catalogue commun dans un premier temps avec stocks distincts par avatar, sélecteur d'avatar discret dans le frontend, traçabilité de sellerAvatar dans les commandes et validation en production.
 - Backend Cloudflare D1 :
   - Helper normalizeCatalogAvatar(requested) dans cloudflare/for-sale-api/src/application.js : valide contre AVATAR_SHEETS avec repli systématique sur "enzo".
